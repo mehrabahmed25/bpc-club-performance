@@ -348,8 +348,29 @@ return {
     const members=await client.from("cobeg_members").select("id,name,active").order("name");
     state.members=members.data||[];
     $("memberList").innerHTML=state.members.map(m=>'<span class="member-chip">'+esc(m.name)+(m.active?'':' (inactive)')+'</span>').join("");
-    const ps=await client.from("players").select("id,display_name,active,created_at").order("created_at",{ascending:false}).limit(100);
-    $("playersBody").innerHTML=(ps.data||[]).map(p=>'<tr><td>'+esc(p.display_name)+'</td><td><span class="pill '+(p.active?'good':'bad')+'">'+(p.active?'Active':'Inactive')+'</span></td><td>'+prettyDate(p.created_at?.slice(0,10))+'</td></tr>').join("");
+    
+const ps = await client
+  .from("players")
+  .select("id,display_name,active,created_at")
+  .order("created_at", { ascending: false })
+  .limit(100);
+
+if (ps.error) {
+  status("adminStatus", ps.error.message, "error");
+  return;
+}
+
+$("playersBody").innerHTML = (ps.data || []).map(p =>
+  '<tr>' +
+    '<td>' + esc(p.display_name) + '</td>' +
+    '<td><span class="pill ' + (p.active ? 'good' : 'bad') + '">' +
+      (p.active ? 'Active' : 'Inactive') +
+    '</span></td>' +
+    '<td>' + prettyDate(p.created_at?.slice(0, 10)) + '</td>' +
+    '<td><button type="button" class="recovery-btn" data-recover="' +
+      esc(p.id) + '">Recover Account</button></td>' +
+  '</tr>'
+).join("");
   }
   async function reviewMatch(id,approve){
     if(!client||!state.isAdmin)return;
