@@ -275,20 +275,30 @@ async function loadHistory(){
       };
     }
 
-    const myGoals = m.opponent_goals;
-    const theirGoals = m.player_goals;
+    
+const myGoals = m.opponent_goals;
+const theirGoals = m.player_goals;
 
-    return {
-      ...m,
-      historyOpponent: submittedName,
-      historyPlayerGoals: myGoals,
-      historyOpponentGoals: theirGoals,
-      historyResult: myGoals > theirGoals
-        ? "WIN"
-        : myGoals < theirGoals
-          ? "LOSS"
-          : "DRAW"
-    };
+const historyResult = myGoals > theirGoals
+  ? "WIN"
+  : myGoals < theirGoals
+    ? "LOSS"
+    : "DRAW";
+
+const historyPoints = myGoals > theirGoals
+  ? 3
+  : myGoals === theirGoals
+    ? 1
+    : 0;
+
+return {
+  ...m,
+  historyOpponent: submittedName,
+  historyPlayerGoals: myGoals,
+  historyOpponentGoals: theirGoals,
+  historyResult,
+  historyPoints
+};
   });
 
   status("historyStatus",rows.length+" results in this view.");
