@@ -271,7 +271,7 @@ async function loadHistory(){
         historyOpponent: m.opponent_name,
         historyPlayerGoals: m.player_goals,
         historyOpponentGoals: m.opponent_goals,
-        historyResult: m.result
+        historyResult: m.result,
         historyPoints: m.points
       };
     }
