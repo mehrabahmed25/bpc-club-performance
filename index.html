@@ -84,8 +84,20 @@
       <form id="memberForm" class="inline-form panel"><input id="newMemberName" maxlength="100" required placeholder="New COBEG XI member name"><button class="primary" type="submit">Add member</button></form>
       <div id="memberList" class="member-list"></div>
       <div class="section-head compact"><h2>Player accounts</h2><p>Newly registered players appear here. You can activate/deactivate and assign admin role in the Supabase dashboard.</p></div>
-      <div class="table-wrap"><table><thead><tr><th>Player</th><th>Status</th><th>Created</th></tr></thead><tbody id="playersBody"></tbody></table></div>
-      <p class="small">To make another admin, use Supabase SQL Editor after they create an account: <code>update public.profiles set role='admin' where id='AUTH_USER_UUID';</code></p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th>Account Recovery</th>
+      </tr>
+    </thead>
+    <tbody id="playersBody"></tbody>
+  </table>
+</div>      <p class="small">To make another admin, use Supabase SQL Editor after they create an account: <code>update public.profiles set role='admin' where id='AUTH_USER_UUID';</code></p>
     </div>
   </section>
 
