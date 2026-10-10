@@ -202,19 +202,109 @@ async function loadMembers(){
   }
   function signed(n){return n>0?"+"+n:n;}
 
-  async function loadHistory(){
-    if(!client)return;
-    if(!state.session){$("historySignIn").classList.remove("hidden");$("historyContent").classList.add("hidden");return;}
-    $("historySignIn").classList.add("hidden");$("historyContent").classList.remove("hidden");
-    status("historyStatus","Loading your history…");
-    let q=client.from("matches").select("id,opponent_name,match_date,player_goals,opponent_goals,result,points,status,counted,exclusion_reason,submitted_at").order("match_date",{ascending:false}).order("submitted_at",{ascending:false}).limit(500);
-    const month=$("historyMonth").value;
-    if(month){const d1=month+"-01";const d=new Date(d1+"T12:00:00");d.setMonth(d.getMonth()+1);const d2=d.toISOString().slice(0,10);q=q.gte("match_date",d1).lt("match_date",d2);}
-    const {data,error}=await q;
-    if(error){status("historyStatus",error.message,"error");return;}
-    status("historyStatus",(data||[]).length+" results in this view.");
-    $("historyBody").innerHTML=(data||[]).length?(data||[]).map(m=>'<tr><td>'+prettyDate(m.match_date)+'</td><td>'+esc(m.opponent_name)+'</td><td><b>'+m.player_goals+' – '+m.opponent_goals+'</b></td><td>'+m.result+'</td><td>'+m.points+'</td><td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status)+'</span></td><td><span class="pill '+(m.counted?"good":"")+'">'+(m.counted?"Yes":"No")+'</span></td></tr>').join(""):'<tr><td colspan="7" class="empty">No match results found for this month.</td></tr>';
+  
+async function loadHistory(){
+  if(!client)return;
+
+  if(!state.session){
+    $("historySignIn").classList.remove("hidden");
+    $("historyContent").classList.add("hidden");
+    return;
   }
+
+  $("historySignIn").classList.add("hidden");
+  $("historyContent").classList.remove("hidden");
+  status("historyStatus","Loading your history…");
+
+  let q = client.from("matches")
+    .select("id,player_id,opponent_name,match_date,player_goals,opponent_goals,result,points,status,counted,exclusion_reason,submitted_at")
+    .order("match_date",{ascending:false})
+    .order("submitted_at",{ascending:false})
+    .limit(500);
+
+  const month = $("historyMonth").value;
+  if(month){
+    const d1 = month + "-01";
+    const d = new Date(d1 + "T12:00:00");
+    d.setMonth(d.getMonth()+1);
+    q = q.gte("match_date",d1).lt("match_date",d.toISOString().slice(0,10));
+  }
+
+  const {data,error} = await q;
+  if(error){
+    status("historyStatus",error.message,"error");
+    return;
+  }
+
+  const matches = data || [];
+  const playerIds = [...new Set(matches.map(m=>m.player_id))];
+  const playerNames = {};
+
+  if(playerIds.length){
+    const {data:players,error:playersError} = await client
+      .from("players")
+      .select("id,display_name")
+      .in("id",playerIds);
+
+    if(playersError){
+      status("historyStatus",playersError.message,"error");
+      return;
+    }
+
+    (players || []).forEach(p=>{
+      playerNames[p.id] = p.display_name;
+    });
+  }
+
+  const myName = (state.player?.display_name || state.profile?.display_name || "")
+    .trim().toLowerCase();
+
+  const rows = matches.map(m=>{
+    const submittedName = (playerNames[m.player_id] || "").trim();
+    const isOpponentView =
+      submittedName.toLowerCase() !== myName &&
+      m.opponent_name.trim().toLowerCase() === myName;
+
+    if(!isOpponentView){
+      return {
+        ...m,
+        historyOpponent: m.opponent_name,
+        historyPlayerGoals: m.player_goals,
+        historyOpponentGoals: m.opponent_goals,
+        historyResult: m.result
+      };
+    }
+
+    const myGoals = m.opponent_goals;
+    const theirGoals = m.player_goals;
+
+    return {
+      ...m,
+      historyOpponent: submittedName,
+      historyPlayerGoals: myGoals,
+      historyOpponentGoals: theirGoals,
+      historyResult: myGoals > theirGoals
+        ? "WIN"
+        : myGoals < theirGoals
+          ? "LOSS"
+          : "DRAW"
+    };
+  });
+
+  status("historyStatus",rows.length+" results in this view.");
+
+  $("historyBody").innerHTML = rows.length
+    ? rows.map(m=>
+      '<tr><td>'+prettyDate(m.match_date)+'</td>'+
+      '<td>'+esc(m.historyOpponent)+'</td>'+
+      '<td><b>'+m.historyPlayerGoals+' – '+m.historyOpponentGoals+'</b></td>'+
+      '<td>'+esc(m.historyResult)+'</td>'+
+      '<td>'+m.points+'</td>'+
+      '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status)+'</span></td>'+
+      '<td><span class="pill '+(m.counted?"good":"")+'">'+(m.counted?"Yes":"No")+'</span></td></tr>'
+    ).join("")
+    : '<tr><td colspan="7" class="empty">No match results found for this month.</td></tr>';
+}
   async function loadProfile(){
     if(!client||!state.session){showView("account");return;}
     $("profileHeading").textContent=(state.player?.display_name||"My")+" dashboard";
