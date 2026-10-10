@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101d35">
+<title>BPC Club Performance</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#" data-view="home"><span class="brand-mark">BPC</span><span><b>Club Performance</b><small>Official match tracker</small></span></a>
+  <button id="menuBtn" class="mobile-menu" aria-label="Open menu">☰</button>
+  <nav id="nav">
+    <button data-view="home" class="navlink active">Leaderboard</button>
+    <button data-view="history" class="navlink">Match history</button>
+    <button data-view="submit" class="navlink auth-only hidden">Submit result</button>
+    <button data-view="admin" class="navlink admin-only hidden">Admin</button>
+    <button data-view="account" class="navlink" id="accountNav">Sign in</button>
+  </nav>
+</header>
+<main>
+  <section id="view-home" class="view">
+    <div class="hero">
+      <div><p class="eyebrow">BPC SEASON · MONTHLY RANKINGS</p><h1>Every match counts.<br><span>Every point matters.</span></h1><p class="hero-sub">Follow the leaderboard, compare performance, and track the road to monthly awards.</p></div>
+      <div class="hero-stat"><span class="trophy">🏆</span><b id="leaderboardMonthLabel">Monthly leaderboard</b><small>Updated from approved results</small></div>
+    </div>
+    <div class="toolbar"><div><label for="monthPicker">Competition month</label><input id="monthPicker" type="month"></div><button class="secondary" id="refreshLeaderboard">↻ Refresh</button></div>
+    <div id="leaderboardStatus" class="status"></div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Player</th><th>MP</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th>COBEG XI</th><th>Award</th></tr></thead><tbody id="leaderboardBody"><tr><td colspan="12" class="empty">Loading leaderboard…</td></tr></tbody></table></div>
+    <p class="table-note">MP = counted matches · GF/GA = goals for/against · GD = goal difference. Pending or rejected results do not affect rankings.</p>
+  </section>
+
+  <section id="view-account" class="view hidden">
+    <div class="section-head"><p class="eyebrow">MEMBER ACCESS</p><h2 id="authTitle">Welcome back</h2><p>Sign in to submit results and view your personal match records.</p></div>
+    <div class="auth-grid">
+      <form id="authForm" class="panel">
+        <label id="displayNameLabel" class="hidden">Display name<input id="displayName" autocomplete="name" placeholder="Your name"></label>
+        <label>Email address<input id="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
+        <button id="authSubmit" class="primary" type="submit">Sign in</button>
+        <button id="toggleAuth" class="text-button" type="button">Need an account? Create one</button>
+        <div id="authMessage" class="status"></div>
+      </form>
+      <aside class="panel soft"><h3>Member account</h3><p>Use one account per player. Your match submissions are linked to your account and remain pending until an admin approves them.</p><p>Already registered? Sign in with the same email and password.</p></aside>
+    </div>
+  </section>
+
+  <section id="view-submit" class="view hidden">
+    <div class="section-head"><p class="eyebrow">MATCH CENTRE</p><h2>Submit a result</h2><p>Enter the final score exactly as played. An admin will review the submission.</p></div>
+    <div class="form-grid">
+      <form id="matchForm" class="panel">
+        <label>Opponent type<select id="opponentType"><option value="cobeg">COBEG XI member</option><option value="other">Other opponent</option></select></label>
+        <label id="cobegOpponentLabel">COBEG XI opponent<select id="cobegOpponent" required><option value="">Loading members…</option></select></label>
+        <label id="otherOpponentLabel" class="hidden">Opponent name<input id="otherOpponent" maxlength="100" placeholder="Enter opponent or team name"></label>
+        <label>Match date<input id="matchDate" type="date" required></label>
+        <div class="score-grid"><label>Your goals<input id="playerGoals" type="number" min="0" max="99" step="1" required></label><span class="vs">VS</span><label>Opponent goals<input id="opponentGoals" type="number" min="0" max="99" step="1" required></label></div>
+        <label>Notes (optional)<textarea id="matchNotes" maxlength="500" rows="3" placeholder="Any useful context"></textarea></label>
+        <button class="primary" type="submit" id="matchSubmit">Submit result</button><div id="matchMessage" class="status"></div>
+      </form>
+      <aside class="panel soft"><h3>Monthly rules</h3><ul><li>Maximum 80 counted matches per month.</li><li>Maximum 5 counted matches against the same opponent per month.</li><li>At least 40 counted matches for award eligibility.</li><li>At least 5 different COBEG XI opponents, within the 80-match limit.</li></ul><p class="small">Submitting a result does not count it automatically. It must be approved.</p></aside>
+    </div>
+  </section>
+
+  <section id="view-history" class="view hidden">
+    <div class="section-head"><p class="eyebrow">MATCH RECORDS</p><h2>Match history</h2><p id="historyIntro">Browse approved match results. Sign in to see your own complete history.</p></div>
+    <div id="historySignIn" class="panel soft"><p>Sign in to view your personal match history, including pending submissions.</p><button class="primary" data-view="account">Sign in</button></div>
+    <div id="historyContent" class="hidden">
+      <div class="toolbar"><div><label for="historyMonth">Filter by month</label><input id="historyMonth" type="month"></div><button class="secondary" id="refreshHistory">↻ Refresh</button></div>
+      <div id="historyStatus" class="status"></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Opponent</th><th>Score</th><th>Result</th><th>Pts</th><th>Status</th><th>Counted</th></tr></thead><tbody id="historyBody"><tr><td colspan="7" class="empty">Sign in to load your history.</td></tr></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="view-admin" class="view hidden">
+    <div class="section-head"><p class="eyebrow">ADMIN CONSOLE</p><h2>Review submissions</h2><p>Approve valid results or reject submissions that need correction.</p></div>
+    <div id="adminDenied" class="panel soft">This section is only available to administrators.</div>
+    <div id="adminContent" class="hidden">
+      <div class="toolbar"><button class="secondary" id="refreshPending">↻ Refresh pending</button><span id="pendingCount" class="pill">0 pending</span></div>
+      <div id="adminStatus" class="status"></div>
+      <div id="pendingList" class="pending-list"></div>
+      <div class="section-head compact"><h2>Manage COBEG XI members</h2><p>Add members who count toward the award requirement.</p></div>
+      <form id="memberForm" class="inline-form panel"><input id="newMemberName" maxlength="100" required placeholder="New COBEG XI member name"><button class="primary" type="submit">Add member</button></form>
+      <div id="memberList" class="member-list"></div>
+      <div class="section-head compact"><h2>Player accounts</h2><p>Newly registered players appear here. You can activate/deactivate and assign admin role in the Supabase dashboard.</p></div>
+      <div class="table-wrap"><table><thead><tr><th>Player</th><th>Status</th><th>Created</th></tr></thead><tbody id="playersBody"></tbody></table></div>
+      <p class="small">To make another admin, use Supabase SQL Editor after they create an account: <code>update public.profiles set role='admin' where id='AUTH_USER_UUID';</code></p>
+    </div>
+  </section>
+
+  <section id="view-profile" class="view hidden">
+    <div class="section-head"><p class="eyebrow">YOUR SEASON</p><h2 id="profileHeading">My dashboard</h2><p>Your counted results for the selected month.</p></div>
+    <div id="profileStats" class="stats-grid"></div>
+    <div class="panel soft"><h3>Monthly award eligibility</h3><p id="eligibilityText">Sign in to view your eligibility.</p><button class="primary" data-view="submit">Submit a match</button></div>
+  </section>
+
+  <footer class="footer"><span>BPC Club Performance</span><span>Results count after admin approval.</span></footer>
+</main>
+<div id="toast" class="toast" role="status"></div>
+<script src="app.js"></script>
+</body></html>
