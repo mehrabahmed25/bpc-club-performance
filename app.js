@@ -272,6 +272,7 @@ async function loadHistory(){
         historyPlayerGoals: m.player_goals,
         historyOpponentGoals: m.opponent_goals,
         historyResult: m.result
+        historyPoints: m.points
       };
     }
 
@@ -309,7 +310,7 @@ return {
       '<td>'+esc(m.historyOpponent)+'</td>'+
       '<td><b>'+m.historyPlayerGoals+' – '+m.historyOpponentGoals+'</b></td>'+
       '<td>'+esc(m.historyResult)+'</td>'+
-      '<td>'+m.points+'</td>'+
+      '<td>'+(m.historyPoints ?? m.points)+'</td>'+
       '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status)+'</span></td>'+
       '<td><span class="pill '+(m.counted?"good":"")+'">'+(m.counted?"Yes":"No")+'</span></td></tr>'
     ).join("")
