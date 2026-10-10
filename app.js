@@ -4,7 +4,15 @@
     !cfg.SUPABASE_URL.includes("PASTE_") && !cfg.SUPABASE_ANON_KEY.includes("PASTE_");
   const client = configReady ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
   const $ = id => document.getElementById(id);
-  const state = { session:null, profile:null, player:null, isAdmin:false, signup:false, members:[] };
+  const state = {
+  session:null,
+  profile:null,
+  player:null,
+  isAdmin:false,
+  signup:false,
+  members:[],
+  registeredPlayers:[]
+};
   const monthNow = new Date().toISOString().slice(0,7);
   $("monthPicker").value = monthNow;
   $("historyMonth").value = monthNow;
@@ -95,14 +103,65 @@
     state.player=pl.data||null;state.isAdmin=state.profile.role==="admin";
     if(state.player&&!state.player.active)toast("Your player profile is inactive. Contact an admin.");
   }
-  async function loadMembers(){
-    if(!client)return;
-    const {data,error}=await client.from("cobeg_members").select("id,name,active").eq("active",true).order("name");
-    if(error){console.error(error);return;}
-    state.members=data||[];
-    const sel=$("cobegOpponent");sel.innerHTML='<option value="">Choose COBEG XI member</option>';
-    state.members.forEach(m=>{const o=document.createElement("option");o.value=m.id;o.textContent=m.name;sel.appendChild(o);});
+  
+async function loadMembers(){
+  if(!client)return;
+
+  const [membersResult, playersResult] = await Promise.all([
+    client.from("cobeg_members")
+      .select("id,name,active")
+      .eq("active",true)
+      .order("name"),
+
+    client.from("players")
+      .select("id,display_name,active")
+      .eq("active",true)
+      .order("display_name")
+  ]);
+
+  if(membersResult.error){
+    console.error("Could not load COBEG XI members:", membersResult.error);
+  } else {
+    state.members = membersResult.data || [];
   }
+
+  if(playersResult.error){
+    console.error("Could not load registered players:", playersResult.error);
+    toast("Could not load registered player suggestions.");
+    return;
+  }
+
+  state.registeredPlayers = playersResult.data || [];
+
+  const sel = $("cobegOpponent");
+  sel.innerHTML = '<option value="">Choose COBEG XI member</option>';
+
+  state.members.forEach(m => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = m.name;
+    sel.appendChild(o);
+  });
+
+  // Show registered player names as suggestions.
+  const input = $("otherOpponent");
+  let list = $("registeredOpponentSuggestions");
+
+  if(!list){
+    list = document.createElement("datalist");
+    list.id = "registeredOpponentSuggestions";
+    input.insertAdjacentElement("afterend", list);
+  }
+
+  input.setAttribute("list", list.id);
+  list.innerHTML = "";
+
+  state.registeredPlayers.forEach(p => {
+    const option = document.createElement("option");
+    option.value = p.display_name;
+    list.appendChild(option);
+  });
+}
   $("opponentType").addEventListener("change",()=>{
     const isCobeg=$("opponentType").value==="cobeg";
     $("cobegOpponentLabel").classList.toggle("hidden",!isCobeg);
