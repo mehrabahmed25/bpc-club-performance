@@ -104,64 +104,79 @@
     if(state.player&&!state.player.active)toast("Your player profile is inactive. Contact an admin.");
   }
   
-async function loadMembers(){
-  if(!client)return;
+
+async function loadMembers() {
+  if (!client) return;
 
   const [membersResult, playersResult] = await Promise.all([
-    client.from("cobeg_members")
+    client
+      .from("cobeg_members")
       .select("id,name,active")
-      .eq("active",true)
+      .eq("active", true)
       .order("name"),
 
-    client.from("players")
+    client
+      .from("players")
       .select("id,display_name,active")
-      .eq("active",true)
+      .eq("active", true)
       .order("display_name")
   ]);
 
-  if(membersResult.error){
+  if (membersResult.error) {
     console.error("Could not load COBEG XI members:", membersResult.error);
-  } else {
-    state.members = membersResult.data || [];
-  }
-
-  if(playersResult.error){
-    console.error("Could not load registered players:", playersResult.error);
-    toast("Could not load registered player suggestions.");
+    toast("Could not load COBEG XI members.");
     return;
   }
 
+  if (playersResult.error) {
+    console.error("Could not load registered players:", playersResult.error);
+    toast("Could not load registered players.");
+    return;
+  }
+
+  state.members = membersResult.data || [];
   state.registeredPlayers = playersResult.data || [];
-  console.log(
-  "Registered opponent names:",
-  state.registeredPlayers.map(p => p.display_name)
-);
 
-  const sel = $("cobegOpponent");
-  sel.innerHTML = '<option value="">Choose COBEG XI member</option>';
+  // Normalize names to avoid differences in capitalization or spaces.
+  const normalizeName = name =>
+    (name || "").trim().replace(/\s+/g, " ").toLowerCase();
 
-  state.members.forEach(m => {
-    const o = document.createElement("option");
-    o.value = m.id;
-    o.textContent = m.name;
-    sel.appendChild(o);
-  });
+  // Build a set of active COBEG XI member names.
+  const cobegNames = new Set(
+    state.members.map(m => normalizeName(m.name))
+  );
 
-  // Show registered player names as suggestions.
-  
-  
-  // Populate the native mobile dropdown with registered players.
-  const opponentSelect = $("otherOpponent");
+  // Fill the COBEG XI dropdown with COBEG XI members only.
+  const cobegSelect = $("cobegOpponent");
 
-  if (opponentSelect) {
-    opponentSelect.innerHTML =
+  if (cobegSelect) {
+    cobegSelect.innerHTML =
+      '<option value="">Choose COBEG XI member</option>';
+
+    state.members.forEach(member => {
+      const option = document.createElement("option");
+      option.value = member.id;
+      option.textContent = member.name;
+      cobegSelect.appendChild(option);
+    });
+  }
+
+  // Fill Other opponent with registered non-COBEG players only.
+  const otherSelect = $("otherOpponent");
+
+  if (otherSelect) {
+    otherSelect.innerHTML =
       '<option value="">Choose registered player</option>';
 
-    state.registeredPlayers.forEach(p => {
+    const nonCobegPlayers = state.registeredPlayers.filter(player =>
+      !cobegNames.has(normalizeName(player.display_name))
+    );
+
+    nonCobegPlayers.forEach(player => {
       const option = document.createElement("option");
-      option.value = p.display_name;
-      option.textContent = p.display_name;
-      opponentSelect.appendChild(option);
+      option.value = player.display_name;
+      option.textContent = player.display_name;
+      otherSelect.appendChild(option);
     });
   }
 }
