@@ -50,3 +50,7 @@
   padding: 14px 16px;
   color: #64748b;
 }
+
+
+/* UCL finalists poster */
+.poster-section{margin:0 0 28px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 8px 28px #101d3510}.poster-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.poster-heading .eyebrow{margin-bottom:3px}.poster-heading h2{margin:0;font-size:clamp(22px,3vw,30px)}.poster-badge{background:#eaf0ff;color:#2459e8;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800}.poster-image{display:block;width:100%;max-height:680px;object-fit:contain;background:#101d35;border-radius:12px}.poster-caption{font-size:12px;color:var(--muted);margin:10px 2px 0}.poster-admin-form{display:grid;gap:12px}.poster-admin-form input[type=file]{padding:10px}.poster-admin-list{display:grid;gap:10px;margin-top:14px}.poster-admin-item{display:flex;align-items:center;justify-content:space-between;gap:14px;background:white;border:1px solid var(--line);border-radius:12px;padding:14px}.poster-admin-item p{margin:4px 0 0}.poster-admin-item button{flex-shrink:0}@media(max-width:600px){.poster-section{padding:12px}.poster-admin-item{align-items:flex-start;flex-direction:column}.poster-image{max-height:70vh}}
