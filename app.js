@@ -104,7 +104,6 @@
     if(state.player&&!state.player.active)toast("Your player profile is inactive. Contact an admin.");
   }
   
-
 async function loadMembers() {
   if (!client) return;
 
@@ -116,9 +115,8 @@ async function loadMembers() {
       .order("name"),
 
     client
-      .from("players")
-      .select("id,display_name,active")
-      .eq("active", true)
+      .from("active_player_directory")
+      .select("id,display_name")
       .order("display_name")
   ]);
 
@@ -128,56 +126,67 @@ async function loadMembers() {
     return;
   }
 
+  state.members = membersResult.data || [];
+
   if (playersResult.error) {
     console.error("Could not load registered players:", playersResult.error);
-    toast("Could not load registered players.");
+    toast("Could not load registered player suggestions.");
     return;
   }
 
-  state.members = membersResult.data || [];
   state.registeredPlayers = playersResult.data || [];
 
-  // Normalize names to avoid differences in capitalization or spaces.
-  const normalizeName = name =>
-    (name || "").trim().replace(/\s+/g, " ").toLowerCase();
-
-  // Build a set of active COBEG XI member names.
-  const cobegNames = new Set(
-    state.members.map(m => normalizeName(m.name))
-  );
-
-  // Fill the COBEG XI dropdown with COBEG XI members only.
+  // Populate the COBEG XI dropdown.
   const cobegSelect = $("cobegOpponent");
+  cobegSelect.innerHTML =
+    '<option value="">Choose COBEG XI member</option>';
 
-  if (cobegSelect) {
-    cobegSelect.innerHTML =
-      '<option value="">Choose COBEG XI member</option>';
+  state.members.forEach(member => {
+    const option = document.createElement("option");
+    option.value = member.id;
+    option.textContent = member.name;
+    cobegSelect.appendChild(option);
+  });
 
-    state.members.forEach(member => {
-      const option = document.createElement("option");
-      option.value = member.id;
-      option.textContent = member.name;
-      cobegSelect.appendChild(option);
-    });
+  // Compare first names without regard to case or extra spaces.
+  function normalizeFirstName(name) {
+    return (name || "")
+      .trim()
+      .split(/\s+/)[0]
+      .toLowerCase();
   }
 
-  // Fill Other opponent with registered non-COBEG players only.
+  const cobegFirstNames = new Set(
+    state.members.map(member => normalizeFirstName(member.name))
+  );
+
+  // Exclude registered players whose first name matches a COBEG XI member.
+  const otherPlayers = state.registeredPlayers.filter(player =>
+    !cobegFirstNames.has(normalizeFirstName(player.display_name))
+  );
+
+  // Populate the Other opponent dropdown.
   const otherSelect = $("otherOpponent");
 
   if (otherSelect) {
+    const previousValue = otherSelect.value;
+
     otherSelect.innerHTML =
       '<option value="">Choose registered player</option>';
 
-    const nonCobegPlayers = state.registeredPlayers.filter(player =>
-      !cobegNames.has(normalizeName(player.display_name))
-    );
-
-    nonCobegPlayers.forEach(player => {
+    otherPlayers.forEach(player => {
       const option = document.createElement("option");
       option.value = player.display_name;
       option.textContent = player.display_name;
       otherSelect.appendChild(option);
     });
+
+    if (
+      previousValue &&
+      otherPlayers.some(player => player.display_name === previousValue)
+    ) {
+      otherSelect.value = previousValue;
+    }
   }
 }
     
