@@ -132,6 +132,10 @@ async function loadMembers(){
   }
 
   state.registeredPlayers = playersResult.data || [];
+  console.log(
+  "Registered opponent names:",
+  state.registeredPlayers.map(p => p.display_name)
+);
 
   const sel = $("cobegOpponent");
   sel.innerHTML = '<option value="">Choose COBEG XI member</option>';
