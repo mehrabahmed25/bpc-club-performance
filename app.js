@@ -149,49 +149,21 @@ async function loadMembers(){
 
   // Show registered player names as suggestions.
   
-  // Prepare the mobile-friendly registered-player dropdown.
-  const input = $("otherOpponent");
-  const list = $("registeredOpponentSuggestions");
+  
+  // Populate the native mobile dropdown with registered players.
+  const opponentSelect = $("otherOpponent");
 
-  if (!input || !list) return;
+  if (opponentSelect) {
+    opponentSelect.innerHTML =
+      '<option value="">Choose registered player</option>';
 
-  function renderOpponentSuggestions() {
-    const query = input.value.trim().toLowerCase();
-
-    const matches = state.registeredPlayers.filter(p =>
-      p.display_name &&
-      p.display_name.toLowerCase().includes(query) &&
-      p.display_name.toLowerCase() !==
-        (state.player?.display_name || "").trim().toLowerCase()
-    );
-
-    list.innerHTML = "";
-
-    if (!matches.length) {
-      const empty = document.createElement("div");
-      empty.className = "opponent-suggestion-empty";
-      empty.textContent = query
-        ? "No matching registered players."
-        : "No other registered players available.";
-      list.appendChild(empty);
-    } else {
-      matches.forEach(p => {
-        const option = document.createElement("button");
-        option.type = "button";
-        option.className = "opponent-suggestion";
-        option.setAttribute("role", "option");
-        option.textContent = p.display_name;
-
-        option.addEventListener("click", () => {
-          input.value = p.display_name;
-          input.dataset.selectedPlayerId = p.id;
-          list.classList.add("hidden");
-          input.setAttribute("aria-expanded", "false");
-        });
-
-        list.appendChild(option);
-      });
-    }
+    state.registeredPlayers.forEach(p => {
+      const option = document.createElement("option");
+      option.value = p.display_name;
+      option.textContent = p.display_name;
+      opponentSelect.appendChild(option);
+    });
+  }
 
     list.classList.remove("hidden");
     input.setAttribute("aria-expanded", "true");
