@@ -144,23 +144,73 @@ async function loadMembers(){
   });
 
   // Show registered player names as suggestions.
+  
+  // Prepare the mobile-friendly registered-player dropdown.
   const input = $("otherOpponent");
-  let list = $("registeredOpponentSuggestions");
+  const list = $("registeredOpponentSuggestions");
 
-  if(!list){
-    list = document.createElement("datalist");
-    list.id = "registeredOpponentSuggestions";
-    input.insertAdjacentElement("afterend", list);
+  if (!input || !list) return;
+
+  function renderOpponentSuggestions() {
+    const query = input.value.trim().toLowerCase();
+
+    const matches = state.registeredPlayers.filter(p =>
+      p.display_name &&
+      p.display_name.toLowerCase().includes(query) &&
+      p.display_name.toLowerCase() !==
+        (state.player?.display_name || "").trim().toLowerCase()
+    );
+
+    list.innerHTML = "";
+
+    if (!matches.length) {
+      const empty = document.createElement("div");
+      empty.className = "opponent-suggestion-empty";
+      empty.textContent = query
+        ? "No matching registered players."
+        : "No other registered players available.";
+      list.appendChild(empty);
+    } else {
+      matches.forEach(p => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "opponent-suggestion";
+        option.setAttribute("role", "option");
+        option.textContent = p.display_name;
+
+        option.addEventListener("click", () => {
+          input.value = p.display_name;
+          input.dataset.selectedPlayerId = p.id;
+          list.classList.add("hidden");
+          input.setAttribute("aria-expanded", "false");
+        });
+
+        list.appendChild(option);
+      });
+    }
+
+    list.classList.remove("hidden");
+    input.setAttribute("aria-expanded", "true");
   }
 
-  input.setAttribute("list", list.id);
-  list.innerHTML = "";
+  // Prevent duplicate event handlers if loadMembers() runs again.
+  if (input.dataset.suggestionsBound !== "true") {
+    input.addEventListener("focus", renderOpponentSuggestions);
+    input.addEventListener("click", renderOpponentSuggestions);
+    input.addEventListener("input", () => {
+      delete input.dataset.selectedPlayerId;
+      renderOpponentSuggestions();
+    });
 
-  state.registeredPlayers.forEach(p => {
-    const option = document.createElement("option");
-    option.value = p.display_name;
-    list.appendChild(option);
-  });
+    document.addEventListener("click", event => {
+      if (!input.contains(event.target) && !list.contains(event.target)) {
+        list.classList.add("hidden");
+        input.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    input.dataset.suggestionsBound = "true";
+  }
 }
   $("opponentType").addEventListener("change",()=>{
     const isCobeg=$("opponentType").value==="cobeg";
