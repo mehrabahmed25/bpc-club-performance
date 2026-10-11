@@ -57,10 +57,10 @@
 
 <label id="otherOpponentLabel" class="hidden">
   Other opponent
-  <select id="otherOpponent">
+  <select id="otherOpponent" required>
     <option value="">Choose registered player</option>
   </select>
-</label>   
+</label> 
         <label>Match date<input id="matchDate" type="date" required></label>
         <div class="score-grid"><label>Your goals<input id="playerGoals" type="number" min="0" max="99" step="1" required></label><span class="vs">VS</span><label>Opponent goals<input id="opponentGoals" type="number" min="0" max="99" step="1" required></label></div>
         <label>Notes (optional)<textarea id="matchNotes" maxlength="500" rows="3" placeholder="Any useful context"></textarea></label>
