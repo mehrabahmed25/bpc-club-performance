@@ -191,11 +191,13 @@ async function loadMembers() {
 }
     
   $("opponentType").addEventListener("change",()=>{
-    const isCobeg=$("opponentType").value==="cobeg";
-    $("cobegOpponentLabel").classList.toggle("hidden",!isCobeg);
-    $("otherOpponentLabel").classList.toggle("hidden",isCobeg);
-    $("cobegOpponent").required=isCobeg;$("otherOpponent").required=!isCobeg;
-  });
+ const isCobeg=$("opponentType").value==="cobeg";
+ $("cobegOpponentLabel").classList.toggle("hidden",!isCobeg);
+ $("otherOpponentLabel").classList.toggle("hidden",isCobeg);
+ $("cobegOpponent").required=isCobeg;
+ $("otherOpponent").required=!isCobeg;
+});
+  $("opponentType").dispatchEvent(new Event("change"));
   
 $("matchForm").addEventListener("submit", async e => {
   e.preventDefault();
