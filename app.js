@@ -28,7 +28,7 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home")loadLeaderboard();
+    if(name==="home"){loadLeaderboard();loadPublicPoster();}
     if(name==="history")loadHistory();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
@@ -47,6 +47,59 @@
     $("leaderboardBody").innerHTML='<tr><td colspan="12" class="empty">Complete the setup steps in README.md to connect the database.</td></tr>';
     $("authSubmit").disabled=true;$("matchSubmit").disabled=true;
   }
+
+  async function loadPublicPoster(){
+    if(!client)return;
+    const {data,error}=await client.from("site_posters").select("id,title,image_path,published_at,expires_at").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("published_at",{ascending:false}).limit(1);
+    const section=$("uclPosterSection");
+    if(error||!data||!data.length){section.classList.add("hidden");return;}
+    const p=data[0];
+    $("posterTitle").textContent=p.title||"UCL Finalists";
+    $("posterImage").src=client.storage.from("bpc-posters").getPublicUrl(p.image_path).data.publicUrl;
+    $("posterCaption").textContent="Featured until "+new Date(p.expires_at).toLocaleString();
+    section.classList.remove("hidden");
+  }
+
+  async function loadPosterAdmin(){
+    if(!client||!state.isAdmin)return;
+    const box=$("posterAdminList");
+    const {data,error}=await client.from("site_posters").select("id,title,image_path,published_at,expires_at,is_active").order("created_at",{ascending:false}).limit(20);
+    if(error){status("posterAdminStatus",error.message,"error");return;}
+    if(!data?.length){box.innerHTML='<div class="panel soft">No posters published yet.</div>';return;}
+    box.innerHTML=data.map(p=>'<article class="poster-admin-item"><div><b>'+esc(p.title)+'</b><p class="small">'+(p.is_active?"Active":"Removed")+' · Expires '+new Date(p.expires_at).toLocaleString()+'</p></div>'+(p.is_active?'<button class="reject-btn" data-remove-poster="'+esc(p.id)+'">Remove now</button>':'<span class="pill">Inactive</span>')+'</article>').join("");
+    box.querySelectorAll("[data-remove-poster]").forEach(b=>b.addEventListener("click",()=>deactivatePoster(b.dataset.removePoster)));
+  }
+
+  async function deactivatePoster(id){
+    if(!state.isAdmin)return;
+    const {error}=await client.from("site_posters").update({is_active:false}).eq("id",id);
+    if(error){status("posterAdminStatus",error.message,"error");return;}
+    status("posterAdminStatus","Poster removed from the website.","success");
+    await loadPosterAdmin();await loadPublicPoster();
+  }
+
+  $("posterForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    if(!state.isAdmin||!state.session)return;
+    const file=$("posterFile").files?.[0];
+    const title=$("posterUploadTitle").value.trim()||"UCL Finalists";
+    if(!file){status("posterAdminStatus","Choose an image first.","error");return;}
+    if(file.size>8*1024*1024){status("posterAdminStatus","Image must be 8 MB or smaller.","error");return;}
+    if(!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type)){status("posterAdminStatus","Please choose a JPG, PNG, WEBP, or GIF image.","error");return;}
+    const btn=$("publishPosterBtn");btn.disabled=true;status("posterAdminStatus","Uploading image…");
+    const path="posters/"+Date.now()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    try{
+      const up=await client.storage.from("bpc-posters").upload(path,file,{contentType:file.type,upsert:false});
+      if(up.error)throw up.error;
+      const {error:oldError}=await client.from("site_posters").update({is_active:false}).eq("is_active",true);
+      if(oldError)throw oldError;
+      const {error:insertError}=await client.from("site_posters").insert({title,image_path:path,is_active:true,created_by:state.session.user.id,expires_at:new Date(Date.now()+72*60*60*1000).toISOString()});
+      if(insertError)throw insertError;
+      $("posterFile").value="";status("posterAdminStatus","Poster published for 3 days.","success");
+      await loadPosterAdmin();await loadPublicPoster();
+    }catch(err){status("posterAdminStatus",err.message||"Could not publish poster.","error");}
+    finally{btn.disabled=false;}
+  });
 
   function setAuthUI(){
     const signed=!!state.session;
@@ -449,6 +502,7 @@ return {
     $("adminDenied").classList.toggle("hidden",state.isAdmin);
     $("adminContent").classList.toggle("hidden",!state.isAdmin);
     if(!state.isAdmin)return;
+    await loadPosterAdmin();
     status("adminStatus","Loading pending submissions…");
     const {data,error}=await client.from("matches").select("id,player_id,opponent_name,match_date,player_goals,opponent_goals,result,points,notes,submitted_at").eq("status","pending").order("submitted_at",{ascending:true}).limit(100);
     if(error){status("adminStatus",error.message,"error");return;}
@@ -514,7 +568,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     });
     const {data}=await client.auth.getSession();state.session=data.session;
     if(state.session)await loadIdentity();
-    setAuthUI();await loadMembers();await loadLeaderboard();
+    setAuthUI();await loadMembers();await loadLeaderboard();await loadPublicPoster();
   }
   boot();
 })();
