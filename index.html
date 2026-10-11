@@ -21,6 +21,12 @@
   </nav>
 </header>
 <main>
+  <section id="uclPosterSection" class="poster-section hidden" aria-label="UCL finalists poster">
+    <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">UCL Finalists</h2></div><span class="poster-badge">Featured</span></div>
+    <img id="posterImage" class="poster-image" alt="UCL finalists poster">
+    <p id="posterCaption" class="poster-caption">Featured for a limited time.</p>
+  </section>
+
   <section id="view-home" class="view">
     <div class="hero">
       <div><p class="eyebrow">BPC SEASON · MONTHLY RANKINGS</p><h1>Every match counts.<br><span>Every point matters.</span></h1><p class="hero-sub">Follow the leaderboard, compare performance, and track the road to monthly awards.</p></div>
@@ -85,6 +91,15 @@
     <div id="adminDenied" class="panel soft">This section is only available to administrators.</div>
     <div id="adminContent" class="hidden">
       <div class="toolbar"><button class="secondary" id="refreshPending">↻ Refresh pending</button><span id="pendingCount" class="pill">0 pending</span></div>
+      <div class="section-head compact"><h2>UCL finalists poster</h2><p>Upload an image to show it at the top of the home page for 3 days. You can remove it earlier.</p></div>
+      <form id="posterForm" class="panel poster-admin-form">
+        <label>Poster title<input id="posterUploadTitle" maxlength="120" value="UCL Finalists" required></label>
+        <label>Choose poster image<input id="posterFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required></label>
+        <p class="small">Use JPG, PNG, WEBP, or GIF. Maximum file size: 8 MB.</p>
+        <button class="primary" id="publishPosterBtn" type="submit">Upload and publish for 3 days</button>
+        <div id="posterAdminStatus" class="status"></div>
+      </form>
+      <div id="posterAdminList" class="poster-admin-list"></div>
       <div id="adminStatus" class="status"></div>
       <div id="pendingList" class="pending-list"></div>
       <div class="section-head compact"><h2>Manage COBEG XI members</h2><p>Add members who count toward the award requirement.</p></div>
