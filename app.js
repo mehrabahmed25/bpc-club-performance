@@ -188,6 +188,7 @@ async function loadMembers(){
     input.dataset.suggestionsBound = "true";
   }
 }
+ }
   $("opponentType").addEventListener("change",()=>{
     const isCobeg=$("opponentType").value==="cobeg";
     $("cobegOpponentLabel").classList.toggle("hidden",!isCobeg);
