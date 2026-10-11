@@ -164,31 +164,8 @@ async function loadMembers(){
       opponentSelect.appendChild(option);
     });
   }
-
-    list.classList.remove("hidden");
-    input.setAttribute("aria-expanded", "true");
-  }
-
-  // Prevent duplicate event handlers if loadMembers() runs again.
-  if (input.dataset.suggestionsBound !== "true") {
-    input.addEventListener("focus", renderOpponentSuggestions);
-    input.addEventListener("click", renderOpponentSuggestions);
-    input.addEventListener("input", () => {
-      delete input.dataset.selectedPlayerId;
-      renderOpponentSuggestions();
-    });
-
-    document.addEventListener("click", event => {
-      if (!input.contains(event.target) && !list.contains(event.target)) {
-        list.classList.add("hidden");
-        input.setAttribute("aria-expanded", "false");
-      }
-    });
-
-    input.dataset.suggestionsBound = "true";
-  }
 }
- }
+    
   $("opponentType").addEventListener("change",()=>{
     const isCobeg=$("opponentType").value==="cobeg";
     $("cobegOpponentLabel").classList.toggle("hidden",!isCobeg);
