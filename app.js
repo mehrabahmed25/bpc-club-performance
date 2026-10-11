@@ -196,25 +196,110 @@ async function loadMembers() {
     $("otherOpponentLabel").classList.toggle("hidden",isCobeg);
     $("cobegOpponent").required=isCobeg;$("otherOpponent").required=!isCobeg;
   });
-  $("matchForm").addEventListener("submit",async e=>{
-    e.preventDefault();if(!client||!state.session){toast("Please sign in first.");showView("account");return;}
-    if(!state.player||!state.player.active){status("matchMessage","Your player profile is not active. Contact an admin.","error");return;}
-    const type=$("opponentType").value, member=state.members.find(m=>m.id===$("cobegOpponent").value);
-    const opponent=type==="cobeg"?(member?.name||""):$("otherOpponent").value.trim();
-    const date=$("matchDate").value, pg=Number($("playerGoals").value), og=Number($("opponentGoals").value);
-    if(!opponent||!date||!Number.isInteger(pg)||!Number.isInteger(og)||pg<0||og<0){status("matchMessage","Please complete the required fields with valid scores.","error");return;}
-    if(opponent.toLowerCase().trim()===state.player.display_name.toLowerCase().trim()){status("matchMessage","You cannot submit yourself as your opponent.","error");return;}
-    const btn=$("matchSubmit");btn.disabled=true;btn.textContent="Submitting…";
-    try{
-      const {data,error}=await client.rpc("submit_match",{p_opponent_name:opponent,p_match_date:date,p_player_goals:pg,p_opponent_goals:og,p_notes:$("matchNotes").value,p_cobeg_member_id:type==="cobeg"?member.id:null});
-      if(error)throw error;
-      $("matchForm").reset();$("matchDate").value=new Date().toISOString().slice(0,10);
-      $("opponentType").dispatchEvent(new Event("change"));
-      status("matchMessage","Result submitted successfully. It is now pending admin approval. Reference: "+data,"success");
-      toast("Result submitted for review.");
-    }catch(err){status("matchMessage",err.message||String(err),"error");}
-    finally{btn.disabled=false;btn.textContent="Submit result";}
-  });
+  
+$("matchForm").addEventListener("submit", async e => {
+  e.preventDefault();
+
+  if (!client || !state.session) {
+    toast("Please sign in first.");
+    showView("account");
+    return;
+  }
+
+  if (!state.player || !state.player.active) {
+    status(
+      "matchMessage",
+      "Your player profile is not active. Contact an admin.",
+      "error"
+    );
+    return;
+  }
+
+  const type = $("opponentType").value;
+  const member = state.members.find(
+    m => m.id === $("cobegOpponent").value
+  );
+
+  const opponent = type === "cobeg"
+    ? (member?.name || "")
+    : $("otherOpponent").value;
+
+  const date = $("matchDate").value;
+  const pg = Number($("playerGoals").value);
+  const og = Number($("opponentGoals").value);
+
+  if (
+    !opponent ||
+    !date ||
+    $("playerGoals").value.trim() === "" ||
+    $("opponentGoals").value.trim() === "" ||
+    !Number.isInteger(pg) ||
+    !Number.isInteger(og) ||
+    pg < 0 ||
+    og < 0
+  ) {
+    status(
+      "matchMessage",
+      "Please select an opponent, choose a date, and enter valid scores.",
+      "error"
+    );
+    return;
+  }
+
+  if (
+    opponent.trim().toLowerCase() ===
+    state.player.display_name.trim().toLowerCase()
+  ) {
+    status(
+      "matchMessage",
+      "You cannot submit yourself as your opponent.",
+      "error"
+    );
+    return;
+  }
+
+  const btn = $("matchSubmit");
+  btn.disabled = true;
+  btn.textContent = "Submitting…";
+
+  try {
+    const { data, error } = await client.rpc("submit_match", {
+      p_opponent_name: opponent,
+      p_match_date: date,
+      p_player_goals: pg,
+      p_opponent_goals: og,
+      p_notes: $("matchNotes").value,
+      p_cobeg_member_id: type === "cobeg" ? member?.id ?? null : null
+    });
+
+    if (error) throw error;
+
+    $("matchForm").reset();
+    $("matchDate").value = new Date().toISOString().slice(0, 10);
+
+    $("opponentType").dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+
+    status(
+      "matchMessage",
+      "Result submitted successfully. It is now pending admin approval. Reference: " + data,
+      "success"
+    );
+
+    toast("Result submitted for review.");
+  } catch (err) {
+    console.error("Match submission failed:", err);
+    status(
+      "matchMessage",
+      err.message || "Submission failed. Please try again.",
+      "error"
+    );
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Submit result";
+  }
+});
 
   async function loadLeaderboard(){
     if(!client)return;
