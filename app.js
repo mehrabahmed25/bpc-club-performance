@@ -10,6 +10,7 @@
   player:null,
   isAdmin:false,
   signup:false,
+  recoveryMode:false,
   members:[],
   registeredPlayers:[]
 };
@@ -102,6 +103,32 @@
   });
 
   function setAuthUI(){
+    if(state.recoveryMode){
+      $("accountNav").textContent="Reset password";
+      document.querySelectorAll(".auth-only,.admin-only").forEach(x=>x.classList.add("hidden"));
+      $("historySignIn").classList.remove("hidden");
+      $("historyContent").classList.add("hidden");
+      $("authTitle").textContent="Choose a new password";
+      $("authForm").innerHTML='<label>New password<input id="newRecoveryPassword" type="password" minlength="8" autocomplete="new-password" required placeholder="At least 8 characters"></label><label>Confirm new password<input id="confirmRecoveryPassword" type="password" minlength="8" autocomplete="new-password" required placeholder="Enter the password again"></label><button id="saveRecoveryPassword" class="primary" type="submit">Save new password</button><div id="recoveryMessage" class="status"></div>';
+      $("authForm").onsubmit=async e=>{
+        e.preventDefault();
+        const password=$("newRecoveryPassword").value;
+        if(password.length<8){status("recoveryMessage","Password must be at least 8 characters.","error");return;}
+        if(password!==$("confirmRecoveryPassword").value){status("recoveryMessage","The passwords do not match.","error");return;}
+        const btn=$("saveRecoveryPassword");btn.disabled=true;
+        try{
+          const {error}=await client.auth.updateUser({password});
+          if(error)throw error;
+          state.recoveryMode=false;
+          history.replaceState(null,"",location.pathname+location.search);
+          setAuthUI();
+          toast("Password updated successfully.");
+        }catch(err){status("recoveryMessage",err.message||"Could not update the password. Open the recovery email link again.","error");}
+        finally{if($("saveRecoveryPassword"))$("saveRecoveryPassword").disabled=false;}
+      };
+      showView("account");
+      return;
+    }
     const signed=!!state.session;
     $("accountNav").textContent=signed?(state.profile?.display_name||"My account"):"Sign in";
     document.querySelectorAll(".auth-only").forEach(x=>x.classList.toggle("hidden",!signed));
@@ -541,7 +568,30 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       esc(p.id) + '">Recover Account</button></td>' +
   '</tr>'
 ).join("");
+    $("playersBody").querySelectorAll("[data-recover]").forEach(button=>{
+      button.onclick=()=>recoverPlayerAccount(button.dataset.recover,button);
+    });
   }
+
+  async function recoverPlayerAccount(playerId,button){
+    if(!state.isAdmin||!state.session)return;
+    const playerName=button.closest("tr")?.querySelector("td")?.textContent?.trim()||"this player";
+    if(!confirm("Send a password reset email to the registered email address for "+playerName+"? The email address will not be displayed."))return;
+    button.disabled=true;
+    const originalText=button.textContent;
+    button.textContent="Sending…";
+    status("adminStatus","Requesting password reset email for "+playerName+"…");
+    try{
+      const {data,error}=await client.functions.invoke("admin-account-recovery",{body:{player_id:playerId}});
+      if(error)throw error;
+      if(data?.error)throw new Error(data.error);
+      status("adminStatus",data?.message||"Password reset email requested.","success");
+    }catch(err){
+      console.error("Account recovery request failed:",err);
+      status("adminStatus",err.message||"Could not request a password reset email.","error");
+    }finally{button.disabled=false;button.textContent=originalText;}
+  }
+
   async function reviewMatch(id,approve){
     if(!client||!state.isAdmin)return;
     let reason="";
@@ -560,8 +610,14 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
 
   async function boot(){
     if(!client){setAuthUI();return;}
-    client.auth.onAuthStateChange(async(_event,session)=>{
+    client.auth.onAuthStateChange(async(event,session)=>{
       state.session=session;
+      if(event==="PASSWORD_RECOVERY"){
+        state.recoveryMode=true;
+        setAuthUI();
+        showView("account");
+        return;
+      }
       if(session){try{await loadIdentity();}catch(e){console.error(e);}}
       else{state.profile=null;state.player=null;state.isAdmin=false;}
       setAuthUI();
