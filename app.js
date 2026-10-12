@@ -70,7 +70,7 @@
     $("posterTitle").textContent=p.title||"Club Announcement";
     $("posterImage").src=client.storage.from("bpc-posters").getPublicUrl(p.image_path).data.publicUrl;
     $("posterImage").alt=p.title||"Club announcement";
-    $("posterCaption").textContent="Announcement "+(posterIndex+1)+" of "+posterSlides.length+" · Featured until "+new Date(p.expires_at).toLocaleString();
+    $("posterCaption").textContent="Announcement "+(posterIndex+1)+" of "+posterSlides.length+" · Active until removed by an admin";
     const controls=$("posterControls");
     controls.classList.toggle("hidden",posterSlides.length<2);
     const indicators=$("posterIndicators");
@@ -129,9 +129,9 @@
     try{
       const up=await client.storage.from("bpc-posters").upload(path,file,{contentType:file.type,upsert:false});
       if(up.error)throw up.error;
-      const {error:insertError}=await client.from("site_posters").insert({title,image_path:path,is_active:true,created_by:state.session.user.id,expires_at:new Date(Date.now()+72*60*60*1000).toISOString()});
+      const {error:insertError}=await client.from("site_posters").insert({title,image_path:path,is_active:true,created_by:state.session.user.id,expires_at:"9999-12-31T23:59:59.000Z"});
       if(insertError)throw insertError;
-      $("posterFile").value="";status("posterAdminStatus","Poster published for 3 days.","success");
+      $("posterFile").value="";status("posterAdminStatus","Poster uploaded and published. It will remain visible until you remove it.","success");
       await loadPosterAdmin();await loadPublicPoster();
     }catch(err){status("posterAdminStatus",err.message||"Could not publish poster.","error");}
     finally{btn.disabled=false;}
