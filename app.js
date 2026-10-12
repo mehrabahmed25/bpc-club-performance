@@ -624,8 +624,8 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     });
     const urlParams=new URLSearchParams(location.search);
     const hashParams=new URLSearchParams(location.hash.startsWith("#")?location.hash.slice(1):location.hash);
-    const recoveryHash=hashParams.get("type")==="recovery" || urlParams.get("type")==="recovery";
     const code=urlParams.get("code");
+    const recoveryHash=hashParams.get("type")==="recovery" || urlParams.get("type")==="recovery" || !!code;
     if(code){
       const {data:codeData,error:codeError}=await client.auth.exchangeCodeForSession(code);
       if(codeError)console.error("Could not exchange recovery link code:",codeError.message);
