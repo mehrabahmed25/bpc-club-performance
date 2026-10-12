@@ -612,7 +612,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(!client){setAuthUI();return;}
     client.auth.onAuthStateChange(async(event,session)=>{
       state.session=session;
-      if(event==="PASSWORD_RECOVERY"){
+      if(event==="PASSWORD_RECOVERY" || (location.hash && /(?:^|[&#])type=recovery(?:&|$)/.test(location.hash.slice(1)))){
         state.recoveryMode=true;
         setAuthUI();
         showView("account");
@@ -623,8 +623,15 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       setAuthUI();
     });
     const {data}=await client.auth.getSession();state.session=data.session;
-    if(state.session)await loadIdentity();
-    setAuthUI();await loadMembers();await loadLeaderboard();await loadPublicPoster();
+    if(location.hash && /(?:^|[&#])type=recovery(?:&|$)/.test(location.hash.slice(1))){
+      state.recoveryMode=true;
+      setAuthUI();
+      showView("account");
+    }else{
+      if(state.session)await loadIdentity();
+      setAuthUI();
+    }
+    await loadMembers();await loadLeaderboard();await loadPublicPoster();
   }
   boot();
 })();
