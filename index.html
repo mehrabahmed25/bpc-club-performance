@@ -96,12 +96,12 @@
     <div id="adminDenied" class="panel soft">This section is only available to administrators.</div>
     <div id="adminContent" class="hidden">
       <div class="toolbar"><button class="secondary" id="refreshPending">↻ Refresh pending</button><span id="pendingCount" class="pill">0 pending</span></div>
-      <div class="section-head compact"><h2>UCL finalists poster</h2><p>Upload an image to show it at the top of the home page for 3 days. You can remove it earlier.</p></div>
+      <div class="section-head compact"><h2>UCL finalists poster</h2><p>Upload an announcement image to show it at the top of the Leaderboard. It stays visible until you remove it manually.</p></div>
       <form id="posterForm" class="panel poster-admin-form">
         <label>Poster title<input id="posterUploadTitle" maxlength="120" value="UCL Finalists" required></label>
         <label>Choose poster image<input id="posterFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required></label>
         <p class="small">Use JPG, PNG, WEBP, or GIF. Maximum file size: 8 MB.</p>
-        <button class="primary" id="publishPosterBtn" type="submit">Upload and publish for 3 days</button>
+        <button class="primary" id="publishPosterBtn" type="submit">Upload only</button>
         <div id="posterAdminStatus" class="status"></div>
       </form>
       <div id="posterAdminList" class="poster-admin-list"></div>
