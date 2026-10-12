@@ -626,9 +626,9 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         const b=normalize(m.opponent_name||"Unknown opponent");
         return [a,b].sort().join("::");
       };
-      // Sequence is based on every submission in the match month, including pending/rejected.
+      // Only approved results receive a lineup sequence; pending/rejected rows remain visible but do not advance it.
       const sequences={};
-      matches.slice().sort((a,b)=>
+      matches.filter(m=>m.status==="approved").slice().sort((a,b)=>
         String(a.match_date||"").localeCompare(String(b.match_date||"")) ||
         String(a.submitted_at||"").localeCompare(String(b.submitted_at||"")) ||
         String(a.id||"").localeCompare(String(b.id||""))
@@ -648,13 +648,13 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         const rows=groups[month].map(m=>{
           const submittedBy=names[m.player_id]||"Unknown player";
           const opponent=m.opponent_name||"Unknown opponent";
-          const seq=sequences[m.id]||1;
+          const seq=sequences[m.id]||null;
           const official=m.status==="approved"&&m.counted===true;
           return '<tr><td>'+prettyDate(m.match_date)+'</td>'+
             '<td>'+esc(submittedBy)+'</td>'+
             '<td>'+esc(submittedBy)+' <span class="muted">vs</span> '+esc(opponent)+'</td>'+
             '<td><b>'+m.player_goals+' – '+m.opponent_goals+'</b></td>'+
-            '<td><span class="pill">'+seq+'/5</span></td>'+
+            '<td>'+(seq?'<span class="pill">'+seq+'/5</span>':'<span class="muted">Not counted (not approved)</span>')+'</td>'+
             '<td>'+esc(m.result||"—")+'</td>'+
             '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status||"unknown")+'</span></td>'+
             '<td><span class="pill '+(official?"good":"")+'">'+(official?"Yes":"No")+'</span></td>'+
@@ -667,7 +667,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       $("allMatchHistoryGroups").innerHTML=months.length
         ?months.map(renderMonth).join("")
         :'<div class="panel soft">No match records found.</div>';
-      status("allMatchHistoryStatus",matches.length+" total submissions across "+months.length+" match month(s). Each lineup is counted in both directions together. Lineup sequence includes pending and rejected submissions; “Officially counted” means approved and counted. Monthly groups are based on match date.");
+      status("allMatchHistoryStatus",matches.length+" total submissions across "+months.length+" match month(s). Each lineup is counted in both directions together. Only approved results advance the lineup sequence; pending and rejected submissions remain visible but do not count. “Officially counted” means approved and counted. Monthly groups are based on match date.");
     }catch(err){
       status("allMatchHistoryStatus",err.message||"Could not load all match history.","error");
     }
