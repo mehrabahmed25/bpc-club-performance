@@ -58,3 +58,13 @@
 
 /* Refined, smaller centered poster */
 .poster-section{max-width:900px;width:calc(100% - 24px);margin:0 auto 26px;padding:16px 18px;border-radius:16px}.poster-heading{max-width:760px;margin:0 auto 12px}.poster-image{width:auto;max-width:100%;max-height:520px;height:auto;object-fit:contain;margin:0 auto;border-radius:10px}.poster-caption{text-align:center;max-width:760px;margin:10px auto 0}@media(max-width:680px){.poster-section{width:100%;padding:12px;margin-bottom:20px}.poster-image{max-height:420px}}
+
+
+/* Announcement slideshow controls */
+.poster-controls{display:flex;align-items:center;justify-content:center;gap:16px;margin:12px auto 0}
+.poster-arrow{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:50%;background:#f3f6fc;color:var(--navy);font-size:26px;line-height:1}
+.poster-arrow:hover,.poster-indicator:hover{background:#e5ecff}
+.poster-indicators{display:flex;align-items:center;justify-content:center;gap:8px}
+.poster-indicator{width:9px;height:9px;padding:0;border:0;border-radius:50%;background:#c7d0e0}
+.poster-indicator.active{background:var(--blue);transform:scale(1.2)}
+@media(max-width:680px){.poster-controls{gap:12px}.poster-arrow{width:34px;height:34px}}
