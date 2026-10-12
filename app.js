@@ -14,6 +14,9 @@
   members:[],
   registeredPlayers:[]
 };
+  let posterSlides = [];
+  let posterIndex = 0;
+  let posterTimer = null;
   const monthNow = new Date().toISOString().slice(0,7);
   $("monthPicker").value = monthNow;
   $("historyMonth").value = monthNow;
@@ -30,7 +33,7 @@
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
     if(name==="home"){loadLeaderboard();loadPublicPoster();}
-    else $("uclPosterSection").classList.add("hidden");
+    else { $("uclPosterSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="history")loadHistory();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
@@ -58,17 +61,42 @@
     $("authSubmit").disabled=true;$("matchSubmit").disabled=true;
   }
 
-  async function loadPublicPoster(){
-    if(!client)return;
-    const {data,error}=await client.from("site_posters").select("id,title,image_path,published_at,expires_at").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("published_at",{ascending:false}).limit(1);
+  function renderPosterSlide(){
     const section=$("uclPosterSection");
-    if(error||!data||!data.length){section.classList.add("hidden");return;}
-    const p=data[0];
-    $("posterTitle").textContent=p.title||"UCL Finalists";
+    if(!posterSlides.length){section.classList.add("hidden");return;}
+    if(posterIndex>=posterSlides.length)posterIndex=0;
+    if(posterIndex<0)posterIndex=posterSlides.length-1;
+    const p=posterSlides[posterIndex];
+    $("posterTitle").textContent=p.title||"Club Announcement";
     $("posterImage").src=client.storage.from("bpc-posters").getPublicUrl(p.image_path).data.publicUrl;
-    $("posterCaption").textContent="Featured until "+new Date(p.expires_at).toLocaleString();
+    $("posterImage").alt=p.title||"Club announcement";
+    $("posterCaption").textContent="Announcement "+(posterIndex+1)+" of "+posterSlides.length+" · Featured until "+new Date(p.expires_at).toLocaleString();
+    const controls=$("posterControls");
+    controls.classList.toggle("hidden",posterSlides.length<2);
+    const indicators=$("posterIndicators");
+    indicators.innerHTML=posterSlides.map((slide,i)=>'<button type="button" class="poster-indicator'+(i===posterIndex?' active':'')+'" aria-label="Show announcement '+(i+1)+'" aria-current="'+(i===posterIndex?'true':'false')+'" data-poster-index="'+i+'"></button>').join("");
+    indicators.querySelectorAll("[data-poster-index]").forEach(button=>button.addEventListener("click",()=>{posterIndex=Number(button.dataset.posterIndex);renderPosterSlide();restartPosterTimer();}));
     section.classList.remove("hidden");
   }
+  function restartPosterTimer(){
+    if(posterTimer){clearInterval(posterTimer);posterTimer=null;}
+    if(posterSlides.length>1)posterTimer=setInterval(()=>{posterIndex=(posterIndex+1)%posterSlides.length;renderPosterSlide();},6000);
+  }
+  async function loadPublicPoster(){
+    if(!client)return;
+    const section=$("uclPosterSection");
+    const {data,error}=await client.from("site_posters").select("id,title,image_path,published_at,expires_at").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("published_at",{ascending:false}).limit(30);
+    if(error||!data||!data.length){
+      posterSlides=[];if(posterTimer){clearInterval(posterTimer);posterTimer=null;}
+      section.classList.add("hidden");return;
+    }
+    posterSlides=data;
+    posterIndex=0;
+    renderPosterSlide();
+    restartPosterTimer();
+  }
+  $("posterPrev").addEventListener("click",()=>{posterIndex=(posterIndex-1+posterSlides.length)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
+  $("posterNext").addEventListener("click",()=>{posterIndex=(posterIndex+1)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
 
   async function loadPosterAdmin(){
     if(!client||!state.isAdmin)return;
@@ -101,8 +129,6 @@
     try{
       const up=await client.storage.from("bpc-posters").upload(path,file,{contentType:file.type,upsert:false});
       if(up.error)throw up.error;
-      const {error:oldError}=await client.from("site_posters").update({is_active:false}).eq("is_active",true);
-      if(oldError)throw oldError;
       const {error:insertError}=await client.from("site_posters").insert({title,image_path:path,is_active:true,created_by:state.session.user.id,expires_at:new Date(Date.now()+72*60*60*1000).toISOString()});
       if(insertError)throw insertError;
       $("posterFile").value="";status("posterAdminStatus","Poster published for 3 days.","success");
