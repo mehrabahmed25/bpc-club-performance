@@ -42,6 +42,14 @@
   $("historyMonth").addEventListener("change",loadHistory);
   $("refreshHistory").addEventListener("click",loadHistory);
   $("refreshPending").addEventListener("click",loadAdmin);
+  $("toggleAllMatchHistory").addEventListener("click",async()=>{
+    const panel=$("allMatchHistoryPanel");
+    const opening=panel.classList.contains("hidden");
+    panel.classList.toggle("hidden",!opening);
+    $("toggleAllMatchHistory").textContent=opening?"Hide all match history":"Show all match history";
+    if(opening)await loadAllMatchHistory();
+  });
+  $("refreshAllMatchHistory").addEventListener("click",loadAllMatchHistory);
 
   if(!configReady){
     status("leaderboardStatus","Setup required: open config.js and paste your Supabase Project URL and anon/public key.","error");
@@ -454,11 +462,21 @@ async function loadHistory(){
   const myName = (state.player?.display_name || state.profile?.display_name || "")
     .trim().toLowerCase();
 
-  const rows = matches.map(m=>{
+  // Personal history includes matches I submitted and matches submitted against me.
+  const myPlayerId = state.player?.id || null;
+  const personalMatches = matches.filter(m=>{
+    const submittedName = (playerNames[m.player_id] || "").trim().toLowerCase();
+    const opponentName = (m.opponent_name || "").trim().toLowerCase();
+    return (myPlayerId && m.player_id === myPlayerId) ||
+      submittedName === myName ||
+      opponentName === myName;
+  });
+
+  const rows = personalMatches.map(m=>{
     const submittedName = (playerNames[m.player_id] || "").trim();
     const isOpponentView =
       submittedName.toLowerCase() !== myName &&
-      m.opponent_name.trim().toLowerCase() === myName;
+      (m.opponent_name || "").trim().toLowerCase() === myName;
 
     if(!isOpponentView){
       return {
@@ -497,7 +515,7 @@ return {
 };
   });
 
-  status("historyStatus",rows.length+" results in this view.");
+  status("historyStatus",rows.length+" personal results in this view.");
 
   $("historyBody").innerHTML = rows.length
     ? rows.map(m=>
@@ -571,6 +589,37 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     $("playersBody").querySelectorAll("[data-recover]").forEach(button=>{
       button.onclick=()=>recoverPlayerAccount(button.dataset.recover,button);
     });
+  }
+
+  async function loadAllMatchHistory(){
+    if(!client||!state.isAdmin)return;
+    status("allMatchHistoryStatus","Loading all match records…");
+    const {data,error}=await client.from("matches")
+      .select("id,player_id,opponent_name,match_date,player_goals,opponent_goals,result,points,status,counted,exclusion_reason,submitted_at,approved_at")
+      .order("match_date",{ascending:false})
+      .order("submitted_at",{ascending:false})
+      .limit(1000);
+    if(error){status("allMatchHistoryStatus",error.message,"error");return;}
+    const matches=data||[];
+    const ids=[...new Set(matches.map(m=>m.player_id))];
+    const names={};
+    if(ids.length){
+      const {data:players,error:playersError}=await client.from("players")
+        .select("id,display_name").in("id",ids);
+      if(playersError){status("allMatchHistoryStatus",playersError.message,"error");return;}
+      (players||[]).forEach(p=>names[p.id]=p.display_name);
+    }
+    status("allMatchHistoryStatus",matches.length+" total match records. Lineup is shown as submitted; status and counted flag are current.");
+    $("allMatchHistoryBody").innerHTML=matches.length?matches.map(m=>
+      '<tr><td>'+prettyDate(m.match_date)+'</td>'+
+      '<td>'+esc(names[m.player_id]||"Unknown player")+' <span class="muted">vs</span> '+esc(m.opponent_name||"Unknown opponent")+'</td>'+
+      '<td><b>'+m.player_goals+' – '+m.opponent_goals+'</b></td>'+
+      '<td>'+esc(m.result||"—")+'</td>'+
+      '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status||"unknown")+'</span></td>'+
+      '<td><span class="pill '+(m.counted?"good":"")+'">'+(m.counted?"Yes":"No")+'</span></td>'+
+      '<td>'+esc(m.exclusion_reason||"—")+'</td>'+
+      '<td>'+esc(m.submitted_at?new Date(m.submitted_at).toLocaleString():"—")+'</td></tr>'
+    ).join(""):'<tr><td colspan="8" class="empty">No match records found.</td></tr>';
   }
 
   async function recoverPlayerAccount(playerId,button){
