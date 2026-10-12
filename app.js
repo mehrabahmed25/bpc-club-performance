@@ -612,7 +612,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(!client){setAuthUI();return;}
     client.auth.onAuthStateChange(async(event,session)=>{
       state.session=session;
-      if(event==="PASSWORD_RECOVERY" || (location.hash && /(?:^|[&#])type=recovery(?:&|$)/.test(location.hash.slice(1)))){
+      if(event==="PASSWORD_RECOVERY"){
         state.recoveryMode=true;
         setAuthUI();
         showView("account");
@@ -622,14 +622,31 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       else{state.profile=null;state.player=null;state.isAdmin=false;}
       setAuthUI();
     });
-    const {data}=await client.auth.getSession();state.session=data.session;
-    if(location.hash && /(?:^|[&#])type=recovery(?:&|$)/.test(location.hash.slice(1))){
+    const {data:sessionData,error:sessionError}=await client.auth.getSession();
+    state.session=sessionData?.session||null;
+    const hashParams=new URLSearchParams(location.hash.startsWith("#")?location.hash.slice(1):location.hash);
+    const recoveryHash=hashParams.get("type")==="recovery";
+    const accessToken=hashParams.get("access_token");
+    const refreshToken=hashParams.get("refresh_token");
+    if(recoveryHash && !state.session && accessToken && refreshToken){
+      const {data:recoverySession,error:recoveryError}=await client.auth.setSession({
+        access_token:accessToken,
+        refresh_token:refreshToken
+      });
+      if(!recoveryError && recoverySession?.session)state.session=recoverySession.session;
+      else console.error("Could not establish recovery session:",recoveryError?.message||sessionError?.message);
+    }
+    if(recoveryHash && state.session){
       state.recoveryMode=true;
       setAuthUI();
       showView("account");
     }else{
       if(state.session)await loadIdentity();
       setAuthUI();
+      if(recoveryHash && !state.session){
+        status("authMessage","This recovery link could not establish a valid session. Request a fresh password reset email and open the newest link in the same browser.","error");
+        showView("account");
+      }
     }
     await loadMembers();await loadLeaderboard();await loadPublicPoster();
   }
