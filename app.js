@@ -664,8 +664,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         return '<details class="panel month-history-group" open><summary><b>'+esc(monthLabel(month))+'</b><span class="muted">'+groups[month].length+' submissions</span></summary>'+
           '<div class="table-wrap"><table><thead><tr><th>Match date</th><th>Submitted by</th><th>Complete lineup</th><th>Score</th><th>Lineup sequence</th><th>Result</th><th>Status</th><th>Officially counted</th><th>Exclusion reason</th><th>Submitted at</th></tr></thead><tbody>'+rows+'</tbody></table></div></details>';
       };
-      $("allMatchHistoryBody").innerHTML="";
-      $("allMatchHistoryBody").closest("table").parentElement.innerHTML=months.length
+      $("allMatchHistoryGroups").innerHTML=months.length
         ?months.map(renderMonth).join("")
         :'<div class="panel soft">No match records found.</div>';
       status("allMatchHistoryStatus",matches.length+" total submissions across "+months.length+" match month(s). Each lineup is counted in both directions together. Lineup sequence includes pending and rejected submissions; “Officially counted” means approved and counted. Monthly groups are based on match date.");
