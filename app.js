@@ -629,7 +629,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(code){
       const {data:codeData,error:codeError}=await client.auth.exchangeCodeForSession(code);
       if(codeError)console.error("Could not exchange recovery link code:",codeError.message);
-      else if(data?.session)state.session=data.session;
+      else if(codeData?.session)state.session=codeData.session;
     }
     const {data:sessionData,error:sessionError}=await client.auth.getSession();
     state.session=state.session||sessionData?.session||null;
