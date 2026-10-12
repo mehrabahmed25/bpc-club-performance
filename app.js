@@ -622,10 +622,17 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       else{state.profile=null;state.player=null;state.isAdmin=false;}
       setAuthUI();
     });
-    const {data:sessionData,error:sessionError}=await client.auth.getSession();
-    state.session=sessionData?.session||null;
+    const urlParams=new URLSearchParams(location.search);
     const hashParams=new URLSearchParams(location.hash.startsWith("#")?location.hash.slice(1):location.hash);
-    const recoveryHash=hashParams.get("type")==="recovery";
+    const recoveryHash=hashParams.get("type")==="recovery" || urlParams.get("type")==="recovery";
+    const code=urlParams.get("code");
+    if(code){
+      const {data:codeData,error:codeError}=await client.auth.exchangeCodeForSession(code);
+      if(codeError)console.error("Could not exchange recovery link code:",codeError.message);
+      else if(data?.session)state.session=data.session;
+    }
+    const {data:sessionData,error:sessionError}=await client.auth.getSession();
+    state.session=state.session||sessionData?.session||null;
     const accessToken=hashParams.get("access_token");
     const refreshToken=hashParams.get("refresh_token");
     if(recoveryHash && !state.session && accessToken && refreshToken){
