@@ -594,32 +594,84 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
   async function loadAllMatchHistory(){
     if(!client||!state.isAdmin)return;
     status("allMatchHistoryStatus","Loading all match records…");
-    const {data,error}=await client.from("matches")
-      .select("id,player_id,opponent_name,match_date,player_goals,opponent_goals,result,points,status,counted,exclusion_reason,submitted_at,approved_at")
-      .order("match_date",{ascending:false})
-      .order("submitted_at",{ascending:false})
-      .limit(1000);
-    if(error){status("allMatchHistoryStatus",error.message,"error");return;}
-    const matches=data||[];
-    const ids=[...new Set(matches.map(m=>m.player_id))];
-    const names={};
-    if(ids.length){
-      const {data:players,error:playersError}=await client.from("players")
-        .select("id,display_name").in("id",ids);
-      if(playersError){status("allMatchHistoryStatus",playersError.message,"error");return;}
-      (players||[]).forEach(p=>names[p.id]=p.display_name);
+    try{
+      // Page through the full table so lineup sequence counts are not cut off at 1,000 rows.
+      const pageSize=1000;
+      let matches=[],from=0;
+      while(true){
+        const {data,error}=await client.from("matches")
+          .select("id,player_id,opponent_name,match_date,player_goals,opponent_goals,result,points,status,counted,exclusion_reason,submitted_at,approved_at")
+          .order("match_date",{ascending:false})
+          .order("submitted_at",{ascending:false})
+          .range(from,from+pageSize-1);
+        if(error)throw error;
+        const page=data||[];
+        matches=matches.concat(page);
+        if(page.length<pageSize)break;
+        from+=pageSize;
+      }
+      const ids=[...new Set(matches.map(m=>m.player_id).filter(Boolean))];
+      const names={};
+      // Keep player-name lookups in safe-sized batches.
+      for(let i=0;i<ids.length;i+=200){
+        const batch=ids.slice(i,i+200);
+        const {data:players,error}=await client.from("players").select("id,display_name").in("id",batch);
+        if(error)throw error;
+        (players||[]).forEach(p=>names[p.id]=p.display_name);
+      }
+      const normalize=v=>String(v||"").trim().replace(/\\s+/g," ").toLocaleLowerCase();
+      const monthLabel=month=>new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
+      const pairKey=m=>{
+        const a=normalize(names[m.player_id]||"Unknown player");
+        const b=normalize(m.opponent_name||"Unknown opponent");
+        return [a,b].sort().join("::");
+      };
+      // Sequence is based on every submission in the match month, including pending/rejected.
+      const sequences={};
+      matches.slice().sort((a,b)=>
+        String(a.match_date||"").localeCompare(String(b.match_date||"")) ||
+        String(a.submitted_at||"").localeCompare(String(b.submitted_at||"")) ||
+        String(a.id||"").localeCompare(String(b.id||""))
+      ).forEach(m=>{
+        const month=String(m.match_date||m.submitted_at||"").slice(0,7)||"unknown";
+        const key=month+"|"+pairKey(m);
+        sequences[m.id]=(sequences[key]||0)+1;
+        sequences[key]=sequences[m.id];
+      });
+      const groups={};
+      matches.forEach(m=>{
+        const month=String(m.match_date||m.submitted_at||"").slice(0,7)||"unknown";
+        (groups[month]||(groups[month]=[])).push(m);
+      });
+      const months=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+      const renderMonth=month=>{
+        const rows=groups[month].map(m=>{
+          const submittedBy=names[m.player_id]||"Unknown player";
+          const opponent=m.opponent_name||"Unknown opponent";
+          const seq=sequences[m.id]||1;
+          const official=m.status==="approved"&&m.counted===true;
+          return '<tr><td>'+prettyDate(m.match_date)+'</td>'+
+            '<td>'+esc(submittedBy)+'</td>'+
+            '<td>'+esc(submittedBy)+' <span class="muted">vs</span> '+esc(opponent)+'</td>'+
+            '<td><b>'+m.player_goals+' – '+m.opponent_goals+'</b></td>'+
+            '<td><span class="pill">'+seq+'/5</span></td>'+
+            '<td>'+esc(m.result||"—")+'</td>'+
+            '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status||"unknown")+'</span></td>'+
+            '<td><span class="pill '+(official?"good":"")+'">'+(official?"Yes":"No")+'</span></td>'+
+            '<td>'+esc(m.exclusion_reason||"—")+'</td>'+
+            '<td>'+esc(m.submitted_at?new Date(m.submitted_at).toLocaleString():"—")+'</td></tr>';
+        }).join("");
+        return '<details class="panel month-history-group" open><summary><b>'+esc(monthLabel(month))+'</b><span class="muted">'+groups[month].length+' submissions</span></summary>'+
+          '<div class="table-wrap"><table><thead><tr><th>Match date</th><th>Submitted by</th><th>Complete lineup</th><th>Score</th><th>Lineup sequence</th><th>Result</th><th>Status</th><th>Officially counted</th><th>Exclusion reason</th><th>Submitted at</th></tr></thead><tbody>'+rows+'</tbody></table></div></details>';
+      };
+      $("allMatchHistoryBody").innerHTML="";
+      $("allMatchHistoryBody").closest("table").parentElement.innerHTML=months.length
+        ?months.map(renderMonth).join("")
+        :'<div class="panel soft">No match records found.</div>';
+      status("allMatchHistoryStatus",matches.length+" total submissions across "+months.length+" match month(s). Each lineup is counted in both directions together. Lineup sequence includes pending and rejected submissions; “Officially counted” means approved and counted. Monthly groups are based on match date.");
+    }catch(err){
+      status("allMatchHistoryStatus",err.message||"Could not load all match history.","error");
     }
-    status("allMatchHistoryStatus",matches.length+" total match records. Lineup is shown as submitted; status and counted flag are current.");
-    $("allMatchHistoryBody").innerHTML=matches.length?matches.map(m=>
-      '<tr><td>'+prettyDate(m.match_date)+'</td>'+
-      '<td>'+esc(names[m.player_id]||"Unknown player")+' <span class="muted">vs</span> '+esc(m.opponent_name||"Unknown opponent")+'</td>'+
-      '<td><b>'+m.player_goals+' – '+m.opponent_goals+'</b></td>'+
-      '<td>'+esc(m.result||"—")+'</td>'+
-      '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status||"unknown")+'</span></td>'+
-      '<td><span class="pill '+(m.counted?"good":"")+'">'+(m.counted?"Yes":"No")+'</span></td>'+
-      '<td>'+esc(m.exclusion_reason||"—")+'</td>'+
-      '<td>'+esc(m.submitted_at?new Date(m.submitted_at).toLocaleString():"—")+'</td></tr>'
-    ).join(""):'<tr><td colspan="8" class="empty">No match records found.</td></tr>';
   }
 
   async function recoverPlayerAccount(playerId,button){
