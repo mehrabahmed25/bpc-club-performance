@@ -30,6 +30,7 @@
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
     if(name==="home"){loadLeaderboard();loadPublicPoster();}
+    else $("uclPosterSection").classList.add("hidden");
     if(name==="history")loadHistory();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
