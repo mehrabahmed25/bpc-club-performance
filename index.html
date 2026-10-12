@@ -102,6 +102,13 @@
       <div id="posterAdminList" class="poster-admin-list"></div>
       <div id="adminStatus" class="status"></div>
       <div id="pendingList" class="pending-list"></div>
+
+      <div class="section-head compact"><h2>All match history</h2><p>View every submitted result, including approved, pending, and rejected matches.</p></div>
+      <div class="toolbar"><button type="button" class="secondary" id="toggleAllMatchHistory">Show all match history</button><button type="button" class="secondary" id="refreshAllMatchHistory">↻ Refresh all matches</button></div>
+      <div id="allMatchHistoryPanel" class="hidden">
+        <div id="allMatchHistoryStatus" class="status"></div>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Complete lineup</th><th>Score</th><th>Result</th><th>Status</th><th>Counted</th><th>Exclusion reason</th><th>Submitted</th></tr></thead><tbody id="allMatchHistoryBody"><tr><td colspan="8" class="empty">Click “Show all match history” to load records.</td></tr></tbody></table></div>
+      </div>
       <div class="section-head compact"><h2>Manage COBEG XI members</h2><p>Add members who count toward the award requirement.</p></div>
       <form id="memberForm" class="inline-form panel"><input id="newMemberName" maxlength="100" required placeholder="New COBEG XI member name"><button class="primary" type="submit">Add member</button></form>
       <div id="memberList" class="member-list"></div>
