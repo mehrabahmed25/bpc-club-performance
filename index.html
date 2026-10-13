@@ -102,6 +102,8 @@
     <div id="adminDenied" class="panel soft">This section is only available to administrators.</div>
     <div id="adminContent" class="hidden">
       <div class="toolbar"><button class="secondary" id="refreshPending">↻ Refresh pending</button><span id="pendingCount" class="pill">0 pending</span></div>
+      <div id="adminStatus" class="status"></div>
+      <div id="pendingList" class="pending-list"></div>
             <div class="section-head compact"><h2>Website branding</h2><p>Upload your official BPC logo and set the name shown in the website header.</p></div>
       <form id="brandingForm" class="panel poster-admin-form">
         <label>Club name<input id="brandNameInput" maxlength="80" value="Brahmanbaria Pes Club" required></label>
@@ -140,9 +142,6 @@
         <div id="posterAdminStatus" class="status"></div>
       </form>
       <div id="posterAdminList" class="poster-admin-list"></div>
-      <div id="adminStatus" class="status"></div>
-      <div id="pendingList" class="pending-list"></div>
-
       <div class="section-head compact"><h2>All match history</h2><p>View every submitted result, including approved, pending, and rejected matches.</p></div>
       <div class="toolbar"><button type="button" class="secondary" id="toggleAllMatchHistory">Show all match history</button><button type="button" class="secondary" id="refreshAllMatchHistory">↻ Refresh all matches</button></div>
       <div id="allMatchHistoryPanel" class="hidden">
