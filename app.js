@@ -14,6 +14,49 @@
   members:[],
   registeredPlayers:[]
 };
+  const BRAND_DEFAULTS={name:"Brahmanbaria Pes Club",subtitle:"Official Website",logo_path:null};
+  let siteBranding={...BRAND_DEFAULTS};
+  function renderBranding(){
+    $("siteBrandName").textContent=siteBranding.name||BRAND_DEFAULTS.name;
+    $("siteBrandSubtitle").textContent=siteBranding.subtitle||BRAND_DEFAULTS.subtitle;
+    const logo=$("siteLogo"),fallback=$("siteLogoFallback");
+    if(siteBranding.logo_path&&client){
+      logo.src=client.storage.from("bpc-posters").getPublicUrl(siteBranding.logo_path).data.publicUrl;
+      logo.classList.remove("hidden");fallback.classList.add("hidden");
+    }else{logo.removeAttribute("src");logo.classList.add("hidden");fallback.classList.remove("hidden");}
+  }
+  async function loadBranding(){
+    renderBranding();
+    if(!client)return;
+    const {data,error}=await client.from("site_branding").select("club_name,subtitle,logo_path").eq("id",1).maybeSingle();
+    if(!error&&data)siteBranding={name:data.club_name||BRAND_DEFAULTS.name,subtitle:data.subtitle||BRAND_DEFAULTS.subtitle,logo_path:data.logo_path||null};
+    renderBranding();
+    $("brandNameInput").value=siteBranding.name;
+    $("brandSubtitleInput").value=siteBranding.subtitle;
+  }
+  loadBranding();
+  $("brandingForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    if(!state.isAdmin||!state.session){status("brandingStatus","Only an admin can save website branding.","error");return;}
+    const name=$("brandNameInput").value.trim(),subtitle=$("brandSubtitleInput").value.trim(),file=$("brandLogoFile").files?.[0];
+    if(!name||!subtitle){status("brandingStatus","Enter both the club name and subtitle.","error");return;}
+    if(file&&file.size>8*1024*1024){status("brandingStatus","Logo must be 8 MB or smaller.","error");return;}
+    if(file&&![ "image/jpeg","image/png","image/webp","image/gif"].includes(file.type)){status("brandingStatus","Choose a JPG, PNG, WEBP, or GIF logo.","error");return;}
+    const btn=$("saveBrandingBtn");btn.disabled=true;status("brandingStatus","Saving website branding…");
+    try{
+      let logoPath=siteBranding.logo_path;
+      if(file){
+        logoPath="branding/"+Date.now()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+        const up=await client.storage.from("bpc-posters").upload(logoPath,file,{contentType:file.type,upsert:false});
+        if(up.error)throw up.error;
+      }
+      const {error}=await client.from("site_branding").upsert({id:1,club_name:name,subtitle,logo_path:logoPath,updated_by:state.session.user.id,updated_at:new Date().toISOString()},{onConflict:"id"});
+      if(error)throw error;
+      siteBranding={name,subtitle,logo_path:logoPath};renderBranding();$("brandLogoFile").value="";
+      status("brandingStatus","Branding saved. The website header is updated.","success");
+    }catch(err){status("brandingStatus",err.message||"Could not save branding. Run the branding SQL migration first.","error");}
+    finally{btn.disabled=false;}
+  });
   let posterSlides = [];
   let posterIndex = 0;
   let posterTimer = null;
