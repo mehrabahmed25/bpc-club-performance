@@ -13,7 +13,8 @@
   <a class="brand" href="#" data-view="home"><span class="brand-mark">BPC</span><span><b>Club Performance</b><small>Official match tracker</small></span></a>
   <button id="menuBtn" class="mobile-menu" aria-label="Open menu">☰</button>
   <nav id="nav">
-    <button data-view="home" class="navlink active">Leaderboard</button>
+    <button data-view="home" class="navlink active">Home</button>
+    <button data-view="leaderboard" class="navlink">Leaderboard</button>
     <button data-view="history" class="navlink">Match history</button>
     <button data-view="submit" class="navlink auth-only hidden">Submit result</button>
     <button data-view="admin" class="navlink admin-only hidden">Admin</button>
@@ -21,6 +22,9 @@
   </nav>
 </header>
 <main>
+  <section id="view-leaderboard" class="view hidden">
+    <div class="section-head"><p class="eyebrow">BPC CLUB UPDATES</p><h2>Home</h2><p>Latest club announcements, news and updates.</p></div>
+    <section id="homeBannerSection" class="home-banner-section hidden" aria-label="Club performance banner"><img id="homeBannerImage" class="home-banner-image" alt="BPC club performance banner"></section>
   <section id="uclPosterSection" class="poster-section hidden" aria-label="UCL finalists poster">
     <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">UCL Finalists</h2></div><span class="poster-badge">Featured</span></div>
     <img id="posterImage" class="poster-image" alt="Club announcement">
@@ -31,8 +35,7 @@
     </div>
     <p id="posterCaption" class="poster-caption">Featured for a limited time.</p>
   </section>
-
-  <section id="view-home" class="view">
+    <div class="home-news-intro"><h2>Club announcements &amp; news</h2><p>Stay updated with the latest from BPC.</p></div>
     <div class="hero">
       <div><p class="eyebrow">BPC SEASON · MONTHLY RANKINGS</p><h1>Every match counts.<br><span>Every point matters.</span></h1><p class="hero-sub">Follow the leaderboard, compare performance, and track the road to monthly awards.</p></div>
       <div class="hero-stat"><span class="trophy">🏆</span><b id="leaderboardMonthLabel">Monthly leaderboard</b><small>Updated from approved results</small></div>
@@ -96,6 +99,14 @@
     <div id="adminDenied" class="panel soft">This section is only available to administrators.</div>
     <div id="adminContent" class="hidden">
       <div class="toolbar"><button class="secondary" id="refreshPending">↻ Refresh pending</button><span id="pendingCount" class="pill">0 pending</span></div>
+      <div class="section-head compact"><h2>Home page banner</h2><p>Upload a club-performance banner for the Home page. It stays visible until you remove it.</p></div>
+      <form id="bannerForm" class="panel poster-admin-form">
+        <label>Choose banner image<input id="bannerFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required></label>
+        <p class="small">Use JPG, PNG, WEBP, or GIF. Maximum file size: 8 MB.</p>
+        <button class="primary" id="publishBannerBtn" type="submit">Upload banner</button>
+        <div id="bannerAdminStatus" class="status"></div>
+      </form>
+      <div id="bannerAdminCurrent" class="poster-admin-list"></div>
       <div class="section-head compact"><h2>UCL finalists poster</h2><p>Upload an announcement image to show it at the top of the Leaderboard. It stays visible until you remove it manually.</p></div>
       <form id="posterForm" class="panel poster-admin-form">
         <label>Poster title<input id="posterUploadTitle" maxlength="120" value="UCL Finalists" required></label>
