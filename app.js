@@ -32,8 +32,9 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadLeaderboard();loadPublicPoster();}
-    else { $("uclPosterSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
+    if(name==="home"){loadPublicPoster();loadHomeBanner();}
+    else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
+    if(name==="leaderboard")loadLeaderboard();
     if(name==="history")loadHistory();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
@@ -85,7 +86,7 @@
   async function loadPublicPoster(){
     if(!client)return;
     const section=$("uclPosterSection");
-    const {data,error}=await client.from("site_posters").select("id,title,image_path,published_at,expires_at").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("published_at",{ascending:false}).limit(30);
+    const {data,error}=await client.from("site_posters").select("id,title,image_path,published_at,expires_at").eq("is_active",true).neq("title","BPC Home Banner").lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("published_at",{ascending:false}).limit(30);
     if(error||!data||!data.length){
       posterSlides=[];if(posterTimer){clearInterval(posterTimer);posterTimer=null;}
       section.classList.add("hidden");return;
@@ -97,6 +98,38 @@
   }
   $("posterPrev").addEventListener("click",()=>{posterIndex=(posterIndex-1+posterSlides.length)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
   $("posterNext").addEventListener("click",()=>{posterIndex=(posterIndex+1)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
+
+  async function loadHomeBanner(){
+    if(!client)return;
+    const section=$("homeBannerSection");
+    const {data,error}=await client.from("site_posters").select("id,image_path").eq("title","BPC Home Banner").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("created_at",{ascending:false}).limit(1);
+    if(error||!data||!data.length){section.classList.add("hidden");return;}
+    $("homeBannerImage").src=client.storage.from("bpc-posters").getPublicUrl(data[0].image_path).data.publicUrl;
+    section.classList.remove("hidden");
+  }
+
+  $("bannerForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    if(!state.isAdmin||!state.session)return;
+    const file=$("bannerFile").files?.[0];
+    if(!file){status("bannerAdminStatus","Choose a banner image first.","error");return;}
+    if(file.size>8*1024*1024){status("bannerAdminStatus","Image must be 8 MB or smaller.","error");return;}
+    if(!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type)){status("bannerAdminStatus","Please choose a JPG, PNG, WEBP, or GIF image.","error");return;}
+    const btn=$("publishBannerBtn");btn.disabled=true;status("bannerAdminStatus","Uploading banner…");
+    const path="banners/"+Date.now()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    try{
+      const up=await client.storage.from("bpc-posters").upload(path,file,{contentType:file.type,upsert:false});
+      if(up.error)throw up.error;
+      const {error}=await client.from("site_posters").update({is_active:false}).eq("title","BPC Home Banner").eq("is_active",true);
+      if(error)throw error;
+      const {error:insertError}=await client.from("site_posters").insert({title:"BPC Home Banner",image_path:path,is_active:true,created_by:state.session.user.id,expires_at:"9999-12-31T23:59:59.000Z"});
+      if(insertError)throw insertError;
+      $("bannerFile").value="";
+      status("bannerAdminStatus","Home banner uploaded. It will remain until you replace or remove it.","success");
+      await loadHomeBanner();await loadPosterAdmin();
+    }catch(err){status("bannerAdminStatus",err.message||"Could not upload banner.","error");}
+    finally{btn.disabled=false;}
+  });
 
   async function loadPosterAdmin(){
     if(!client||!state.isAdmin)return;
@@ -782,7 +815,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         showView("account");
       }
     }
-    await loadMembers();await loadLeaderboard();await loadPublicPoster();
+    await loadMembers();await loadPublicPoster();await loadHomeBanner();
   }
   boot();
 })();
