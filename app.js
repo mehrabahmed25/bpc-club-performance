@@ -99,12 +99,41 @@
   $("posterPrev").addEventListener("click",()=>{posterIndex=(posterIndex-1+posterSlides.length)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
   $("posterNext").addEventListener("click",()=>{posterIndex=(posterIndex+1)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
 
+  function bannerDestinationValue(){
+    const choice=$("bannerDestination").value;
+    if(choice==="none")return "";
+    if(choice==="custom"){
+      const raw=$("bannerCustomUrl").value.trim();
+      if(!raw)return null;
+      try{const url=new URL(raw);if(url.protocol!=="https:"&&url.protocol!=="http:")return null;return url.href;}catch{return null;}
+    }
+    return ({home:"home",leaderboard:"leaderboard",history:"history",submit:"submit"})[choice]||"";
+  }
+  function renderHomeBannerLink(url){
+    const img=$("homeBannerImage");
+    $("homeBannerSection").dataset.destination=url||"";
+    img.style.cursor=url?"pointer":"default";
+    img.tabIndex=url?0:-1;
+    img.setAttribute("role",url?"link":"img");
+    img.setAttribute("aria-label",url?"Club banner — open destination":"BPC club performance banner");
+  }
+  function openBannerDestination(){
+    const destination=$("homeBannerSection").dataset.destination;
+    if(!destination)return;
+    if(["home","leaderboard","history","submit"].includes(destination)){showView(destination);return;}
+    try{const url=new URL(destination);if(url.protocol==="https:"||url.protocol==="http:")window.open(url.href,"_blank","noopener,noreferrer");}catch{}
+  }
+  $("bannerDestination").addEventListener("change",()=>{$("bannerCustomUrlLabel").classList.toggle("hidden",$("bannerDestination").value!=="custom");});
+  $("homeBannerImage").addEventListener("click",openBannerDestination);
+  $("homeBannerImage").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openBannerDestination();}});
+
   async function loadHomeBanner(){
     if(!client)return;
     const section=$("homeBannerSection");
-    const {data,error}=await client.from("site_posters").select("id,image_path").eq("title","BPC Home Banner").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("created_at",{ascending:false}).limit(1);
+    const {data,error}=await client.from("site_posters").select("id,image_path,link_url").eq("title","BPC Home Banner").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("created_at",{ascending:false}).limit(1);
     if(error||!data||!data.length){section.classList.add("hidden");return;}
     $("homeBannerImage").src=client.storage.from("bpc-posters").getPublicUrl(data[0].image_path).data.publicUrl;
+    renderHomeBannerLink(data[0].link_url||"");
     section.classList.remove("hidden");
   }
 
@@ -122,7 +151,9 @@
       if(up.error)throw up.error;
       const {error}=await client.from("site_posters").update({is_active:false}).eq("title","BPC Home Banner").eq("is_active",true);
       if(error)throw error;
-      const {error:insertError}=await client.from("site_posters").insert({title:"BPC Home Banner",image_path:path,is_active:true,created_by:state.session.user.id,expires_at:"9999-12-31T23:59:59.000Z"});
+      const destination=bannerDestinationValue();
+      if(destination===null)throw new Error("Please enter a valid http:// or https:// custom URL.");
+      const {error:insertError}=await client.from("site_posters").insert({title:"BPC Home Banner",image_path:path,link_url:destination||null,is_active:true,created_by:state.session.user.id,expires_at:"9999-12-31T23:59:59.000Z"});
       if(insertError)throw insertError;
       $("bannerFile").value="";
       status("bannerAdminStatus","Home banner uploaded. It will remain until you replace or remove it.","success");
