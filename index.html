@@ -105,6 +105,18 @@
       <div class="section-head compact"><h2>Home page banner</h2><p>Upload a club-performance banner for the Home page. It stays visible until you remove it.</p></div>
       <form id="bannerForm" class="panel poster-admin-form">
         <label>Choose banner image<input id="bannerFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required></label>
+        <label>Banner destination
+          <select id="bannerDestination" required>
+            <option value="leaderboard">Leaderboard</option>
+            <option value="home">Home page</option>
+            <option value="history">Match history</option>
+            <option value="submit">Submit result</option>
+            <option value="custom">Custom URL</option>
+            <option value="none">No link</option>
+          </select>
+        </label>
+        <label id="bannerCustomUrlLabel" class="hidden">Custom URL<input id="bannerCustomUrl" type="url" placeholder="https://example.com"></label>
+        <p class="small">Choose where visitors go when they click the homepage banner.</p>
         <p class="small">Use JPG, PNG, WEBP, or GIF. Maximum file size: 8 MB.</p>
         <button class="primary" id="publishBannerBtn" type="submit">Upload banner</button>
         <div id="bannerAdminStatus" class="status"></div>
