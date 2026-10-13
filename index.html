@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101d35">
-<title>BPC Club Performance</title>
+<title>Brahmanbaria Pes Club — Official Website</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="#" data-view="home"><span class="brand-mark">BPC</span><span><b>Club Performance</b><small>Official match tracker</small></span></a>
+  <a class="brand" href="#" data-view="home"><img id="siteLogo" class="brand-logo hidden" alt="Brahmanbaria Pes Club logo"><span id="siteLogoFallback" class="brand-mark">BPC</span><span><b id="siteBrandName">Brahmanbaria Pes Club</b><small id="siteBrandSubtitle">Official Website</small></span></a>
   <button id="menuBtn" class="mobile-menu" aria-label="Open menu">☰</button>
   <nav id="nav">
     <button data-view="home" class="navlink active">Home</button>
@@ -102,6 +102,15 @@
     <div id="adminDenied" class="panel soft">This section is only available to administrators.</div>
     <div id="adminContent" class="hidden">
       <div class="toolbar"><button class="secondary" id="refreshPending">↻ Refresh pending</button><span id="pendingCount" class="pill">0 pending</span></div>
+            <div class="section-head compact"><h2>Website branding</h2><p>Upload your official BPC logo and set the name shown in the website header.</p></div>
+      <form id="brandingForm" class="panel poster-admin-form">
+        <label>Club name<input id="brandNameInput" maxlength="80" value="Brahmanbaria Pes Club" required></label>
+        <label>Subtitle<input id="brandSubtitleInput" maxlength="100" value="Official Website" required></label>
+        <label>Upload club logo<input id="brandLogoFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+        <p class="small">Logo is optional. Use a square PNG with a transparent background for best results. JPG, PNG, WEBP, or GIF up to 8 MB.</p>
+        <button class="primary" id="saveBrandingBtn" type="submit">Save branding</button>
+        <div id="brandingStatus" class="status"></div>
+      </form>
       <div class="section-head compact"><h2>Home page banner</h2><p>Upload a club-performance banner for the Home page. It stays visible until you remove it.</p></div>
       <form id="bannerForm" class="panel poster-admin-form">
         <label>Choose banner image<input id="bannerFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required></label>
