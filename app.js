@@ -877,6 +877,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       const uid=state.session?.user?.id;
       officialState.canEdit=!!uid&&(state.isAdmin||officialState.editors.some(x=>x.user_id===uid));
       $("officialEditorPanel").classList.toggle("hidden",!officialState.canEdit);
+      const editorAdminControls=$("officialEditorAdminControls");if(editorAdminControls)editorAdminControls.classList.toggle("hidden",!state.isAdmin);
       const seasonPicker=$("officialSeasonPicker"),old=seasonPicker.value;
       seasonPicker.innerHTML=officialState.seasons.length?officialState.seasons.map(x=>'<option value="'+x.id+'">'+esc(x.name)+(x.is_closed?' (closed)':'')+'</option>').join(""):'<option value="">No seasons created</option>';
       if(officialState.seasons.some(x=>x.id===old))seasonPicker.value=old;
