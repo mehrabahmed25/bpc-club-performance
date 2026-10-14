@@ -726,6 +726,10 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     });
   }
 
+  let headToHeadFilter={a:"",b:""};
+  $("searchHeadToHead").addEventListener("click",()=>{const a=$("headToHeadPlayerA").value,b=$("headToHeadPlayerB").value;if(!a||!b){status("allMatchHistoryStatus","Choose both players to search.","error");return;}if(a===b){status("allMatchHistoryStatus","Choose two different players.","error");return;}headToHeadFilter={a,b};loadAllMatchHistory();});
+  $("clearHeadToHead").addEventListener("click",()=>{headToHeadFilter={a:"",b:""};$("headToHeadPlayerA").value="";$("headToHeadPlayerB").value="";loadAllMatchHistory();});
+
   async function loadAllMatchHistory(){
     if(!client||!state.isAdmin)return;
     status("allMatchHistoryStatus","Loading all match records…");
@@ -755,6 +759,10 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         (players||[]).forEach(p=>names[p.id]=p.display_name);
       }
       const normalize=v=>String(v||"").trim().replace(/\\s+/g," ").toLocaleLowerCase();
+      const playerOptions=Object.entries(names).map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
+      for(const id of ["headToHeadPlayerA","headToHeadPlayerB"]){const el=$(id),selected=el.value;el.innerHTML='<option value="">Choose player</option>'+playerOptions.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");if(selected&&playerOptions.some(p=>p.id===selected))el.value=selected;}
+      if(headToHeadFilter.a&&playerOptions.some(p=>p.id===headToHeadFilter.a))$("headToHeadPlayerA").value=headToHeadFilter.a;
+      if(headToHeadFilter.b&&playerOptions.some(p=>p.id===headToHeadFilter.b))$("headToHeadPlayerB").value=headToHeadFilter.b;
       const monthLabel=month=>new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
       const pairKey=m=>{
         const a=normalize(names[m.player_id]||"Unknown player");
@@ -773,8 +781,10 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         sequences[m.id]=(sequences[key]||0)+1;
         sequences[key]=sequences[m.id];
       });
+      const allMatches=matches;
+      const filteredMatches=headToHeadFilter.a&&headToHeadFilter.b?allMatches.filter(m=>{const submitted=normalize(names[m.player_id]||"");const opponent=normalize(m.opponent_name||"");const a=normalize(names[headToHeadFilter.a]||"");const b=normalize(names[headToHeadFilter.b]||"");return (submitted===a&&opponent===b)||(submitted===b&&opponent===a);}):allMatches;
       const groups={};
-      matches.forEach(m=>{
+      filteredMatches.forEach(m=>{
         const month=String(m.match_date||m.submitted_at||"").slice(0,7)||"unknown";
         (groups[month]||(groups[month]=[])).push(m);
       });
@@ -802,7 +812,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       $("allMatchHistoryGroups").innerHTML=months.length
         ?months.map(renderMonth).join("")
         :'<div class="panel soft">No match records found.</div>';
-      status("allMatchHistoryStatus",matches.length+" total submissions across "+months.length+" match month(s). Each lineup is counted in both directions together. Only approved results advance the lineup sequence; pending and rejected submissions remain visible but do not count. “Officially counted” means approved and counted. Monthly groups are based on match date.");
+      status("allMatchHistoryStatus",headToHeadFilter.a&&headToHeadFilter.b?filteredMatches.length+" matching submissions between "+(names[headToHeadFilter.a]||"Player A")+" and "+(names[headToHeadFilter.b]||"Player B")+". Includes both directions and all statuses.":"Showing all "+matches.length+" submissions across "+months.length+" match month(s). Each lineup is counted in both directions together. Only approved results advance the lineup sequence; pending and rejected submissions remain visible but do not count. “Officially counted” means approved and counted. Monthly groups are based on match date.");
     }catch(err){
       status("allMatchHistoryStatus",err.message||"Could not load all match history.","error");
     }
