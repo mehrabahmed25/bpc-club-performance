@@ -766,7 +766,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         if(legacyError)throw legacyError;
         (legacyPlayers||[]).forEach(p=>{if(p.id&&p.display_name)names[p.id]=p.display_name;});
       }
-      const normalize=v=>String(v||"").trim().replace(/\\s+/g," ").toLocaleLowerCase();
+      const normalize=v=>String(v||"").trim().replace(/\s+/g," ").toLocaleLowerCase();
       const playerOptions=Object.entries(names).map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
       for(const id of ["headToHeadPlayerA","headToHeadPlayerB"]){
         const el=$(id),selected=el.value;
