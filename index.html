@@ -146,6 +146,10 @@
       <div class="section-head compact"><h2>All match history</h2><p>View every submitted result, including approved, pending, and rejected matches.</p></div>
       <div class="toolbar"><button type="button" class="secondary" id="toggleAllMatchHistory">Show all match history</button><button type="button" class="secondary" id="refreshAllMatchHistory">↻ Refresh all matches</button></div>
       <div id="allMatchHistoryPanel" class="hidden">
+        <div class="panel" id="headToHeadSearchPanel">
+          <div class="section-head compact"><h3>Search matches between two players</h3><p>Includes both lineup directions and approved, rejected, and pending submissions.</p></div>
+          <div class="inline-form"><label>Player A<select id="headToHeadPlayerA"><option value="">Choose player</option></select></label><label>Player B<select id="headToHeadPlayerB"><option value="">Choose player</option></select></label><button type="button" class="primary" id="searchHeadToHead">Search</button><button type="button" class="secondary" id="clearHeadToHead">Clear search</button></div>
+        </div>
         <div id="allMatchHistoryStatus" class="status"></div>
         <div id="allMatchHistoryGroups"><div class="panel soft">Click “Show all match history” to load records.</div></div>
       </div>
