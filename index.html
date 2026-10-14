@@ -16,6 +16,7 @@
     <button data-view="home" class="navlink active">Home</button>
     <button data-view="leaderboard" class="navlink">Leaderboard</button>
     <button data-view="history" class="navlink">Match history</button>
+    <button data-view="official" class="navlink">Official Matches</button>
     <button data-view="submit" class="navlink auth-only hidden">Submit result</button>
     <button data-view="admin" class="navlink admin-only hidden">Admin</button>
     <button data-view="account" class="navlink" id="accountNav">Sign in</button>
@@ -173,6 +174,44 @@
     <div class="section-head"><p class="eyebrow">YOUR SEASON</p><h2 id="profileHeading">My dashboard</h2><p>Your counted results for the selected month.</p></div>
     <div id="profileStats" class="stats-grid"></div>
     <div class="panel soft"><h3>Monthly award eligibility</h3><p id="eligibilityText">Sign in to view your eligibility.</p><button class="primary" data-view="submit">Submit a match</button></div>
+  </section>
+
+
+  <section id="view-official" class="view hidden">
+    <div class="section-head"><p class="eyebrow">BPC COMPETITION RECORDS</p><h2>Official Matches</h2><p>Track BPC players' results against outside opponents. Only the designated editor and admins can manage records.</p></div>
+    <div class="official-tabs" role="tablist" aria-label="Official standings views">
+      <button type="button" class="primary" id="officialAllTimeTab">All-time standings</button>
+      <button type="button" class="secondary" id="officialSeasonTab">Season standings</button>
+    </div>
+    <div id="officialSeasonPickerWrap" class="toolbar hidden"><div><label for="officialSeasonPicker">Choose season</label><select id="officialSeasonPicker"></select></div><span id="officialSeasonDates" class="small"></span></div>
+    <div id="officialStatus" class="status"></div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Player</th><th>Played</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody id="officialStandingsBody"><tr><td colspan="10" class="empty">Loading official standings…</td></tr></tbody></table></div>
+    <p class="table-note">Points: win 3, draw 1, loss 0. Rankings use points, goal difference, then wins. Outside opponents are not recorded by name.</p>
+    <section id="officialEditorPanel" class="hidden">
+      <div class="section-head compact"><h2>Official match editor</h2><p>Add or correct a BPC player's official result. Results update all-time and season standings automatically.</p></div>
+      <div id="officialEditorStatus" class="status"></div>
+      <form id="officialResultForm" class="panel">
+        <input type="hidden" id="officialResultId">
+        <label>BPC player<select id="officialPlayer" required></select></label>
+        <label>Match date<input id="officialMatchDate" type="date" required></label>
+        <div class="score-grid"><label>Goals scored<input id="officialGoalsFor" type="number" min="0" max="99" step="1" required></label><span class="vs">VS</span><label>Goals conceded<input id="officialGoalsAgainst" type="number" min="0" max="99" step="1" required></label></div>
+        <div class="official-form-actions"><button class="primary" id="officialSaveResult" type="submit">Save official result</button><button class="secondary hidden" id="officialCancelEdit" type="button">Cancel edit</button></div>
+      </form>
+      <div class="section-head compact"><h2>Saved official results</h2></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Player</th><th>Score</th><th>Result</th><th>Actions</th></tr></thead><tbody id="officialResultsBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody></table></div>
+      <div class="section-head compact"><h2>Manage seasons</h2><p>Create a season with custom dates, or edit and close an existing season.</p></div>
+      <form id="officialSeasonForm" class="panel">
+        <input type="hidden" id="officialSeasonId">
+        <label>Season name<input id="officialSeasonName" maxlength="80" required placeholder="2026 Season"></label>
+        <div class="score-grid"><label>Start date<input id="officialSeasonStart" type="date" required></label><span class="vs">TO</span><label>End date<input id="officialSeasonEnd" type="date" required></label></div>
+        <button class="primary" type="submit" id="officialSaveSeason">Save season</button>
+        <button class="secondary hidden" type="button" id="officialCancelSeasonEdit">Cancel edit</button>
+      </form>
+      <div id="officialSeasonAdminList" class="member-list"></div>
+      <div class="section-head compact"><h2>Designated editor</h2><p>Assign a registered account to manage this page only. This does not grant full website admin access.</p></div>
+      <form id="officialEditorAssignForm" class="inline-form panel"><select id="officialEditorAccount" required aria-label="Registered account"></select><button class="primary" type="submit">Assign editor</button></form>
+      <div id="officialEditorList" class="member-list"></div>
+    </section>
   </section>
 
   <footer class="footer"><span>BPC Club Performance</span><span>Results count after admin approval.</span></footer>
