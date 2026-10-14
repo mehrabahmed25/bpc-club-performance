@@ -749,20 +749,30 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         if(page.length<pageSize)break;
         from+=pageSize;
       }
-      const ids=[...new Set(matches.map(m=>m.player_id).filter(Boolean))];
+      // Populate the head-to-head selectors from registered player profiles,
+      // not only from players who already have a match in the current history result.
+      const {data:players,error:playersError}=await client.from("players")
+        .select("id,display_name")
+        .order("display_name",{ascending:true});
+      if(playersError)throw playersError;
       const names={};
-      // Keep player-name lookups in safe-sized batches.
-      for(let i=0;i<ids.length;i+=200){
-        const batch=ids.slice(i,i+200);
-        const {data:players,error}=await client.from("players").select("id,display_name").in("id",batch);
-        if(error)throw error;
-        (players||[]).forEach(p=>names[p.id]=p.display_name);
+      (players||[]).forEach(p=>{if(p.id&&p.display_name)names[p.id]=p.display_name;});
+      // Keep names for match records even if a legacy player profile is no longer present.
+      const missingIds=[...new Set(matches.map(m=>m.player_id).filter(id=>id&&!names[id]))];
+      for(let i=0;i<missingIds.length;i+=200){
+        const batch=missingIds.slice(i,i+200);
+        const {data:legacyPlayers,error:legacyError}=await client.from("players")
+          .select("id,display_name").in("id",batch);
+        if(legacyError)throw legacyError;
+        (legacyPlayers||[]).forEach(p=>{if(p.id&&p.display_name)names[p.id]=p.display_name;});
       }
       const normalize=v=>String(v||"").trim().replace(/\\s+/g," ").toLocaleLowerCase();
       const playerOptions=Object.entries(names).map(([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
-      for(const id of ["headToHeadPlayerA","headToHeadPlayerB"]){const el=$(id),selected=el.value;el.innerHTML='<option value="">Choose player</option>'+playerOptions.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");if(selected&&playerOptions.some(p=>p.id===selected))el.value=selected;}
-      if(headToHeadFilter.a&&playerOptions.some(p=>p.id===headToHeadFilter.a))$("headToHeadPlayerA").value=headToHeadFilter.a;
-      if(headToHeadFilter.b&&playerOptions.some(p=>p.id===headToHeadFilter.b))$("headToHeadPlayerB").value=headToHeadFilter.b;
+      for(const id of ["headToHeadPlayerA","headToHeadPlayerB"]){
+        const el=$(id),selected=el.value;
+        el.innerHTML='<option value="">Choose player</option>'+playerOptions.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join("");
+        if(selected&&playerOptions.some(p=>p.id===selected))el.value=selected;
+      }
       const monthLabel=month=>new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
       const pairKey=m=>{
         const a=normalize(names[m.player_id]||"Unknown player");
