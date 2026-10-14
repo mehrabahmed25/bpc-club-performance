@@ -208,9 +208,11 @@
         <button class="secondary hidden" type="button" id="officialCancelSeasonEdit">Cancel edit</button>
       </form>
       <div id="officialSeasonAdminList" class="member-list"></div>
-      <div class="section-head compact"><h2>Designated editor</h2><p>Assign a registered account to manage this page only. This does not grant full website admin access.</p></div>
-      <form id="officialEditorAssignForm" class="inline-form panel"><select id="officialEditorAccount" required aria-label="Registered account"></select><button class="primary" type="submit">Assign editor</button></form>
-      <div id="officialEditorList" class="member-list"></div>
+      <div id="officialEditorAdminControls" class="admin-only hidden">
+        <div class="section-head compact"><h2>Designated editor</h2><p>Assign a registered account to manage this page only. This does not grant full website admin access.</p></div>
+        <form id="officialEditorAssignForm" class="inline-form panel"><select id="officialEditorAccount" required aria-label="Registered account"></select><button class="primary" type="submit">Assign editor</button></form>
+        <div id="officialEditorList" class="member-list"></div>
+      </div>
     </section>
   </section>
 
