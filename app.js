@@ -79,6 +79,7 @@
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="history")loadHistory();
+    if(name==="official")loadOfficialPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
     window.scrollTo({top:0,behavior:"smooth"});
@@ -840,6 +841,100 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const {error}=await client.from("cobeg_members").insert({name,active:true});
     if(error){status("adminStatus",error.message,"error");return;}
     $("newMemberName").value="";toast("COBEG XI member added.");await loadAdmin();await loadMembers();
+  });
+
+
+  // Official Matches is isolated from the friendly-match tables and leaderboard.
+  const officialState={players:[],seasons:[],matches:[],editors:[],mode:"all",loaded:false,canEdit:false};
+  const officialResult=(gf,ga)=>gf>ga?"Win":gf<ga?"Loss":"Draw";
+  function officialStats(playerId,season){
+    const rows=officialState.matches.filter(m=>m.player_id===playerId&&(!season||(m.match_date>=season.start_date&&m.match_date<=season.end_date)));
+    const s={played:rows.length,w:0,d:0,l:0,gf:0,ga:0,pts:0};
+    rows.forEach(m=>{s.gf+=Number(m.goals_for);s.ga+=Number(m.goals_against);if(m.goals_for>m.goals_against){s.w++;s.pts+=3;}else if(m.goals_for===m.goals_against){s.d++;s.pts++;}else s.l++;});
+    s.gd=s.gf-s.ga;return s;
+  }
+  function renderOfficialStandings(){
+    const season=officialState.mode==="season"?officialState.seasons.find(s=>s.id===$("officialSeasonPicker").value):null;
+    $("officialSeasonPickerWrap").classList.toggle("hidden",officialState.mode!=="season");
+    $("officialAllTimeTab").className=officialState.mode==="all"?"primary":"secondary";
+    $("officialSeasonTab").className=officialState.mode==="season"?"primary":"secondary";
+    $("officialSeasonDates").textContent=season?prettyDate(season.start_date)+" – "+prettyDate(season.end_date):"";
+    const rows=officialState.players.map(p=>({p,s:officialStats(p.id,season)})).sort((a,b)=>b.s.pts-a.s.pts||b.s.gd-a.s.gd||b.s.w-a.s.w||a.p.display_name.localeCompare(b.p.display_name));
+    $("officialStandingsBody").innerHTML=rows.length?rows.map((r,i)=>'<tr><td>'+ (i+1)+'</td><td>'+esc(r.p.display_name)+'</td><td>'+r.s.played+'</td><td>'+r.s.w+'</td><td>'+r.s.d+'</td><td>'+r.s.l+'</td><td>'+r.s.gf+'</td><td>'+r.s.ga+'</td><td>'+ (r.s.gd>0?"+":"")+r.s.gd+'</td><td class="points">'+r.s.pts+'</td></tr>').join(""):'<tr><td colspan="10" class="empty">No registered players found.</td></tr>';
+  }
+  async function loadOfficialPage(){
+    if(!client){status("officialStatus","Database connection is not configured.","error");return;}
+    status("officialStatus","Loading official standings…");
+    try{
+      const [p,s,m,e]=await Promise.all([
+        client.from("official_player_directory").select("id,display_name").order("display_name"),
+        client.from("official_seasons").select("id,name,start_date,end_date,is_closed").order("start_date",{ascending:false}),
+        client.from("official_matches").select("id,player_id,match_date,goals_for,goals_against,created_at").order("match_date",{ascending:false}),
+        state.session?client.from("official_matches_editors").select("user_id,assigned_at"):Promise.resolve({data:[],error:null})
+      ]);
+      for(const x of [p,s,m,e])if(x.error)throw x.error;
+      officialState.players=p.data||[];officialState.seasons=s.data||[];officialState.matches=m.data||[];officialState.editors=e.data||[];
+      const uid=state.session?.user?.id;
+      officialState.canEdit=!!uid&&(state.isAdmin||officialState.editors.some(x=>x.user_id===uid));
+      $("officialEditorPanel").classList.toggle("hidden",!officialState.canEdit);
+      const seasonPicker=$("officialSeasonPicker"),old=seasonPicker.value;
+      seasonPicker.innerHTML=officialState.seasons.length?officialState.seasons.map(x=>'<option value="'+x.id+'">'+esc(x.name)+(x.is_closed?' (closed)':'')+'</option>').join(""):'<option value="">No seasons created</option>';
+      if(officialState.seasons.some(x=>x.id===old))seasonPicker.value=old;
+      $("officialPlayer").innerHTML=officialState.players.map(x=>'<option value="'+x.id+'">'+esc(x.display_name)+'</option>').join("");
+      $("officialMatchDate").value=$("officialMatchDate").value||new Date().toISOString().slice(0,10);
+      $("officialEditorAccount").innerHTML='<option value="">Choose registered account</option>';
+      if(state.isAdmin){
+        const {data:accounts,error}=await client.from("players").select("user_id,display_name").not("user_id","is",null).order("display_name");
+        if(error)throw error;
+        $("officialEditorAccount").innerHTML='<option value="">Choose registered account</option>'+(accounts||[]).map(x=>'<option value="'+x.user_id+'">'+esc(x.display_name)+'</option>').join("");
+      }
+      renderOfficialStandings();renderOfficialResults();renderOfficialSeasons();renderOfficialEditors();
+      status("officialStatus",officialState.mode==="season"&&!officialState.seasons.length?"Create a season to view season-specific standings.":"Official standings updated.","success");
+    }catch(err){status("officialStatus",err.message||"Could not load official matches. Run the official-matches SQL migration first.","error");}
+  }
+  function renderOfficialResults(){
+    const sorted=[...officialState.matches].sort((a,b)=>b.match_date.localeCompare(a.match_date));
+    $("officialResultsBody").innerHTML=sorted.length?sorted.map(m=>{const p=officialState.players.find(x=>x.id===m.player_id);return '<tr><td>'+prettyDate(m.match_date)+'</td><td>'+esc(p?.display_name||"Registered player")+'</td><td>'+m.goals_for+' – '+m.goals_against+'</td><td>'+officialResult(m.goals_for,m.goals_against)+'</td><td><button type="button" class="secondary" data-official-edit="'+m.id+'">Edit</button> <button type="button" class="reject-btn" data-official-delete="'+m.id+'">Delete</button></td></tr>';}).join(""):'<tr><td colspan="5" class="empty">No official results recorded yet.</td></tr>';
+    document.querySelectorAll("[data-official-edit]").forEach(b=>b.onclick=()=>{const m=officialState.matches.find(x=>x.id===b.dataset.officialEdit);if(!m)return;$("officialResultId").value=m.id;$("officialPlayer").value=m.player_id;$("officialMatchDate").value=m.match_date;$("officialGoalsFor").value=m.goals_for;$("officialGoalsAgainst").value=m.goals_against;$("officialSaveResult").textContent="Update official result";$("officialCancelEdit").classList.remove("hidden");$("officialResultForm").scrollIntoView({behavior:"smooth",block:"center"});});
+    document.querySelectorAll("[data-official-delete]").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this official result? Standings will be recalculated."))return;const {error}=await client.from("official_matches").delete().eq("id",b.dataset.officialDelete);if(error){status("officialEditorStatus",error.message,"error");return;}toast("Official result deleted.");await loadOfficialPage();});
+  }
+  function renderOfficialSeasons(){
+    $("officialSeasonAdminList").innerHTML=officialState.seasons.map(s=>'<span class="member-chip">'+esc(s.name)+' · '+prettyDate(s.start_date)+'–'+prettyDate(s.end_date)+(s.is_closed?' · Closed':'')+' <button type="button" class="secondary" data-season-edit="'+s.id+'">Edit</button> <button type="button" class="secondary" data-season-close="'+s.id+'">'+(s.is_closed?'Reopen':'Close')+'</button></span>').join("")||'<span class="small">No seasons yet.</span>';
+    document.querySelectorAll("[data-season-edit]").forEach(b=>b.onclick=()=>{const s=officialState.seasons.find(x=>x.id===b.dataset.seasonEdit);if(!s)return;$("officialSeasonId").value=s.id;$("officialSeasonName").value=s.name;$("officialSeasonStart").value=s.start_date;$("officialSeasonEnd").value=s.end_date;$("officialSaveSeason").textContent="Update season";$("officialCancelSeasonEdit").classList.remove("hidden");});
+    document.querySelectorAll("[data-season-close]").forEach(b=>b.onclick=async()=>{const s=officialState.seasons.find(x=>x.id===b.dataset.seasonClose);if(!s)return;const {error}=await client.from("official_seasons").update({is_closed:!s.is_closed}).eq("id",s.id);if(error){status("officialEditorStatus",error.message,"error");return;}await loadOfficialPage();});
+  }
+  function renderOfficialEditors(){
+    $("officialEditorList").innerHTML=state.isAdmin?officialState.editors.map(e=>{const p=officialState.players.find(x=>x.user_id===e.user_id);return '<span class="member-chip">'+esc(p?.display_name||"Assigned account")+' <button type="button" class="reject-btn" data-editor-remove="'+e.user_id+'">Remove</button></span>';}).join("")||'<span class="small">No designated editor assigned.</span>':"";
+    document.querySelectorAll("[data-editor-remove]").forEach(b=>b.onclick=async()=>{if(!confirm("Remove this page editor?"))return;const {error}=await client.from("official_matches_editors").delete().eq("user_id",b.dataset.editorRemove);if(error){status("officialEditorStatus",error.message,"error");return;}await loadOfficialPage();});
+  }
+  $("officialAllTimeTab").addEventListener("click",()=>{officialState.mode="all";renderOfficialStandings();});
+  $("officialSeasonTab").addEventListener("click",()=>{officialState.mode="season";renderOfficialStandings();});
+  $("officialSeasonPicker").addEventListener("change",renderOfficialStandings);
+  $("officialResultForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();if(!officialState.canEdit)return;
+    const id=$("officialResultId").value;
+    const row={player_id:$("officialPlayer").value,match_date:$("officialMatchDate").value,goals_for:Number($("officialGoalsFor").value),goals_against:Number($("officialGoalsAgainst").value),updated_by:state.session.user.id};
+    if(!row.player_id||!row.match_date||row.goals_for<0||row.goals_against<0||!Number.isInteger(row.goals_for)||!Number.isInteger(row.goals_against)){status("officialEditorStatus","Choose a player, date, and valid whole-number scores.","error");return;}
+    const result=id?await client.from("official_matches").update(row).eq("id",id):await client.from("official_matches").insert({...row,created_by:state.session.user.id});
+    if(result.error){status("officialEditorStatus",result.error.message,"error");return;}
+    $("officialResultForm").reset();$("officialResultId").value="";$("officialSaveResult").textContent="Save official result";$("officialCancelEdit").classList.add("hidden");toast(id?"Official result updated.":"Official result saved.");await loadOfficialPage();
+  });
+  $("officialCancelEdit").addEventListener("click",()=>{$("officialResultForm").reset();$("officialResultId").value="";$("officialSaveResult").textContent="Save official result";$("officialCancelEdit").classList.add("hidden");});
+  $("officialSeasonForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();if(!officialState.canEdit)return;
+    const id=$("officialSeasonId").value,name=$("officialSeasonName").value.trim(),start_date=$("officialSeasonStart").value,end_date=$("officialSeasonEnd").value;
+    if(!name||!start_date||!end_date||end_date<start_date){status("officialEditorStatus","Enter a season name and valid date range.","error");return;}
+    const payload={name,start_date,end_date,updated_by:state.session.user.id};
+    const result=id?await client.from("official_seasons").update(payload).eq("id",id):await client.from("official_seasons").insert({...payload,created_by:state.session.user.id});
+    if(result.error){status("officialEditorStatus",result.error.message,"error");return;}
+    $("officialSeasonForm").reset();$("officialSeasonId").value="";$("officialSaveSeason").textContent="Save season";$("officialCancelSeasonEdit").classList.add("hidden");toast("Season saved.");await loadOfficialPage();
+  });
+  $("officialCancelSeasonEdit").addEventListener("click",()=>{$("officialSeasonForm").reset();$("officialSeasonId").value="";$("officialSaveSeason").textContent="Save season";$("officialCancelSeasonEdit").classList.add("hidden");});
+  $("officialEditorAssignForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();if(!state.isAdmin){status("officialEditorStatus","Only a full website admin can assign the page editor.","error");return;}
+    const user_id=$("officialEditorAccount").value;if(!user_id){status("officialEditorStatus","Choose a registered account first.","error");return;}
+    const {error}=await client.from("official_matches_editors").upsert({user_id,assigned_by:state.session.user.id},{onConflict:"user_id"});
+    if(error){status("officialEditorStatus",error.message,"error");return;}toast("Official Matches editor assigned.");await loadOfficialPage();
   });
 
   async function boot(){
