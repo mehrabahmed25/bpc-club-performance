@@ -579,8 +579,11 @@ async function loadHistory(){
   const playerNames = {};
 
   if(playerIds.length){
+    // Use the readable directory exposed to signed-in players.
+    // Direct reads from "players" may be restricted by row-level security,
+    // causing valid submitted-by names to appear as "Unknown player".
     const {data:players,error:playersError} = await client
-      .from("players")
+      .from("active_player_directory")
       .select("id,display_name")
       .in("id",playerIds);
 
@@ -590,7 +593,7 @@ async function loadHistory(){
     }
 
     (players || []).forEach(p=>{
-      playerNames[p.id] = p.display_name;
+      if(p.id && p.display_name) playerNames[p.id] = p.display_name;
     });
   }
 
