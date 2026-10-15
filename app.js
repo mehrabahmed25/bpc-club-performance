@@ -607,16 +607,39 @@ async function loadHistory(){
       opponentName === myName;
   });
 
+  const normalizeHistoryName = v => String(v || "").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  const historyPairKey = m => [
+    normalizeHistoryName(playerNames[m.player_id] || "Unknown player"),
+    normalizeHistoryName(m.opponent_name || "Unknown opponent")
+  ].sort().join("::");
+  // Approved results alone advance the sequence, matching the admin history logic.
+  const historySequences = {};
+  matches.filter(m => m.status === "approved").slice().sort((a,b) =>
+    String(a.match_date || "").localeCompare(String(b.match_date || "")) ||
+    String(a.submitted_at || "").localeCompare(String(b.submitted_at || "")) ||
+    String(a.id || "").localeCompare(String(b.id || ""))
+  ).forEach(m => {
+    const monthKey = String(m.match_date || m.submitted_at || "").slice(0,7) || "unknown";
+    const key = monthKey + "|" + historyPairKey(m);
+    historySequences[m.id] = (historySequences[key] || 0) + 1;
+    historySequences[key] = historySequences[m.id];
+  });
+
   const rows = personalMatches.map(m=>{
     const submittedName = (playerNames[m.player_id] || "").trim();
     const isOpponentView =
       submittedName.toLowerCase() !== myName &&
       (m.opponent_name || "").trim().toLowerCase() === myName;
+    const common = {
+      ...m,
+      historySubmittedBy: submittedName || "—",
+      historyLineup: (submittedName || "Unknown player") + " vs " + (m.opponent_name || "Unknown opponent"),
+      historySequence: historySequences[m.id] || null
+    };
 
     if(!isOpponentView){
       return {
-        ...m,
-        historyOpponent: m.opponent_name,
+        ...common,
         historyPlayerGoals: m.player_goals,
         historyOpponentGoals: m.opponent_goals,
         historyResult: m.result,
@@ -624,30 +647,17 @@ async function loadHistory(){
       };
     }
 
-    
-const myGoals = m.opponent_goals;
-const theirGoals = m.player_goals;
-
-const historyResult = myGoals > theirGoals
-  ? "WIN"
-  : myGoals < theirGoals
-    ? "LOSS"
-    : "DRAW";
-
-const historyPoints = myGoals > theirGoals
-  ? 3
-  : myGoals === theirGoals
-    ? 1
-    : 0;
-
-return {
-  ...m,
-  historyOpponent: submittedName,
-  historyPlayerGoals: myGoals,
-  historyOpponentGoals: theirGoals,
-  historyResult,
-  historyPoints
-};
+    const myGoals = m.opponent_goals;
+    const theirGoals = m.player_goals;
+    const historyResult = myGoals > theirGoals ? "WIN" : myGoals < theirGoals ? "LOSS" : "DRAW";
+    const historyPoints = myGoals > theirGoals ? 3 : myGoals === theirGoals ? 1 : 0;
+    return {
+      ...common,
+      historyPlayerGoals: myGoals,
+      historyOpponentGoals: theirGoals,
+      historyResult,
+      historyPoints
+    };
   });
 
   status("historyStatus",rows.length+" personal results in this view.");
@@ -655,14 +665,16 @@ return {
   $("historyBody").innerHTML = rows.length
     ? rows.map(m=>
       '<tr><td>'+prettyDate(m.match_date)+'</td>'+
-      '<td>'+esc(m.historyOpponent)+'</td>'+
+      '<td>'+esc(m.historySubmittedBy)+'</td>'+
+      '<td>'+esc(m.historyLineup)+'</td>'+
       '<td><b>'+m.historyPlayerGoals+' – '+m.historyOpponentGoals+'</b></td>'+
       '<td>'+esc(m.historyResult)+'</td>'+
       '<td>'+(m.historyPoints ?? m.points)+'</td>'+
+      '<td>'+(m.historySequence?'<span class="pill">'+m.historySequence+'/5</span>':'<span class="muted">—</span>')+'</td>'+
       '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status)+'</span></td>'+
       '<td><span class="pill '+(m.counted?"good":"")+'">'+(m.counted?"Yes":"No")+'</span></td></tr>'
     ).join("")
-    : '<tr><td colspan="7" class="empty">No match results found for this month.</td></tr>';
+    : '<tr><td colspan="9" class="empty">No match results found for this month.</td></tr>';
 }
   async function loadProfile(){
     if(!client||!state.session){showView("account");return;}
