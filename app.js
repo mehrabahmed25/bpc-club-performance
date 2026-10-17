@@ -533,10 +533,18 @@ $("matchForm").addEventListener("submit", async e => {
     status("leaderboardStatus","Loading rankings…");
     const {data,error}=await client.rpc("get_leaderboard",{p_month:monthDate(month)});
     if(error){status("leaderboardStatus",error.message,"error");return;}
+    const {data:cobegTotals,error:cobegError}=await client.rpc("get_cobeg_match_totals",{p_month:monthDate(month)});
+    if(cobegError){status("leaderboardStatus","Leaderboard loaded, but COBEG XI match totals could not be loaded: "+cobegError.message,"error");return;}
+    const cobegByPlayer={};
+    (cobegTotals||[]).forEach(row=>{cobegByPlayer[row.player_id]=Number(row.total_mp_vs_cobeg_xi)||0;});
     status("leaderboardStatus",data.length+" active players · Approved and counted results only.");
     const body=$("leaderboardBody");
-    if(!data.length){body.innerHTML='<tr><td colspan="12" class="empty">No active players yet. Members can register to appear here.</td></tr>';return;}
-    body.innerHTML=data.map(r=>'<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell"><span class="avatar">'+esc((r.player_name||"?").split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td><span class="pill '+(r.award_eligible?'good':'')+'">'+(r.award_eligible?'Eligible':'In progress')+'</span></td></tr>').join("");
+    if(!data.length){body.innerHTML='<tr><td colspan="13" class="empty">No active players yet. Members can register to appear here.</td></tr>';return;}
+    body.innerHTML=data.map(r=>{
+      const total=cobegByPlayer[r.player_id]||0;
+      const eligible=!!r.award_eligible&&total>=25;
+      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell"><span class="avatar">'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
+    }).join("");
   }
   function signed(n){return n>0?"+"+n:n;}
 
