@@ -17,7 +17,7 @@ AS $$
     COUNT(*)::bigint AS total_mp_vs_cobeg_xi
   FROM public.matches AS m
   JOIN public.cobeg_members AS c
-    ON m.cobeg_member_id = c.id
+    ON lower(trim(m.opponent_name)) = lower(trim(c.name))
   WHERE m.match_date >= date_trunc('month', p_month)::date
     AND m.match_date < (date_trunc('month', p_month) + interval '1 month')::date
     AND m.status = 'approved'
