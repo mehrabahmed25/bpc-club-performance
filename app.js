@@ -542,7 +542,7 @@ $("matchForm").addEventListener("submit", async e => {
     if(!data.length){body.innerHTML='<tr><td colspan="13" class="empty">No active players yet. Members can register to appear here.</td></tr>';return;}
     body.innerHTML=data.map(r=>{
       const total=cobegByPlayer[r.player_id]||0;
-      const eligible=!!r.award_eligible&&total>=25;
+      const eligible=!!r.award_eligible;
       return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell"><span class="avatar">'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
     }).join("");
   }
@@ -694,13 +694,9 @@ async function loadHistory(){
     if(error){$("profileStats").innerHTML='<div class="panel">'+esc(error.message)+'</div>';return;}
     const s=data?.[0];
     if(!s){$("profileStats").innerHTML="";return;}
-    const {data:totals,error:totalsError}=await client.rpc("get_cobeg_match_totals",{p_month:monthDate($("monthPicker").value||monthNow)});
-    if(totalsError){$("eligibilityText").textContent="Could not load COBEG XI match totals: "+totalsError.message;return;}
-    const cobegTotal=(totals||[]).find(row=>row.player_id===state.player?.id)?.total_mp_vs_cobeg_xi||0;
-    const eligible=!!s.award_eligible&&Number(cobegTotal)>=25;
-    const vals=[["Matches",s.matches_played],["Wins",s.wins],["Draws",s.draws],["Losses",s.losses],["Goals for",s.goals_for],["Goals against",s.goals_against],["Goal difference",signed(s.goal_difference)],["Points",s.points],["MP vs COBEG XI",cobegTotal+"/25"]];
+    const vals=[["Matches",s.matches_played],["Wins",s.wins],["Draws",s.draws],["Losses",s.losses],["Goals for",s.goals_for],["Goals against",s.goals_against],["Goal difference",signed(s.goal_difference)],["Points",s.points]];
     $("profileStats").innerHTML=vals.map(x=>'<div class="stat-card"><small>'+x[0]+'</small><b>'+x[1]+'</b></div>').join("");
-    $("eligibilityText").textContent=eligible?"You are currently eligible for the monthly award.":`Award requirements: at least 40 counted matches, 5 different COBEG XI opponents, and 25 counted matches vs COBEG XI. Current progress: ${s.matches_played}/40 counted matches, ${s.cobeg_opponents}/5 COBEG XI opponents, ${cobegTotal}/25 COBEG XI matches. Pending matches this month: ${s.pending_matches}.`;
+    $("eligibilityText").textContent=s.award_eligible?"You are currently eligible for the monthly award.":`You need at least 40 counted matches and 5 different COBEG XI opponents. Current progress: ${s.matches_played}/40 counted matches, ${s.cobeg_opponents}/5 COBEG XI opponents. Pending matches this month: ${s.pending_matches}.`;
   }
 
   async function loadAdmin(){
