@@ -12,7 +12,8 @@
   signup:false,
   recoveryMode:false,
   members:[],
-  registeredPlayers:[]
+  registeredPlayers:[],
+  canAccessFunds:false
 };
   const BRAND_DEFAULTS={name:"Brahmanbaria Pes Club",subtitle:"Official Website",logo_path:null};
   let siteBranding={...BRAND_DEFAULTS};
@@ -71,6 +72,7 @@
   function monthDate(v){return v ? v+"-01" : new Date().toISOString().slice(0,10);}
   function prettyDate(v){if(!v)return "—";const d=new Date(v+"T12:00:00");return d.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"});}
   function showView(name){
+    if(name==="funds"&&!state.canAccessFunds){toast("BPC Funds is restricted to authorized accounts.");name="home";}
     document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
@@ -80,6 +82,7 @@
     if(name==="leaderboard")loadLeaderboard();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
+    if(name==="funds")loadFundsPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
     window.scrollTo({top:0,behavior:"smooth"});
@@ -276,6 +279,7 @@
     $("accountNav").textContent=signed?(state.profile?.display_name||"My account"):"Sign in";
     document.querySelectorAll(".auth-only").forEach(x=>x.classList.toggle("hidden",!signed));
     document.querySelectorAll(".admin-only").forEach(x=>x.classList.toggle("hidden",!state.isAdmin));
+    $("fundsNav").classList.toggle("hidden",!state.canAccessFunds);
     $("historySignIn").classList.toggle("hidden",signed);
     $("historyContent").classList.toggle("hidden",!signed);
     if(signed){
@@ -706,6 +710,7 @@ async function loadHistory(){
     $("adminContent").classList.toggle("hidden",!state.isAdmin);
     if(!state.isAdmin)return;
     await loadPosterAdmin();
+    await loadFundsAccessAdmin();
     status("adminStatus","Loading pending submissions…");
     const {data,error}=await client.from("matches").select("id,player_id,opponent_name,match_date,player_goals,opponent_goals,result,points,notes,submitted_at").eq("status","pending").order("submitted_at",{ascending:true}).limit(100);
     if(error){status("adminStatus",error.message,"error");return;}
@@ -974,6 +979,73 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     $("officialSeasonForm").reset();$("officialSeasonId").value="";$("officialSaveSeason").textContent="Save season";$("officialCancelSeasonEdit").classList.add("hidden");toast("Season saved.");await loadOfficialPage();
   });
   $("officialCancelSeasonEdit").addEventListener("click",()=>{$("officialSeasonForm").reset();$("officialSeasonId").value="";$("officialSaveSeason").textContent="Save season";$("officialCancelSeasonEdit").classList.add("hidden");});
+
+  async function refreshFundsAccess(){
+    state.canAccessFunds=!!state.isAdmin;
+    if(client&&state.session&&!state.isAdmin){
+      const {data,error}=await client.from("bpc_funds_access").select("user_id").eq("user_id",state.session.user.id).maybeSingle();
+      state.canAccessFunds=!error&&!!data;
+    }
+    const nav=$("fundsNav");if(nav)nav.classList.toggle("hidden",!state.canAccessFunds);
+    const current=$("view-funds");
+    if(current&&!current.classList.contains("hidden")&&!state.canAccessFunds)showView("home");
+  }
+  async function loadFundsAccessAdmin(){
+    if(!state.isAdmin||!client)return;
+    status("fundsAccessStatus","Loading authorized accounts…");
+    const [accountsResult,accessResult]=await Promise.all([
+      client.from("players").select("user_id,display_name").not("user_id","is",null).order("display_name"),
+      client.from("bpc_funds_access").select("user_id,granted_at").order("granted_at",{ascending:true})
+    ]);
+    if(accountsResult.error||accessResult.error){status("fundsAccessStatus",accountsResult.error?.message||accessResult.error?.message||"Could not load access list.","error");return;}
+    const accounts=accountsResult.data||[], access=accessResult.data||[], names={};
+    accounts.forEach(a=>{names[a.user_id]=a.display_name||"Registered account";});
+    $("fundsAccessAccount").innerHTML='<option value="">Choose registered account</option>'+accounts.filter(a=>!access.some(x=>x.user_id===a.user_id)).map(a=>'<option value="'+esc(a.user_id)+'">'+esc(a.display_name||"Registered account")+'</option>').join("");
+    $("fundsAccessList").innerHTML=access.length?access.map(a=>'<div class="member-chip">'+esc(names[a.user_id]||a.user_id)+' <button type="button" class="reject-btn" data-revoke-funds="'+esc(a.user_id)+'">Remove access</button></div>').join(""):'<p class="small">No additional accounts have been granted access yet. Administrators always have access.</p>';
+    status("fundsAccessStatus",access.length+" account(s) granted access.");
+    document.querySelectorAll("[data-revoke-funds]").forEach(btn=>btn.onclick=async()=>{
+      if(!state.isAdmin)return;
+      const userId=btn.dataset.revokeFunds;
+      if(!confirm("Remove BPC Funds access for "+(names[userId]||"this account")+"?"))return;
+      const {error}=await client.from("bpc_funds_access").delete().eq("user_id",userId);
+      if(error){status("fundsAccessStatus",error.message,"error");return;}
+      await loadFundsAccessAdmin();toast("BPC Funds access removed.");
+    });
+  }
+  $("fundsAccessForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    if(!state.isAdmin||!state.session){status("fundsAccessStatus","Only administrators can grant access.","error");return;}
+    const user_id=$("fundsAccessAccount").value;
+    if(!user_id){status("fundsAccessStatus","Choose an account first.","error");return;}
+    const {error}=await client.from("bpc_funds_access").upsert({user_id,granted_by:state.session.user.id},{onConflict:"user_id"});
+    if(error){status("fundsAccessStatus",error.message,"error");return;}
+    await loadFundsAccessAdmin();toast("BPC Funds access granted.");
+  });
+  async function loadFundsPage(){
+    if(!client||!state.session||!state.canAccessFunds){$("fundsDenied").classList.remove("hidden");$("fundsContent").classList.add("hidden");return;}
+    $("fundsDenied").classList.add("hidden");$("fundsContent").classList.remove("hidden");
+    $("fundDate").value=$("fundDate").value||new Date().toISOString().slice(0,10);
+    status("fundsStatus","Loading donation history…");
+    const {data,error}=await client.from("bpc_fund_donations").select("id,donor_name,amount,donation_date,note,created_by,created_at").order("donation_date",{ascending:false}).order("created_at",{ascending:false});
+    if(error){status("fundsStatus",error.message,"error");$("fundsHistoryBody").innerHTML='<tr><td colspan="5" class="empty">Could not load donation history.</td></tr>';return;}
+    const ids=[...new Set((data||[]).map(x=>x.created_by))], names={};
+    if(ids.length){const {data:profiles}=await client.from("profiles").select("id,display_name").in("id",ids);(profiles||[]).forEach(p=>names[p.id]=p.display_name||"Member");}
+    $("fundsHistoryBody").innerHTML=(data||[]).length?data.map(d=>'<tr><td>'+prettyDate(d.donation_date)+'</td><td>'+esc(d.donor_name)+'</td><td>'+Number(d.amount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td>'+esc(d.note||"—")+'</td><td>'+esc(names[d.created_by]||"Member")+'</td></tr>').join(""):'<tr><td colspan="5" class="empty">No donations have been recorded yet.</td></tr>';
+    status("fundsStatus",(data||[]).length+" donation record(s).");
+  }
+  $("fundDonationForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    if(!state.session||!state.canAccessFunds){status("fundFormStatus","You do not have permission to add donations.","error");return;}
+    const donor_name=$("fundDonorName").value.trim(),amount=Number($("fundAmount").value),donation_date=$("fundDate").value,note=$("fundNote").value.trim();
+    if(!donor_name||!Number.isFinite(amount)||amount<=0||!donation_date){status("fundFormStatus","Enter a donor, valid positive amount, and date.","error");return;}
+    const btn=ev.submitter;if(btn)btn.disabled=true;
+    const {error}=await client.from("bpc_fund_donations").insert({donor_name,amount,donation_date,note:note||null,created_by:state.session.user.id});
+    if(error)status("fundFormStatus",error.message,"error");
+    else{$("fundDonationForm").reset();$("fundDate").value=new Date().toISOString().slice(0,10);status("fundFormStatus","Donation saved.");await loadFundsPage();}
+    if(btn)btn.disabled=false;
+  });
+  $("refreshFunds").addEventListener("click",loadFundsPage);
+
   $("officialEditorAssignForm").addEventListener("submit",async ev=>{
     ev.preventDefault();if(!state.isAdmin){status("officialEditorStatus","Only a full website admin can assign the page editor.","error");return;}
     const user_id=$("officialEditorAccount").value;if(!user_id){status("officialEditorStatus","Choose a registered account first.","error");return;}
@@ -992,7 +1064,8 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         return;
       }
       if(session){try{await loadIdentity();}catch(e){console.error(e);}}
-      else{state.profile=null;state.player=null;state.isAdmin=false;}
+      else{state.profile=null;state.player=null;state.isAdmin=false;state.canAccessFunds=false;}
+      await refreshFundsAccess();
       setAuthUI();
     });
     const urlParams=new URLSearchParams(location.search);
@@ -1022,6 +1095,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       showView("account");
     }else{
       if(state.session)await loadIdentity();
+      await refreshFundsAccess();
       setAuthUI();
       if(recoveryHash && !state.session){
         status("authMessage","This recovery link could not establish a valid session. Request a fresh password reset email and open the newest link in the same browser.","error");
