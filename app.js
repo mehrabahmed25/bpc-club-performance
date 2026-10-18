@@ -1054,7 +1054,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
   }
   $("fundDonationForm").addEventListener("submit",async ev=>{
     ev.preventDefault();
-    if(!state.session||!state.canAccessFunds){status("fundFormStatus","You do not have permission to add donations.","error");return;}
+    if(!state.session||!state.isAdmin){status("fundFormStatus","Only administrators can record donations.","error");return;}
     const donor_name=$("fundDonorName").value.trim(),amount=Number($("fundAmount").value),donation_date=$("fundDate").value,note=$("fundNote").value.trim();
     if(!donor_name||!Number.isFinite(amount)||amount<=0||!donation_date){status("fundFormStatus","Enter a donor, valid positive amount, and date.","error");return;}
     const btn=ev.submitter;if(btn)btn.disabled=true;
