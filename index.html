@@ -17,6 +17,7 @@
     <button data-view="leaderboard" class="navlink">Leaderboard</button>
     <button data-view="history" class="navlink">Match history</button>
     <button data-view="official" class="navlink">Official Matches</button>
+    <button data-view="tournaments" class="navlink">Tournaments</button>
     <button data-view="funds" id="fundsNav" class="navlink hidden">BPC Funds</button>
     <button data-view="submit" class="navlink auth-only hidden">Submit result</button>
     <button data-view="admin" class="navlink admin-only hidden">Admin</button>
@@ -216,6 +217,36 @@
     <div class="panel soft"><h3>Monthly award eligibility</h3><p id="eligibilityText">Sign in to view your eligibility.</p><button class="primary" data-view="submit">Submit a match</button></div>
   </section>
 
+
+
+  <section id="view-tournaments" class="view hidden">
+    <div class="section-head"><p class="eyebrow">BPC COMPETITIONS</p><h2>Tournaments</h2><p>Browse tournaments, register to compete, and follow fixtures and approved results. Tournament records are separate from friendly-match statistics.</p></div>
+    <div id="tournamentStatus" class="status"></div>
+    <div id="tournamentAdminPanel" class="panel hidden">
+      <div class="section-head compact"><h2>Create tournament</h2><p>Configure a tournament before publishing it.</p></div>
+      <form id="tournamentCreateForm">
+        <label>Tournament name<input id="tournamentName" maxlength="120" required placeholder="e.g. BPC Autumn Cup"></label>
+        <label>Description<textarea id="tournamentDescription" rows="3" maxlength="3000" placeholder="Rules and tournament details"></textarea></label>
+        <div class="score-grid">
+          <label>Competition type<select id="tournamentType"><option value="individual">Individual</option><option value="team">Team</option></select></label>
+          <label>Format<select id="tournamentFormat"><option value="round_robin">Round robin</option><option value="knockout">Knockout</option><option value="group_knockout">Group stage + knockout</option><option value="swiss">Swiss</option></select></label>
+        </div>
+        <div class="score-grid">
+          <label>Visibility<select id="tournamentVisibility"><option value="all_members">All logged-in members</option><option value="participants_admins">Participants and admins</option><option value="restricted">Restricted (participant/admin)</option></select></label>
+          <label>Registration<select id="tournamentRegistrationMode"><option value="both">Self-registration + admin-managed</option><option value="self">Self-registration</option><option value="admin">Admin-managed</option></select></label>
+        </div>
+        <label>Score workflow<select id="tournamentWorkflow"><option value="participant_admin">Participant submits → admin approves</option><option value="admin_entered">Admin enters and approves</option><option value="participant_opponent_admin">Participant submits → opponent confirms → admin resolves</option></select></label>
+        <div class="score-grid">
+          <label>Registration deadline<input id="tournamentDeadline" type="datetime-local"></label>
+          <label>Participant limit (optional)<input id="tournamentLimit" type="number" min="2" step="1" placeholder="No limit"></label>
+        </div>
+        <label><input id="tournamentRequireApproval" type="checkbox"> Require admin approval for registrations</label>
+        <button class="primary" type="submit">Save as draft</button>
+      </form>
+    </div>
+    <div id="tournamentList" class="tournament-list"><div class="panel soft">Loading tournaments…</div></div>
+    <div id="tournamentDetail" class="hidden"></div>
+  </section>
 
   <section id="view-official" class="view hidden">
     <div class="section-head"><p class="eyebrow">BPC COMPETITION RECORDS</p><h2>Official Matches</h2><p>Track BPC players' results against outside opponents. Only the designated editor and admins can manage records.</p></div>
