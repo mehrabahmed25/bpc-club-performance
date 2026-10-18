@@ -17,6 +17,7 @@
     <button data-view="leaderboard" class="navlink">Leaderboard</button>
     <button data-view="history" class="navlink">Match history</button>
     <button data-view="official" class="navlink">Official Matches</button>
+    <button data-view="funds" id="fundsNav" class="navlink hidden">BPC Funds</button>
     <button data-view="submit" class="navlink auth-only hidden">Submit result</button>
     <button data-view="admin" class="navlink admin-only hidden">Admin</button>
     <button data-view="account" class="navlink" id="accountNav">Sign in</button>
@@ -156,6 +157,10 @@
       <div class="section-head compact"><h2>Manage COBEG XI members</h2><p>Add members who count toward the award requirement.</p></div>
       <form id="memberForm" class="inline-form panel"><input id="newMemberName" maxlength="100" required placeholder="New COBEG XI member name"><button class="primary" type="submit">Add member</button></form>
       <div id="memberList" class="member-list"></div>
+      <div class="section-head compact"><h2>BPC Funds access</h2><p>Grant or remove access to the private BPC Funds page. Only administrators can manage access.</p></div>
+      <form id="fundsAccessForm" class="inline-form panel"><select id="fundsAccessAccount" required aria-label="Registered account"></select><button class="primary" type="submit">Grant access</button></form>
+      <div id="fundsAccessStatus" class="status"></div>
+      <div id="fundsAccessList" class="member-list"></div>
       <div class="section-head compact"><h2>Player accounts</h2><p>Newly registered players appear here. You can activate/deactivate and assign admin role in the Supabase dashboard.</p></div>
 
 <div class="table-wrap">
@@ -171,6 +176,23 @@
     <tbody id="playersBody"></tbody>
   </table>
 </div>      <p class="small">To make another admin, use Supabase SQL Editor after they create an account: <code>update public.profiles set role='admin' where id='AUTH_USER_UUID';</code></p>
+    </div>
+  </section>
+
+  <section id="view-funds" class="view hidden">
+    <div class="section-head"><p class="eyebrow">PRIVATE CLUB RECORDS</p><h2>BPC Funds</h2><p>Donation history for authorized members only.</p></div>
+    <div id="fundsDenied" class="panel soft">This page is private. You do not have access.</div>
+    <div id="fundsContent" class="hidden">
+      <form id="fundDonationForm" class="panel">
+        <div class="section-head compact"><h2>Record a donation</h2><p>Add the donor, amount, and date to the funds history.</p></div>
+        <label>Donor name<input id="fundDonorName" maxlength="120" required placeholder="Donor's name"></label>
+        <div class="score-grid"><label>Amount (BDT)<input id="fundAmount" type="number" min="0.01" step="0.01" required placeholder="0.00"></label><span class="vs">ON</span><label>Donation date<input id="fundDate" type="date" required></label></div>
+        <label>Note (optional)<input id="fundNote" maxlength="300" placeholder="Optional note"></label>
+        <button class="primary" type="submit">Save donation</button><div id="fundFormStatus" class="status"></div>
+      </form>
+      <div class="toolbar"><h2>Donation history</h2><button type="button" class="secondary" id="refreshFunds">↻ Refresh</button></div>
+      <div id="fundsStatus" class="status"></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Donor</th><th>Amount (BDT)</th><th>Note</th><th>Recorded by</th></tr></thead><tbody id="fundsHistoryBody"><tr><td colspan="5" class="empty">Loading donation history…</td></tr></tbody></table></div>
     </div>
   </section>
 
