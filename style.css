@@ -81,3 +81,16 @@
 
 /* Official Matches */
 .official-tabs{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 12px}.official-form-actions{display:flex;gap:10px;flex-wrap:wrap}.official-form-actions button{flex:1}@media(max-width:600px){.official-tabs button{flex:1}.official-form-actions{flex-direction:column}}
+
+/* Isolated BPC Tournaments UI */
+.tournament-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;margin-top:18px}
+.tournament-card{display:flex;flex-direction:column;gap:10px}
+.tournament-card h3{font-size:21px;margin:0}
+.tournament-card p{margin:0}
+.tournament-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.tournament-meta{display:flex;flex-direction:column;gap:4px;color:var(--muted);font-size:12px;margin:4px 0 8px}
+#tournamentCreateForm label{display:block;font-size:13px;font-weight:750;color:#39475e;margin-bottom:16px}
+#tournamentCreateForm input:not([type=checkbox]),#tournamentCreateForm select,#tournamentCreateForm textarea{display:block;width:100%;margin-top:7px;padding:12px 13px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:var(--ink)}
+#tournamentCreateForm label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px}
+.fixture-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+#tournamentDetail{margin-top:24px}
