@@ -1021,17 +1021,36 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(error){status("fundsAccessStatus",error.message,"error");return;}
     await loadFundsAccessAdmin();toast("BPC Funds access granted.");
   });
+  const fundMoney=value=>"৳"+Number(value||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   async function loadFundsPage(){
     if(!client||!state.session||!state.canAccessFunds){$("fundsDenied").classList.remove("hidden");$("fundsContent").classList.add("hidden");return;}
     $("fundsDenied").classList.add("hidden");$("fundsContent").classList.remove("hidden");
     $("fundDate").value=$("fundDate").value||new Date().toISOString().slice(0,10);
-    status("fundsStatus","Loading donation history…");
-    const {data,error}=await client.from("bpc_fund_donations").select("id,donor_name,amount,donation_date,note,created_by,created_at").order("donation_date",{ascending:false}).order("created_at",{ascending:false});
-    if(error){status("fundsStatus",error.message,"error");$("fundsHistoryBody").innerHTML='<tr><td colspan="5" class="empty">Could not load donation history.</td></tr>';return;}
-    const ids=[...new Set((data||[]).map(x=>x.created_by))], names={};
+    if($("fundExpenseDate"))$("fundExpenseDate").value=$("fundExpenseDate").value||new Date().toISOString().slice(0,10);
+    if($("fundExpenseForm"))$("fundExpenseForm").classList.toggle("hidden",!state.isAdmin);
+    status("fundsStatus","Loading fund records…");
+    const [donationsResult,expensesResult]=await Promise.all([
+      client.from("bpc_fund_donations").select("id,donor_name,amount,donation_date,note,created_by,created_at").order("donation_date",{ascending:false}).order("created_at",{ascending:false}),
+      client.from("bpc_fund_expenses").select("id,description,amount,expense_date,note,created_by,created_at").order("expense_date",{ascending:false}).order("created_at",{ascending:false})
+    ]);
+    if(donationsResult.error||expensesResult.error){
+      const err=donationsResult.error||expensesResult.error;
+      status("fundsStatus",err.message,"error");
+      $("fundsHistoryBody").innerHTML='<tr><td colspan="5" class="empty">Could not load fund records. Run the BPC fund-expenses SQL migration.</td></tr>';
+      if($("fundExpensesBody"))$("fundExpensesBody").innerHTML='<tr><td colspan="5" class="empty">Could not load expense history.</td></tr>';
+      return;
+    }
+    const donations=donationsResult.data||[], expenses=expensesResult.data||[];
+    const totalDonations=donations.reduce((sum,x)=>sum+Number(x.amount||0),0);
+    const totalExpenses=expenses.reduce((sum,x)=>sum+Number(x.amount||0),0);
+    $("fundTotalDonations").textContent=fundMoney(totalDonations);
+    $("fundTotalExpenses").textContent=fundMoney(totalExpenses);
+    $("fundCurrentBalance").textContent=fundMoney(totalDonations-totalExpenses);
+    const ids=[...new Set([...donations,...expenses].map(x=>x.created_by))], names={};
     if(ids.length){const {data:profiles}=await client.from("profiles").select("id,display_name").in("id",ids);(profiles||[]).forEach(p=>names[p.id]=p.display_name||"Member");}
-    $("fundsHistoryBody").innerHTML=(data||[]).length?data.map(d=>'<tr><td>'+prettyDate(d.donation_date)+'</td><td>'+esc(d.donor_name)+'</td><td>'+Number(d.amount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td><td>'+esc(d.note||"—")+'</td><td>'+esc(names[d.created_by]||"Member")+'</td></tr>').join(""):'<tr><td colspan="5" class="empty">No donations have been recorded yet.</td></tr>';
-    status("fundsStatus",(data||[]).length+" donation record(s).");
+    $("fundsHistoryBody").innerHTML=donations.length?donations.map(d=>'<tr><td>'+prettyDate(d.donation_date)+'</td><td>'+esc(d.donor_name)+'</td><td>'+fundMoney(d.amount)+'</td><td>'+esc(d.note||"—")+'</td><td>'+esc(names[d.created_by]||"Member")+'</td></tr>').join(""):'<tr><td colspan="5" class="empty">No donations have been recorded yet.</td></tr>';
+    if($("fundExpensesBody"))$("fundExpensesBody").innerHTML=expenses.length?expenses.map(d=>'<tr><td>'+prettyDate(d.expense_date)+'</td><td>'+esc(d.description)+'</td><td>'+fundMoney(d.amount)+'</td><td>'+esc(d.note||"—")+'</td><td>'+esc(names[d.created_by]||"Member")+'</td></tr>').join(""):'<tr><td colspan="5" class="empty">No expenses have been recorded yet.</td></tr>';
+    status("fundsStatus",donations.length+" donation record(s) · "+expenses.length+" expense record(s).");
   }
   $("fundDonationForm").addEventListener("submit",async ev=>{
     ev.preventDefault();
