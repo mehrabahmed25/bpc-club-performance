@@ -82,6 +82,7 @@
     if(name==="leaderboard")loadLeaderboard();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
+    if(name==="tournaments")loadTournaments();
     if(name==="funds")loadFundsPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
@@ -979,6 +980,73 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     $("officialSeasonForm").reset();$("officialSeasonId").value="";$("officialSaveSeason").textContent="Save season";$("officialCancelSeasonEdit").classList.add("hidden");toast("Season saved.");await loadOfficialPage();
   });
   $("officialCancelSeasonEdit").addEventListener("click",()=>{$("officialSeasonForm").reset();$("officialSeasonId").value="";$("officialSaveSeason").textContent="Save season";$("officialCancelSeasonEdit").classList.add("hidden");});
+
+
+  // Tournament module: separate tables only; never writes to friendly-match or funds tables.
+  function tournamentSlug(value){
+    return value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,70);
+  }
+  function tournamentDate(value){
+    if(!value)return "Not set";
+    const d=new Date(value);return Number.isNaN(d.getTime())?"Not set":d.toLocaleString();
+  }
+  async function loadTournaments(){
+    if(!client){status("tournamentStatus","Supabase connection is not configured.","error");return;}
+    $("tournamentAdminPanel").classList.toggle("hidden",!state.isAdmin);
+    status("tournamentStatus","Loading tournaments…");
+    const {data,error}=await client.from("tournament_tournaments")
+      .select("id,name,slug,description,competition_type,format,status,visibility,registration_mode,registration_requires_approval,registration_deadline,participant_limit,score_workflow,created_at")
+      .order("created_at",{ascending:false});
+    if(error){
+      $("tournamentList").innerHTML='<div class="panel soft">Tournament storage is not ready yet. An administrator must run the reviewed BPC Tournaments SQL migration in Supabase.</div>';
+      status("tournamentStatus",error.message,"error");return;
+    }
+    const rows=data||[];
+    $("tournamentList").innerHTML=rows.length?rows.map(t=>'<article class="panel tournament-card"><div class="tournament-card-head"><div><p class="eyebrow">'+esc(t.competition_type==='team'?'TEAM TOURNAMENT':'INDIVIDUAL TOURNAMENT')+' · '+esc(t.format.replaceAll("_"," ").toUpperCase())+'</p><h3>'+esc(t.name)+'</h3></div><span class="pill '+(t.status==='in_progress'?'good':t.status==='registration_open'?'pending':'')+'">'+esc(t.status.replaceAll("_"," "))+'</span></div><p>'+esc(t.description||"No description provided.")+'</p><div class="tournament-meta"><span>Registration: '+esc(t.registration_mode.replaceAll("_"," "))+'</span><span>Visibility: '+esc(t.visibility.replaceAll("_"," "))+'</span><span>Deadline: '+esc(tournamentDate(t.registration_deadline))+'</span></div><button type="button" class="secondary" data-tournament-open="'+esc(t.id)+'">View tournament</button> '+(state.isAdmin&&t.status==='draft'?'<button type="button" class="primary" data-tournament-publish="'+esc(t.id)+'">Open registration</button>':'')+'</article>').join(""):'<div class="panel soft">No tournaments are published yet.'+(state.isAdmin?' Create one above to get started.':'')+'</div>';
+    status("tournamentStatus",rows.length+" tournament(s) available.");
+    document.querySelectorAll("[data-tournament-open]").forEach(b=>b.addEventListener("click",()=>openTournament(b.dataset.tournamentOpen)));
+    document.querySelectorAll("[data-tournament-publish]").forEach(b=>b.addEventListener("click",()=>publishTournament(b.dataset.tournamentPublish)));
+  }
+  $("tournamentCreateForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    if(!state.isAdmin||!state.session){status("tournamentStatus","Only a website administrator can create tournaments.","error");return;}
+    const name=$("tournamentName").value.trim(),slug=tournamentSlug(name);
+    if(!name||!slug){status("tournamentStatus","Enter a valid tournament name.","error");return;}
+    const limit=$("tournamentLimit").value;
+    const payload={name,slug,description:$("tournamentDescription").value.trim()||null,competition_type:$("tournamentType").value,format:$("tournamentFormat").value,status:"draft",visibility:$("tournamentVisibility").value,registration_mode:$("tournamentRegistrationMode").value,registration_requires_approval:$("tournamentRequireApproval").checked,registration_deadline:$("tournamentDeadline").value?new Date($("tournamentDeadline").value).toISOString():null,participant_limit:limit?Number(limit):null,score_workflow:$("tournamentWorkflow").value,created_by:state.session.user.id};
+    const {error}=await client.from("tournament_tournaments").insert(payload);
+    if(error){status("tournamentStatus",error.message,"error");return;}
+    $("tournamentCreateForm").reset();toast("Tournament draft created.");await loadTournaments();
+  });
+  async function publishTournament(id){
+    if(!state.isAdmin)return;
+    const {error}=await client.from("tournament_tournaments").update({status:"registration_open",updated_at:new Date().toISOString()}).eq("id",id).eq("status","draft");
+    if(error){status("tournamentStatus",error.message,"error");return;}
+    toast("Registration opened.");await loadTournaments();
+  }
+  async function openTournament(id){
+    const {data:t,error}=await client.from("tournament_tournaments").select("*").eq("id",id).maybeSingle();
+    if(error||!t){status("tournamentStatus",error?.message||"Tournament unavailable.","error");return;}
+    const [pr,mr,sr]=await Promise.all([
+      client.from("tournament_participants").select("id,entrant_type,user_id,cobeg_member_id,external_name,status,seed,registered_at").eq("tournament_id",id).order("registered_at"),
+      client.from("tournament_matches").select("id,stage_id,round_number,match_number,participant_a_id,participant_b_id,score_a,score_b,status,scheduled_at").eq("tournament_id",id).order("round_number").order("match_number"),
+      client.from("tournament_stages").select("id,name,stage_type,sequence_number,status").eq("tournament_id",id).order("sequence_number")
+    ]);
+    if(pr.error||mr.error||sr.error){status("tournamentStatus",pr.error?.message||mr.error?.message||sr.error?.message,"error");return;}
+    const participants=pr.data||[],matches=mr.data||[],stages=sr.data||[];
+    const mine=participants.find(p=>p.user_id===state.session?.user?.id);
+    const canRegister=!!state.session&&t.status==="registration_open"&&["self","both"].includes(t.registration_mode)&&!mine&&(!t.registration_deadline||new Date(t.registration_deadline)>new Date())&&(!t.participant_limit||participants.filter(p=>["pending","confirmed","waitlisted"].includes(p.status)).length<t.participant_limit);
+    const detail=$("tournamentDetail");detail.classList.remove("hidden");
+    detail.innerHTML='<div class="section-head compact"><h2>'+esc(t.name)+'</h2><p>'+esc(t.description||"")+'</p></div><div class="panel"><p><b>Status:</b> '+esc(t.status.replaceAll("_"," "))+' · <b>Format:</b> '+esc(t.format.replaceAll("_"," "))+' · <b>Type:</b> '+esc(t.competition_type)+'</p><p><b>Scoring:</b> '+esc(JSON.stringify(t.scoring_config_json||{}))+'</p>'+(canRegister?'<button type="button" class="primary" id="tournamentSelfRegister">Register for this tournament</button>':'')+(mine?'<p>Your registration: <b>'+esc(mine.status)+'</b></p>':'')+'</div><div class="section-head compact"><h3>Participants ('+participants.length+')</h3></div><div class="table-wrap"><table><thead><tr><th>Entrant</th><th>Type</th><th>Status</th><th>Seed</th></tr></thead><tbody>'+ (participants.length?participants.map(p=>'<tr><td>'+esc(p.external_name||p.user_id||p.cobeg_member_id||"Participant")+'</td><td>'+esc(p.entrant_type)+'</td><td>'+esc(p.status)+'</td><td>'+esc(p.seed??"—")+'</td></tr>').join(""):'<tr><td colspan="4" class="empty">No participants yet.</td></tr>')+'</tbody></table></div><div class="section-head compact"><h3>Stages & fixtures</h3></div>'+ (stages.map(s=>'<div class="panel"><h3>'+esc(s.name)+' · '+esc(s.stage_type.replaceAll("_"," "))+'</h3><p>'+esc(s.status)+'</p>'+matches.filter(m=>m.stage_id===s.id).map(m=>'<div class="fixture-row"><span>Round '+m.round_number+' · Match '+m.match_number+'</span><b>'+esc(m.status==='approved'||m.status==='completed'?(m.score_a+" – "+m.score_b):m.status.replaceAll("_"," "))+'</b></div>').join("")+'</div>').join("")||'<div class="panel soft">Fixtures have not been generated yet.</div>');
+    $("tournamentSelfRegister")?.addEventListener("click",async()=>{
+      if(!state.session||!["self","both"].includes(t.registration_mode))return;
+      const statusValue=t.registration_requires_approval?"pending":"confirmed";
+      const {error}=await client.from("tournament_participants").insert({tournament_id:id,entrant_type:"individual",user_id:state.session.user.id,registration_source:"self",status:statusValue,created_by:state.session.user.id});
+      if(error){status("tournamentStatus",error.message,"error");return;}
+      toast("Registration submitted.");await openTournament(id);await loadTournaments();
+    });
+    detail.scrollIntoView({behavior:"smooth",block:"start"});
+  }
 
   async function refreshFundsAccess(){
     state.canAccessFunds=!!state.isAdmin;
