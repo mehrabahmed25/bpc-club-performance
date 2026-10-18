@@ -1055,12 +1055,11 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     }));
     document.querySelectorAll("[data-admin-score]").forEach(b=>b.addEventListener("click",async()=>{
       const match=matches.find(m=>m.id===b.dataset.adminScore);if(!match)return;
+      if(t.score_workflow!=="admin_entered"){status("tournamentStatus","Use the review queue for participant-submitted results.","error");return;}
       const a=prompt("Score for participant A:");if(a===null)return;const z=prompt("Score for participant B:");if(z===null)return;
       if(!/^\\d+$/.test(a)||!/^\\d+$/.test(z)){status("tournamentStatus","Scores must be non-negative whole numbers.","error");return;}
-      const {data:sub,error:subError}=await client.from("tournament_result_submissions").insert({match_id:match.id,submitted_by:state.session.user.id,score_a:Number(a),score_b:Number(z),status:"pending"}).select("id").single();
-      if(subError){status("tournamentStatus",subError.message,"error");return;}
-      const {error:reviewError}=await client.rpc("tournament_review_result",{p_submission_id:sub.id,p_decision:"approve",p_reason:"Admin-entered score"});
-      if(reviewError){status("tournamentStatus",reviewError.message,"error");return;}await openTournament(id);toast("Score approved.");
+      const {error:scoreError}=await client.rpc("tournament_admin_enter_result",{p_match_id:match.id,p_score_a:Number(a),p_score_b:Number(z),p_reason:"Admin-entered score"});
+      if(scoreError){status("tournamentStatus",scoreError.message,"error");return;}await openTournament(id);toast("Score approved.");
     }));
     document.querySelectorAll("[data-submit-score]").forEach(b=>b.addEventListener("click",async()=>{
       const a=prompt("Score for participant A:");if(a===null)return;const z=prompt("Score for participant B:");if(z===null)return;
