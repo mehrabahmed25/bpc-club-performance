@@ -1063,6 +1063,17 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     else{$("fundDonationForm").reset();$("fundDate").value=new Date().toISOString().slice(0,10);status("fundFormStatus","Donation saved.");await loadFundsPage();}
     if(btn)btn.disabled=false;
   });
+  $("fundExpenseForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    if(!state.session||!state.isAdmin){status("fundExpenseStatus","Only administrators can record fund expenses.","error");return;}
+    const description=$("fundExpenseDescription").value.trim(),amount=Number($("fundExpenseAmount").value),expense_date=$("fundExpenseDate").value,note=$("fundExpenseNote").value.trim();
+    if(!description||!Number.isFinite(amount)||amount<=0||!expense_date){status("fundExpenseStatus","Enter a description, valid positive amount, and date.","error");return;}
+    const btn=ev.submitter;if(btn)btn.disabled=true;
+    const {error}=await client.from("bpc_fund_expenses").insert({description,amount,expense_date,note:note||null,created_by:state.session.user.id});
+    if(error)status("fundExpenseStatus",error.message,"error");
+    else{$("fundExpenseForm").reset();$("fundExpenseDate").value=new Date().toISOString().slice(0,10);status("fundExpenseStatus","Expense saved.");await loadFundsPage();}
+    if(btn)btn.disabled=false;
+  });
   $("refreshFunds").addEventListener("click",loadFundsPage);
 
   $("officialEditorAssignForm").addEventListener("submit",async ev=>{
