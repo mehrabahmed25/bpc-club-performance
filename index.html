@@ -198,6 +198,15 @@
       <div class="toolbar"><h2>Donation history</h2><button type="button" class="secondary" id="refreshFunds">↻ Refresh</button></div>
       <div id="fundsStatus" class="status"></div>
       <div class="table-wrap"><table><thead><tr><th>Date</th><th>Donor</th><th>Amount (BDT)</th><th>Note</th><th>Recorded by</th></tr></thead><tbody id="fundsHistoryBody"><tr><td colspan="5" class="empty">Loading donation history…</td></tr></tbody></table></div>
+      <form id="fundExpenseForm" class="panel admin-only">
+        <div class="section-head compact"><h2>Record a fund expense</h2><p>Only website administrators can record spending from BPC Funds.</p></div>
+        <label>Expense description / reason<input id="fundExpenseDescription" maxlength="200" required placeholder="What was the fund used for?"></label>
+        <div class="score-grid"><label>Amount (BDT)<input id="fundExpenseAmount" type="number" min="0.01" step="0.01" required placeholder="0.00"></label><span class="vs">ON</span><label>Expense date<input id="fundExpenseDate" type="date" required></label></div>
+        <label>Additional note (optional)<input id="fundExpenseNote" maxlength="500" placeholder="Details or receipt reference"></label>
+        <button class="primary" type="submit">Save expense</button><div id="fundExpenseStatus" class="status"></div>
+      </form>
+      <div class="toolbar"><h2>Expense history</h2></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description / reason</th><th>Amount (BDT)</th><th>Note</th><th>Recorded by</th></tr></thead><tbody id="fundExpensesBody"><tr><td colspan="5" class="empty">Loading expense history…</td></tr></tbody></table></div>
     </div>
   </section>
 
