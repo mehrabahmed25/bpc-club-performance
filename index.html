@@ -212,25 +212,29 @@
   </section>
 
   <section id="view-profile" class="view hidden">
-    <div class="section-head"><p class="eyebrow">YOUR SEASON</p><h2 id="profileHeading">My dashboard</h2><p>Your counted results for the selected month.</p></div>
-    <div id="profileStats" class="stats-grid"></div>
+    <div class="db-hero">
+      <div class="db-who"><span class="db-avatar" id="dbAvatar">?</span><div><h2 id="profileHeading">My dashboard</h2><p class="db-sub" id="dbSub">Your fixtures and results in one place.</p></div></div>
+      <div class="db-next" id="dbNext"></div>
+    </div>
     <div id="myTournamentSection" class="hidden">
-      <div class="section-head compact"><p class="eyebrow">TOURNAMENTS</p><h3>My upcoming tournament matches</h3><p>Fixtures you are playing in, with the date your score is due. Tournament results are separate from friendly-match statistics.</p></div>
+      <div class="section-head compact"><h3>Your tournament matches</h3><p>Enter the score in the boxes beside the names before the deadline. Your opponent and an admin are notified when you submit.</p></div>
       <div id="myTournamentStatus" class="status"></div>
       <div id="myTournamentUpcoming"></div>
-      <div class="section-head compact"><h3>My tournament results</h3><p>Shown here once an administrator has approved the result.</p></div>
+      <div class="section-head compact"><h3>Tournament results</h3><p>Results appear here once an administrator approves them.</p></div>
       <div id="myTournamentResults"></div>
     </div>
-    <div class="panel soft"><h3>Monthly award eligibility</h3><p id="eligibilityText">Sign in to view your eligibility.</p><button class="primary" data-view="submit">Submit a match</button></div>
+    <div class="section-head compact"><h3>Friendly matches this month</h3><p>Your counted results for the selected month.</p></div>
+    <div id="profileStats" class="stats-grid"></div>
+    <div class="panel soft"><h3>Monthly award eligibility</h3><p id="eligibilityText">Sign in to view your eligibility.</p><div id="eligibilityBars" class="db-bars"></div><button class="primary" data-view="submit">Submit a match</button></div>
   </section>
 
 
 
   <section id="view-tournaments" class="view hidden">
-    <div class="section-head"><p class="eyebrow">BPC COMPETITIONS</p><h2>Tournaments</h2><p>Browse tournaments, register to compete, and follow fixtures and approved results. Tournament records are separate from friendly-match statistics.</p></div>
+    <div class="tn-masthead"><h2>Tournaments</h2><p>Register, follow your fixtures, and send in scores before the deadline. Tournament results are kept separate from friendly-match statistics.</p></div>
     <div id="tournamentStatus" class="status"></div>
     <div id="tournamentAdminPanel" class="panel hidden">
-      <div class="section-head compact"><h2>Create tournament</h2><p>Configure a tournament before publishing it.</p></div>
+      <details class="tn-create"><summary><b>Create a tournament</b><span class="small">Save it as a draft first, then open registration when you are ready.</span></summary>
       <form id="tournamentCreateForm">
         <label>Tournament name<input id="tournamentName" maxlength="120" required placeholder="e.g. BPC Autumn Cup"></label>
         <label>Description<textarea id="tournamentDescription" rows="3" maxlength="3000" placeholder="Rules and tournament details"></textarea></label>
@@ -250,7 +254,9 @@
         <label><input id="tournamentRequireApproval" type="checkbox"> Require admin approval for registrations</label>
         <button class="primary" type="submit">Save as draft</button>
       </form>
+      </details>
     </div>
+    <div id="tournamentTabs" class="tn-tabs hidden" role="tablist" aria-label="Tournament groups"></div>
     <div id="tournamentList" class="tournament-list"><div class="panel soft">Loading tournaments…</div></div>
     <div id="tournamentDetail" class="hidden"></div>
   </section>
