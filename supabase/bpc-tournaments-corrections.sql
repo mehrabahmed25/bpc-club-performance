@@ -34,10 +34,10 @@ declare
  v_best_sf bigint;
  v_seed integer;
  v_best_seed integer;
- v_seen boolean;
 begin
  if not public.tournament_is_admin() then raise exception 'Administrator permission required'; end if;
  if p_round < 1 then raise exception 'Round must be positive'; end if;
+ if not p_publish then raise exception 'Preview-only fixture generation is not supported yet. Confirm publishing to create fixtures.'; end if;
  select * into v_s from public.tournament_stages where id=p_stage_id for update;
  if not found then raise exception 'Stage not found'; end if;
  select * into v_t from public.tournament_tournaments where id=v_s.tournament_id for update;
@@ -73,7 +73,7 @@ begin
    join public.tournament_participants p on p.id=se.participant_id
    where se.stage_id=p_stage_id and se.entry_status in ('active','qualified')
      and p.status='confirmed'
-     and (v_s.stage_type<>'group' or se.group_id is null);
+     and (v_s.stage_type<>'group' or se.group_id is not null);
  end if;
  v_n:=coalesce(array_length(v_ids,1),0);
  if v_n<2 then raise exception 'At least two eligible entrants are required'; end if;
@@ -144,14 +144,6 @@ begin
        end if;
      end loop;
    else
-     for v_i in 1..v_n loop
-       v_a:=v_ids[v_i];
-       if v_a is null then continue; end if;
-       v_match:=v_match+1;
-       -- Winners from the prior round are paired in their prior match order.
-       exit;
-     end loop;
-     v_match:=0;
      for v_i in 1..(v_n/2) loop
        v_a:=v_ids[2*v_i-1]; v_b:=v_ids[2*v_i];
        v_match:=v_match+1;
