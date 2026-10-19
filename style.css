@@ -331,3 +331,9 @@
 .tn-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:900;flex:0 0 36px}
 .tn-mgr-list .tn-empty{background:#ffffff10;border-color:#ffffff30;color:#c5d1e9}
 @media(max-width:680px){.tn-mgr{flex-wrap:wrap}.tn-mgr .reject-btn{width:100%}}
+
+/* Dashboard sign out */
+.db-left{display:flex;flex-direction:column;align-items:flex-start;gap:16px;justify-content:space-between}
+.db-signout{border:1px solid #ffffff3d;background:#ffffff14;color:#fff;border-radius:999px;padding:8px 16px;font-weight:700;font-size:13px}
+.db-signout:hover{background:#ffffff26}
+.db-signout:focus-visible{outline:2px solid #fff;outline-offset:2px}

@@ -73,6 +73,7 @@
   function monthDate(v){return v ? v+"-01" : new Date().toISOString().slice(0,10);}
   function prettyDate(v){if(!v)return "—";const d=new Date(v+"T12:00:00");return d.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"});}
   function showView(name){
+    if(name==="account"&&state.session&&!state.recoveryMode)name="profile";
     if(name==="funds"&&!state.canAccessFunds){toast("BPC Funds is restricted to authorized accounts.");name="home";}
     document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
@@ -309,17 +310,18 @@
           if(result.error)throw result.error;
           status("authMessage","Account created. If email confirmation is enabled, check your inbox to confirm before signing in.","success");
           state.signup=false;
-          if(result.data.session){state.session=result.data.session;await loadIdentity();setAuthUI();toast("Account created.");}
+          if(result.data.session){state.session=result.data.session;await loadIdentity();setAuthUI();toast("Account created.");showView("profile");}
         }else{
           result=await client.auth.signInWithPassword({email,password});
           if(result.error)throw result.error;
-          state.session=result.data.session;await loadIdentity();setAuthUI();toast("Welcome back.");
+          state.session=result.data.session;await loadIdentity();setAuthUI();toast("Welcome back.");showView("profile");
         }
       }catch(err){status("authMessage",err.message||String(err),"error");}
       finally{if($("authSubmit"))$("authSubmit").disabled=false;}
     };
     $("toggleAuth").onclick=()=>{state.signup=!state.signup;setAuthUI();};
   }
+  $("dbSignOut").addEventListener("click",()=>signOut());
   async function signOut(){await client.auth.signOut();state.session=null;state.profile=null;state.player=null;state.isAdmin=false;state.tnAdmin=false;state.isTnManager=false;setAuthUI();toast("Signed out.");showView("home");}
   async function loadIdentity(){
     if(!client||!state.session)return;
