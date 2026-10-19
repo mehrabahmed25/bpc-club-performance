@@ -243,29 +243,7 @@
   <section id="view-tournaments" class="view hidden">
     <div class="tn-masthead"><h2>Tournaments</h2><p>Register, follow your fixtures, and send in scores before the deadline. Tournament results are kept separate from friendly-match statistics.</p></div>
     <div id="tournamentStatus" class="status"></div>
-    <div id="tournamentAdminPanel" class="panel hidden">
-      <details class="tn-create"><summary><b>Create a tournament</b><span class="small">Save it as a draft first, then open registration when you are ready.</span></summary>
-      <form id="tournamentCreateForm">
-        <label>Tournament name<input id="tournamentName" maxlength="120" required placeholder="e.g. BPC Autumn Cup"></label>
-        <label>Description<textarea id="tournamentDescription" rows="3" maxlength="3000" placeholder="Rules and tournament details"></textarea></label>
-        <div class="score-grid">
-          <label>Competition type<select id="tournamentType"><option value="individual">Individual</option><option value="team">Team</option></select></label>
-          <label>Format<select id="tournamentFormat"><option value="round_robin">Round robin</option><option value="knockout">Knockout</option><option value="group_knockout">Group stage + knockout</option><option value="swiss">Swiss</option></select></label>
-        </div>
-        <div class="score-grid">
-          <label>Visibility<select id="tournamentVisibility"><option value="all_members">All logged-in members</option><option value="participants_admins">Participants and admins</option><option value="restricted">Restricted (participant/admin)</option></select></label>
-          <label>Registration<select id="tournamentRegistrationMode"><option value="both">Self-registration + admin-managed</option><option value="self">Self-registration</option><option value="admin">Admin-managed</option></select></label>
-        </div>
-        <label>Score workflow<select id="tournamentWorkflow"><option value="participant_admin">Participant submits → admin approves</option><option value="admin_entered">Admin enters and approves</option><option value="participant_opponent_admin">Participant submits → opponent confirms → admin resolves</option></select></label>
-        <div class="score-grid">
-          <label>Registration deadline<input id="tournamentDeadline" type="datetime-local"></label>
-          <label>Participant limit (optional)<input id="tournamentLimit" type="number" min="2" step="1" placeholder="No limit"></label>
-        </div>
-        <label><input id="tournamentRequireApproval" type="checkbox"> Require admin approval for registrations</label>
-        <button class="primary" type="submit">Save as draft</button>
-      </form>
-      </details>
-    </div>
+    <div id="tournamentAdminPanel" class="tn-createbar hidden"><div><b>Run a tournament</b><span class="small">Choose a format, decide how players join and how scores work, and open sign-ups in three steps.</span></div><button type="button" class="primary" id="tnCreateBtn">Create tournament</button></div>
     <details id="tnManagersPanel" class="panel tn-mgr-panel hidden">
       <summary><span class="tn-mgr-key" aria-hidden="true">&#128273;</span><span class="tn-mgr-title"><b>Tournament managers</b><span class="small">Give a trusted member control of this page only. Full admins only.</span></span><span class="tn-count" id="tnManagersCount">0</span></summary>
       <form id="tnManagerForm" class="inline-form"><select id="tnManagerAccount" required aria-label="Registered account"></select><button class="primary" type="submit">Grant access</button></form>

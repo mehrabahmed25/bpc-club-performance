@@ -1178,17 +1178,114 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     applyTnVisibility();
     if(state.isAdmin)loadTnManagers();
   }
-  $("tournamentCreateForm").addEventListener("submit",async ev=>{
-    ev.preventDefault();
-    if(!state.tnAdmin||!state.session){status("tournamentStatus","Only a website administrator can create tournaments.","error");return;}
-    const name=$("tournamentName").value.trim(),slug=tournamentSlug(name);
-    if(!name||!slug){status("tournamentStatus","Enter a valid tournament name.","error");return;}
-    const limit=$("tournamentLimit").value;
-    const payload={name,slug,description:$("tournamentDescription").value.trim()||null,competition_type:$("tournamentType").value,format:$("tournamentFormat").value,status:"draft",visibility:$("tournamentVisibility").value,registration_mode:$("tournamentRegistrationMode").value,registration_requires_approval:$("tournamentRequireApproval").checked,registration_deadline:$("tournamentDeadline").value?new Date($("tournamentDeadline").value).toISOString():null,participant_limit:limit?Number(limit):null,score_workflow:$("tournamentWorkflow").value,created_by:state.session.user.id};
-    const {error}=await client.from("tournament_tournaments").insert(payload);
-    if(error){status("tournamentStatus",error.message,"error");return;}
-    $("tournamentCreateForm").reset();toast("Tournament draft created.");await loadTournaments();
-  });
+  // ---- Create-tournament wizard (admins and managers) -------------------------------
+  const TN_PICK_FORMAT=[["round_robin","Round robin","Everyone plays everyone. Best for smaller fields."],["knockout","Knockout","Win to advance. Lose and you are out."],["group_knockout","Groups, then knockout","A group stage first, then knockout rounds for the qualifiers."],["swiss","Swiss","A fixed number of rounds, paired by current points."]];
+  const TN_PICK_FLOW=[["participant_admin","Players submit, admin approves","Either player sends the score and an admin approves it. Recommended."],["participant_opponent_admin","Players submit, opponent confirms, admin approves","The other player must confirm the score before the admin sees it."],["admin_entered","Admin enters every score","Players cannot submit. Admins type the scores in."]];
+  const TN_PICK_JOIN=[["both","Players sign up, and I can add players","Open sign-ups, plus you can add anyone yourself."],["self","Players sign up themselves","Players join from the tournament page."],["admin","I add the players","Sign-ups stay closed. You build the list."]];
+  const TN_PICK_SEE=[["all_members","Everyone signed in","Every member can find and follow it."],["participants_admins","Only its players and admins","Hidden from members who are not taking part."]];
+  const tnOpt=(name,val,title,text,on)=>'<label class="tn-opt"><input type="radio" name="'+name+'" value="'+esc(val)+'"'+(on?' checked':'')+'><span><b>'+esc(title)+'</b><small>'+esc(text)+'</small></span></label>';
+  function openTnWizard(){
+    if(!state.tnAdmin||!state.session)return;
+    const d={name:"",description:"",type:"individual",format:"round_robin",join:"both",approval:false,deadline:"",limit:"",see:"all_members",flow:"participant_admin"};
+    const STEPS=["Basics","Players","Scores"];let step=0,busy=false;
+    const ov=document.createElement("div");ov.className="modal-overlay";
+    ov.innerHTML='<div class="modal-box tn-wiz" role="dialog" aria-modal="true" aria-labelledby="wizTitle"><div class="tn-wiz-head"><div><h3 id="wizTitle">New tournament</h3><p class="small" id="wizSub"></p></div><button type="button" class="tn-wiz-x" id="wizX" aria-label="Close">&times;</button></div><ol class="tn-wiz-steps" id="wizSteps"></ol><div class="tn-wiz-body" id="wizBody"></div><div class="status" id="wizErr" role="alert"></div><div class="tn-wiz-foot" id="wizFoot"></div></div>';
+    document.body.appendChild(ov);
+    const $w=id=>ov.querySelector("#"+id);
+    const close=()=>{ov.remove();document.removeEventListener("keydown",onKey);};
+    const onKey=e=>{if(e.key==="Escape"&&!busy)close();};
+    document.addEventListener("keydown",onKey);
+    $w("wizX").onclick=()=>{if(!busy)close();};
+    const err=m=>{$w("wizErr").textContent=m||"";};
+    const summary=()=>{
+      const f=TN_PICK_FORMAT.find(x=>x[0]===d.format)[1],fl=TN_PICK_FLOW.find(x=>x[0]===d.flow)[1],j=TN_PICK_JOIN.find(x=>x[0]===d.join)[1];
+      const rows=[["Name",d.name.trim()],["Type",d.type==="team"?"Teams":"Individual players"],["Format",f],["Joining",j+(d.join!=="admin"&&d.approval?", approved by you":"")],["Visible to",TN_PICK_SEE.find(x=>x[0]===d.see)[1]],["Scores",fl]];
+      if(d.join!=="admin"&&d.deadline)rows.push(["Sign-ups close",tournamentDate(new Date(d.deadline).toISOString())]);
+      if(d.limit)rows.push(["Player limit",d.limit]);
+      return '<dl class="tn-sum">'+rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join("")+'</dl>';
+    };
+    function render(){
+      err("");
+      $w("wizSteps").innerHTML=STEPS.map((x,i)=>'<li class="'+(i===step?'on':i<step?'done':'')+'"><span>'+(i<step?'&#10003;':i+1)+'</span>'+x+'</li>').join("");
+      $w("wizSub").textContent=["Name it and pick how it is played.","Choose who can join and how.","Choose how scores are reported, then review."][step];
+      let body="";
+      if(step===0){
+        body='<label class="tn-field">Tournament name<input id="wName" maxlength="120" required placeholder="e.g. BPC Autumn Cup" value="'+esc(d.name)+'"></label>'
+          +'<label class="tn-field">Short description <em>(optional)</em><textarea id="wDesc" rows="2" maxlength="3000" placeholder="Rules, prizes, anything players should know">'+esc(d.description)+'</textarea></label>'
+          +'<fieldset class="tn-set"><legend>Who plays</legend><div class="tn-opts two">'+tnOpt("wType","individual","Individual players","Each player enters on their own.",d.type==="individual")+tnOpt("wType","team","Teams","A player registers a team with a name.",d.type==="team")+'</div></fieldset>'
+          +'<fieldset class="tn-set"><legend>Format</legend><div class="tn-opts two">'+TN_PICK_FORMAT.map(x=>tnOpt("wFormat",x[0],x[1],x[2],d.format===x[0])).join("")+'</div></fieldset>';
+      }else if(step===1){
+        body='<fieldset class="tn-set"><legend>How do players join?</legend><div class="tn-opts">'+TN_PICK_JOIN.map(x=>tnOpt("wJoin",x[0],x[1],x[2],d.join===x[0])).join("")+'</div></fieldset>'
+          +'<div id="wSignup" class="'+(d.join==="admin"?'hidden':'')+'"><label class="tn-switch"><input type="checkbox" id="wApproval"'+(d.approval?' checked':'')+'><span><b>I approve each sign-up</b><small>Off means players are confirmed straight away.</small></span></label>'
+          +'<div class="tn-two"><label class="tn-field">Sign-ups close <em>(optional)</em><input type="datetime-local" id="wDeadline" value="'+esc(d.deadline)+'"></label><label class="tn-field">Player limit <em>(optional)</em><input type="number" id="wLimit" min="2" step="1" placeholder="No limit" value="'+esc(d.limit)+'"></label></div></div>'
+          +'<fieldset class="tn-set"><legend>Who can see it?</legend><div class="tn-opts two">'+TN_PICK_SEE.map(x=>tnOpt("wSee",x[0],x[1],x[2],d.see===x[0])).join("")+'</div></fieldset>';
+      }else{
+        body='<fieldset class="tn-set"><legend>How are scores reported?</legend><div class="tn-opts">'+TN_PICK_FLOW.map(x=>tnOpt("wFlow",x[0],x[1],x[2],d.flow===x[0])).join("")+'</div></fieldset><h4 class="tn-sum-h">Review</h4>'+summary()
+          +(d.format==="group_knockout"?'<p class="small">Groups are set up once enough players are confirmed. The checklist on the tournament page will guide you.</p>':'');
+      }
+      $w("wizBody").innerHTML=body;
+      $w("wizFoot").innerHTML=(step>0?'<button type="button" class="secondary" id="wBack">Back</button>':'<button type="button" class="secondary" id="wCancel">Cancel</button>')
+        +(step<2?'<button type="button" class="primary" id="wNext">Continue</button>':'<button type="button" class="secondary" id="wDraft">Save as draft</button><button type="button" class="primary" id="wCreate">Create and open sign-ups</button>');
+      wire();
+      $w("wizBody").querySelector("input,textarea")?.focus({preventScroll:true});
+    }
+    function read(){
+      const g=id=>$w(id);
+      if(step===0){d.name=g("wName").value;d.description=g("wDesc").value;d.type=ov.querySelector('input[name=wType]:checked').value;d.format=ov.querySelector('input[name=wFormat]:checked').value;}
+      else if(step===1){d.join=ov.querySelector('input[name=wJoin]:checked').value;d.approval=!!g("wApproval")?.checked;d.deadline=g("wDeadline")?.value||"";d.limit=g("wLimit")?.value||"";d.see=ov.querySelector('input[name=wSee]:checked').value;}
+      else{d.flow=ov.querySelector('input[name=wFlow]:checked').value;}
+    }
+    function validate(){
+      if(step===0){if(!tournamentSlug(d.name.trim())||d.name.trim().length<3)return "Give the tournament a name of at least 3 letters.";}
+      if(step===1&&d.join!=="admin"){
+        if(d.limit&&(!Number.isInteger(Number(d.limit))||Number(d.limit)<2))return "The player limit must be a whole number of 2 or more.";
+        if(d.deadline&&new Date(d.deadline)<=new Date())return "Sign-ups must close at a time in the future.";
+      }
+      return "";
+    }
+    function wire(){
+      $w("wCancel")&&($w("wCancel").onclick=()=>close());
+      $w("wBack")&&($w("wBack").onclick=()=>{read();step--;render();});
+      $w("wNext")&&($w("wNext").onclick=()=>{read();const m=validate();if(m){err(m);return;}step++;render();});
+      ov.querySelectorAll('input[name=wJoin]').forEach(r=>r.addEventListener("change",()=>{$w("wSignup").classList.toggle("hidden",r.value==="admin"&&r.checked);}));
+      ov.querySelectorAll('input[name=wFlow]').forEach(r=>r.addEventListener("change",()=>{read();$w("wizBody").querySelector(".tn-sum").outerHTML=summary();}));
+      $w("wizBody").querySelectorAll("input[type=text],input:not([type]),textarea").forEach(i=>i.addEventListener("keydown",e=>{if(e.key==="Enter"&&i.tagName!=="TEXTAREA"){e.preventDefault();$w("wNext")?.click();}}));
+      $w("wDraft")&&($w("wDraft").onclick=()=>submit(false));
+      $w("wCreate")&&($w("wCreate").onclick=()=>submit(true));
+    }
+    async function submit(openNow){
+      if(busy)return;read();const m=validate();if(m){err(m);return;}
+      busy=true;ov.querySelectorAll("button").forEach(b=>b.disabled=true);err("");$w("wCreate")&&($w("wCreate").textContent="Creating…");
+      const base=tournamentSlug(d.name.trim());
+      const payload={name:d.name.trim(),slug:base,description:d.description.trim()||null,competition_type:d.type,format:d.format,status:"draft",visibility:d.see,registration_mode:d.join,registration_requires_approval:d.join!=="admin"&&d.approval,registration_deadline:d.join!=="admin"&&d.deadline?new Date(d.deadline).toISOString():null,participant_limit:d.join!=="admin"&&d.limit?Number(d.limit):null,score_workflow:d.flow,created_by:state.session.user.id};
+      let res=await client.from("tournament_tournaments").insert(payload).select("id").single();
+      if(res.error&&res.error.code==="23505"){payload.slug=base.slice(0,64)+"-"+Math.random().toString(36).slice(2,6);res=await client.from("tournament_tournaments").insert(payload).select("id").single();}
+      if(res.error){busy=false;ov.querySelectorAll("button").forEach(b=>b.disabled=false);err(res.error.message);$w("wCreate")&&($w("wCreate").textContent="Create and open sign-ups");return;}
+      const id=res.data.id;
+      // Simple formats get their stage now; entrants are lined up automatically when round 1 is generated.
+      if(d.format!=="group_knockout")await client.rpc("tournament_admin_setup_stages",{p_tournament_id:id,p_group_count:4});
+      if(openNow)await client.from("tournament_tournaments").update({status:"registration_open",updated_at:new Date().toISOString()}).eq("id",id).eq("status","draft");
+      close();toast(openNow?"Tournament created and sign-ups are open.":"Draft saved. Open sign-ups when you are ready.");
+      await loadTournaments();await openTournament(id);
+    }
+    render();
+  }
+  $("tnCreateBtn").addEventListener("click",openTnWizard);
+  // Small text/number prompt dialog. Resolves to the entered string, or null if cancelled.
+  function askText(o){
+    return new Promise(resolve=>{
+      const ov=document.createElement("div");ov.className="modal-overlay";
+      ov.innerHTML='<div class="modal-box" role="dialog" aria-modal="true"><h3>'+esc(o.title)+'</h3>'+(o.text?'<p class="small">'+esc(o.text)+'</p>':'')+'<label>'+esc(o.label)+'<input id="atInput" type="'+(o.type||"text")+'"'+(o.min!=null?' min="'+o.min+'"':'')+(o.max!=null?' max="'+o.max+'"':'')+' maxlength="100" value="'+esc(o.value||"")+'" placeholder="'+esc(o.placeholder||"")+'"></label><div class="toolbar"><button type="button" class="primary" id="atOk">'+esc(o.confirmText||"Continue")+'</button><button type="button" class="secondary" id="atCancel">Cancel</button></div><div class="status" id="atErr" role="alert"></div></div>';
+      document.body.appendChild(ov);
+      const inp=ov.querySelector("#atInput");inp.focus();inp.select();
+      const close=v=>{ov.remove();resolve(v);};
+      const ok=()=>{const v=inp.value.trim();const m=o.validate?o.validate(v):"";if(m){ov.querySelector("#atErr").textContent=m;return;}close(v);};
+      ov.querySelector("#atCancel").onclick=()=>close(null);
+      ov.querySelector("#atOk").onclick=ok;
+      inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();ok();}else if(e.key==="Escape")close(null);});
+      ov.addEventListener("click",e=>{if(e.target===ov)close(null);});
+    });
+  }
   async function publishTournament(id){
     if(!state.tnAdmin)return;
     const {error}=await client.from("tournament_tournaments").update({status:"registration_open",updated_at:new Date().toISOString()}).eq("id",id).eq("status","draft");
@@ -1287,7 +1384,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     ]);
     if(pr.error||mr.error||sr.error||rr.error){status("tournamentStatus",pr.error?.message||mr.error?.message||sr.error?.message||rr.error?.message||"Could not load tournament details.","error");return;}
     const participants=pr.data||[],matches=mr.data||[],stages=sr.data||[],pendingSubmissions=rr.data||[];
-    const mine=participants.find(p=>p.user_id===state.session?.user?.id);
+    const mine=participants.find(p=>p.user_id===state.session?.user?.id&&!["withdrawn","rejected"].includes(p.status));
     const visibleParticipants=state.tnAdmin?participants:participants.filter(p=>p.status==="confirmed");
     const canRegister=!!state.session&&t.status==="registration_open"&&["self","both"].includes(t.registration_mode)&&!mine&&(!t.registration_deadline||new Date(t.registration_deadline)>new Date())&&(!t.participant_limit||participants.filter(p=>["pending","confirmed","waitlisted"].includes(p.status)).length<t.participant_limit);
     const entrantNames={};
@@ -1336,8 +1433,26 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const facts=[["Players",confirmedCount+(t.participant_limit?" of "+t.participant_limit:"")],["Format",TN_FORMAT[t.format]||t.format],["Scoring",TN_FLOW[t.score_workflow]||t.score_workflow]];
     if(nextDue&&!ended)facts.push(["Next score deadline",fmtDeadline(nextDue)]);
     else if(t.status==="registration_open"&&t.registration_deadline)facts.push(["Registration closes",tournamentDate(t.registration_deadline)]);
-    const regBtn=canRegister?'<div class="tn-reg"><button type="button" class="primary" id="tournamentSelfRegister">'+(t.competition_type==="team"?"Register a team":"Register for this tournament")+'</button></div>':'';
-    const mineLine=mine?'<p class="tn-mine">Your registration: <b>'+esc(mine.status)+'</b></p>':'';
+    const spotsLeft=t.participant_limit?Math.max(0,t.participant_limit-participants.filter(p=>["pending","confirmed","waitlisted"].includes(p.status)).length):null;
+    const deadlinePassed=!!t.registration_deadline&&new Date(t.registration_deadline)<=new Date();
+    const rc=(tone,title,text,extra)=>'<div class="tn-regcard '+tone+'"><div><b>'+title+'</b><span>'+text+'</span></div>'+(extra||"")+'</div>';
+    let regBtn="";
+    if(!ended){
+      if(mine){
+        const M={confirmed:["ok","You are in","You are confirmed. Your fixtures and deadlines will show here and on your dashboard."],pending:["wait","Waiting for approval","Your sign-up has been sent. An admin will confirm it."],waitlisted:["wait","You are on the waitlist","The tournament is full. You will be moved up if a place opens."]}[mine.status]||["wait","Registered","Status: "+mine.status];
+        regBtn=rc(M[0],M[1],M[2]);
+      }else if(canRegister){
+        const bits=[];if(t.registration_requires_approval)bits.push("An admin approves each sign-up.");if(spotsLeft!==null)bits.push(spotsLeft+" place"+(spotsLeft===1?"":"s")+" left.");if(t.registration_deadline)bits.push("Closes "+tournamentDate(t.registration_deadline)+".");
+        regBtn=rc("open",t.competition_type==="team"?"Register your team":"Join this tournament",bits.join(" ")||"Sign-ups are open.",'<button type="button" class="primary" id="tournamentSelfRegister">'+(t.competition_type==="team"?"Register a team":"Join tournament")+'</button>');
+      }else if(t.status==="registration_open"){
+        if(!state.session)regBtn=rc("open","Sign in to join","Sign-ups are open for members.",'<button type="button" class="primary" id="tnSignInBtn">Sign in</button>');
+        else if(!["self","both"].includes(t.registration_mode))regBtn=rc("wait","Players are added by the admins","Sign-ups are not open for this tournament.");
+        else if(deadlinePassed)regBtn=rc("wait","Sign-ups have closed","The registration deadline has passed.");
+        else if(spotsLeft===0)regBtn=rc("wait","This tournament is full","No places are left.");
+      }else if(t.status==="registration_closed")regBtn=rc("wait","Sign-ups are closed","Registration has ended for this tournament.");
+      else if(t.status==="draft")regBtn=rc("wait","Not open yet","Sign-ups have not opened.");
+    }
+    const mineLine="";
     let adminBar="";
     if(state.tnAdmin){
       const setup=ended?'':'<button type="button" class="secondary" id="tournamentAddEntrant">Add entrant</button><button type="button" class="secondary" id="tournamentAddStage">Create stage</button><button type="button" class="secondary" id="tournamentSetupStages">Set up default stages</button>';
@@ -1347,6 +1462,19 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const hero='<header class="tn-hero" id="tnHero"><div class="tn-hero-top"><button type="button" class="tn-back" id="tnBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All tournaments</button>'+tnStateHtml(t.status)+'</div><h2>'+esc(t.name)+'</h2>'+(t.description?'<p class="tn-lede">'+esc(t.description)+'</p>':'')
       +'<div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span></div><ul class="tn-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'</ul>'+regBtn+mineLine+adminBar+'</header>';
     const banner=ended?'<div class="tn-banner"><span><b>'+(t.status==="archived"?"This tournament is archived.":t.status==="cancelled"?"This tournament was cancelled.":"This tournament has ended.")+'</b> Fixtures and approved results stay here for reference. New fixtures and scores are closed.</span></div>':'';
+    let checklist="";
+    if(state.tnAdmin&&!ended){
+      const pendingReg=participants.filter(p=>p.status==="pending").length,hasStages=stages.length>0,hasFixtures=matches.length>0;
+      const steps=[
+        {done:true,title:"Tournament created",hint:"Format and rules are saved."},
+        {done:t.status!=="draft",title:"Open sign-ups",hint:t.status==="draft"?"Players cannot see or join it as a member until you open it.":"Open.",act:t.status==="draft"?["Open sign-ups","open"]:null},
+        {done:confirmedCount>=2,title:"Confirm at least two players",hint:confirmedCount+" confirmed"+(pendingReg?", "+pendingReg+" waiting for your approval (see Participants below)":"")+".",act:["Add a player","entrant"]},
+        {done:hasFixtures,title:hasStages?"Generate round 1":"Set up stages",hint:hasStages?"Pairs the confirmed players and can set a score deadline.":"Creates the groups or rounds for this format.",act:hasStages?["Generate round 1","generate"]:["Set up stages","stages"]},
+        {done:matches.some(m=>["approved","completed"].includes(m.status)),title:"Review and approve scores",hint:pendingSubmissions.length?pendingSubmissions.length+" waiting for review below.":"Submitted scores appear in the review queue.",act:null}
+      ];
+      const cur=steps.findIndex(x=>!x.done);
+      checklist='<section class="tn-check" aria-label="Setup checklist"><div class="tn-check-head"><h3>'+(cur<0?"Everything is set up":"Next steps")+'</h3><span class="small">'+steps.filter(x=>x.done).length+' of '+steps.length+' done</span></div><ol>'+steps.map((x,i)=>'<li class="'+(x.done?'done':i===cur?'now':'')+'"><span class="tn-check-dot">'+(x.done?'&#10003;':i+1)+'</span><div><b>'+esc(x.title)+'</b><small>'+esc(x.hint)+'</small></div>'+(i===cur&&x.act?'<button type="button" class="'+(i===cur?'primary':'secondary')+'" data-cl="'+x.act[1]+'">'+esc(x.act[0])+'</button>':'')+'</li>').join("")+'</ol></section>';
+    }
     const queue=state.tnAdmin?'<section class="tn-section"><div class="tn-section-head"><h3>Results waiting for review</h3>'+(pendingSubmissions.length?'<span class="tn-count">'+pendingSubmissions.length+'</span>':'')+'</div>'+(pendingSubmissions.length?pendingSubmissions.map(x=>'<div class="tn-review">'+queueBoard(x)+'<div class="tn-actions"><button type="button" class="primary" data-review-result="'+esc(x.id)+'" data-review-decision="approve">Approve</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="reject">Reject</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="dispute">Dispute</button></div></div>').join(""):'<div class="tn-empty">Nothing waiting. Submitted scores will show up here for approval.</div>')+'</section>':'';
     const confirmList=!state.tnAdmin&&t.score_workflow==="participant_opponent_admin"?pendingSubmissions.filter(x=>x.status==="awaiting_opponent"&&x.submitted_by!==uid&&matches.some(m=>m.id===x.match_id&&(myPartIds.has(m.participant_a_id)||myPartIds.has(m.participant_b_id)))):[];
     const confirmHtml=confirmList.length?'<section class="tn-section"><div class="tn-section-head"><h3>Confirm your opponent’s score</h3></div>'+confirmList.map(x=>'<div class="tn-review">'+queueBoard(x)+'<div class="tn-actions"><button type="button" class="primary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="true">Confirm score</button><button type="button" class="secondary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="false">Dispute score</button></div></div>').join("")+'</section>':'';
@@ -1359,17 +1487,27 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     }).join("")+'</div>':'<div class="tn-empty">No participants yet.</div>')+'</section>';
     tnOpen=id;
     const detail=$("tournamentDetail");
-    detail.innerHTML=hero+banner+confirmHtml+queue+fixturesHtml+peopleHtml;
+    detail.innerHTML=hero+banner+checklist+confirmHtml+queue+fixturesHtml+peopleHtml;
     applyTnVisibility();
     $("tournamentSetupStages")?.addEventListener("click",async()=>{
       let groups=4;
-      if(t.format==="group_knockout"){const answer=prompt("How many groups? Enter 2–8.","4");if(answer===null)return;groups=Number(answer);if(!Number.isInteger(groups)||groups<2||groups>8){status("tournamentStatus","Group count must be 2–8.","error");return;}}
-      if(!confirm("Create the default stages for this tournament now? This is available only before any stages exist."))return;
+      if(t.format==="group_knockout"){
+        const answer=await askText({title:"How many groups?",text:"Players are split evenly across the groups. You need at least two confirmed players per group.",label:"Number of groups (2 to 8)",type:"number",min:2,max:8,value:"4",confirmText:"Set up stages",validate:v=>{const n=Number(v);return Number.isInteger(n)&&n>=2&&n<=8?"":"Enter a whole number from 2 to 8.";}});
+        if(answer===null)return;groups=Number(answer);
+      }
       const {data,error}=await client.rpc("tournament_admin_setup_stages",{p_tournament_id:id,p_group_count:groups});
       if(error){status("tournamentStatus",error.message,"error");return;}
       await openTournament(id);toast("Default stages created.");
     });
     $("tournamentAddEntrant")?.addEventListener("click",()=>tournamentShowAddEntrant(id));
+    $("tnSignInBtn")?.addEventListener("click",()=>showView("account"));
+    detail.querySelectorAll("[data-cl]").forEach(b=>b.addEventListener("click",async()=>{
+      const k=b.dataset.cl;
+      if(k==="open"){await publishTournament(id);await openTournament(id);}
+      else if(k==="entrant")tournamentShowAddEntrant(id);
+      else if(k==="stages")$("tournamentSetupStages")?.click();
+      else if(k==="generate")detail.querySelector("[data-generate-stage]")?.click();
+    }));
     document.querySelectorAll("[data-participant-approve]").forEach(b=>b.addEventListener("click",async()=>{
       if(!state.tnAdmin)return;
       const p=participants.find(x=>x.id===b.dataset.participantApprove);if(!p)return;
@@ -1446,13 +1584,14 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       if(!state.session||!["self","both"].includes(t.registration_mode))return;
       let error;
       if(t.competition_type==="team"){
-        const teamName=prompt("Team name:");if(!teamName||!teamName.trim())return;
+        const teamName=await askText({title:"Name your team",text:"This is the name shown on fixtures and standings.",label:"Team name",placeholder:"e.g. Brahmanbaria Blasters",confirmText:"Register team",validate:v=>v.length>=2&&v.length<=100?"":"Team names need 2 to 100 characters."});if(!teamName)return;
         const result=await client.rpc("tournament_register_team",{p_tournament_id:id,p_team_name:teamName.trim()});error=result.error;
       }else{
         const result=await client.rpc("tournament_register_individual",{p_tournament_id:id});error=result.error;
       }
       if(error){status("tournamentStatus",error.message,"error");return;}
-      toast("Registration submitted.");await openTournament(id);await loadTournaments();
+      const joined=await client.from("tournament_participants").select("status").eq("tournament_id",id).eq("user_id",state.session.user.id).not("status","in","(withdrawn,rejected)").maybeSingle();
+      toast(joined.data?.status==="confirmed"?"You are in. Good luck!":joined.data?.status==="waitlisted"?"The tournament is full, so you are on the waitlist.":"Sign-up sent. An admin will confirm it.");await openTournament(id);await loadTournaments();
     });
     window.scrollTo({top:0,behavior:"smooth"});
   }
