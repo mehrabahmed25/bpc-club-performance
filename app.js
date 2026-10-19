@@ -1056,7 +1056,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       if(error){status("tournamentStatus",error.message,"error");return;}
       await openTournament(id);toast("Default stages created.");
     });
-    $("tournamentAddEntrant")?.addEventListener("click",()=>tournamentAdminAddEntrant(id));
+    $("tournamentAddEntrant")?.addEventListener("click",()=>tournamentShowAddEntrant(id));
     document.querySelectorAll("[data-confirm-result]").forEach(b=>b.addEventListener("click",async()=>{
       const reason=b.dataset.confirmValue==="false"?(prompt("Reason for disputing this score (optional):")||null):null;
       const {error}=await client.rpc("tournament_confirm_result",{p_submission_id:b.dataset.confirmResult,p_confirm:b.dataset.confirmValue==="true",p_reason:reason});
@@ -1125,14 +1125,41 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
   }
 
 
-  async function tournamentAdminAddEntrant(tournamentId){
-    const name=prompt("Entrant name (or display name for an external entrant):");
-    if(!name||!name.trim())return;
-    const kind=prompt("Type individual or team?","individual");
-    if(!["individual","team"].includes((kind||"").toLowerCase()))return;
-    const {data,error}=await client.rpc("tournament_admin_add_entrant",{p_tournament_id:tournamentId,p_entrant_type:kind.toLowerCase(),p_display_name:name.trim(),p_user_id:null,p_cobeg_member_id:null,p_seed:null});
-    if(error){status("tournamentStatus",error.message,"error");return;}
-    toast("Entrant added.");await openTournament(tournamentId);
+  async function tournamentShowAddEntrant(tournamentId){
+    if(!state.isAdmin)return;
+    const detail=$("tournamentDetail");
+    let panel=$("tournamentAddEntrantPanel");
+    if(panel){panel.remove();return;}
+    panel=document.createElement("div");panel.id="tournamentAddEntrantPanel";panel.className="panel";
+    panel.innerHTML='<h3>Add registered entrant</h3><p class="small">Choose a registered website account or COBEG XI member.</p><label for="tournamentEntrantSelect">Registered member</label><select id="tournamentEntrantSelect"><option value="">Loading members…</option></select><div class="toolbar"><button type="button" class="primary" id="tournamentConfirmAddEntrant">Add selected member</button><button type="button" class="secondary" id="tournamentCancelAddEntrant">Cancel</button></div><p id="tournamentAddEntrantStatus" class="small"></p>';
+    const anchor=$("tournamentAddEntrant");
+    anchor?.closest(".toolbar")?.insertAdjacentElement("afterend",panel);
+    const [playersResult,membersResult]=await Promise.all([
+      client.from("players").select("user_id,display_name,active").not("user_id","is",null).eq("active",true).order("display_name"),
+      client.from("cobeg_members").select("id,name,active").eq("active",true).order("name")
+    ]);
+    const select=$("tournamentEntrantSelect");
+    if(!select)return;
+    if(playersResult.error||membersResult.error){select.innerHTML='<option value="">Could not load registered members</option>';status("tournamentAddEntrantStatus",playersResult.error?.message||membersResult.error?.message||"Could not load members.","error");return;}
+    const options=[
+      ...(playersResult.data||[]).map(p=>({value:"user:"+p.user_id,label:(p.display_name||"Registered account")+" · Website account",user_id:p.user_id})),
+      ...(membersResult.data||[]).map(m=>({value:"member:"+m.id,label:m.name+" · COBEG XI member",cobeg_member_id:m.id}))
+    ];
+    const seen=new Set();
+    select.innerHTML='<option value="">Choose a registered member</option>'+options.filter(o=>{if(seen.has(o.value))return false;seen.add(o.value);return true;}).map(o=>'<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>').join("");
+    if(!options.length)select.innerHTML='<option value="">No active registered members found</option>';
+    $("tournamentCancelAddEntrant")?.addEventListener("click",()=>panel.remove());
+    $("tournamentConfirmAddEntrant")?.addEventListener("click",async()=>{
+      const chosen=options.find(o=>o.value===select.value);
+      if(!chosen){status("tournamentAddEntrantStatus","Please select a member.","error");return;}
+      const {error}=await client.rpc("tournament_admin_add_entrant",{
+        p_tournament_id:tournamentId,p_entrant_type:"individual",
+        p_display_name:chosen.label.split(" · ")[0],
+        p_user_id:chosen.user_id||null,p_cobeg_member_id:chosen.cobeg_member_id||null,p_seed:null
+      });
+      if(error){status("tournamentAddEntrantStatus",error.message,"error");return;}
+      toast("Registered member added to tournament.");await openTournament(tournamentId);
+    });
   }
 
   async function refreshFundsAccess(){
