@@ -183,10 +183,10 @@ begin
          ((m.participant_a_id=v_a and m.participant_b_id=v_candidate) or (m.participant_a_id=v_candidate and m.participant_b_id=v_a))) then
          continue;
        end if;
-       select coalesce(sum(case when m.status in ('approved','completed') and m.winner_participant_id=e.participant_id then coalesce((v_t.scoring_config_json->>'win')::numeric,3)
+       select coalesce(sum(case when m.status in ('approved','completed') and m.winner_participant_id=se.participant_id then coalesce((v_t.scoring_config_json->>'win')::numeric,3)
                                 when m.status in ('approved','completed') and m.winner_participant_id is null and m.score_a=m.score_b then coalesce((v_t.scoring_config_json->>'draw')::numeric,1) else 0 end),0),
-              coalesce(sum(case when m.status in ('approved','completed') and m.participant_a_id=e.participant_id then m.score_a
-                                when m.status in ('approved','completed') and m.participant_b_id=e.participant_id then m.score_b else 0 end),0),
+              coalesce(sum(case when m.status in ('approved','completed') and m.participant_a_id=se.participant_id then m.score_a
+                                when m.status in ('approved','completed') and m.participant_b_id=se.participant_id then m.score_b else 0 end),0),
               coalesce(se.seed,2147483647)
        into v_points,v_sf,v_seed
        from public.tournament_stage_entries se
