@@ -94,3 +94,21 @@
 #tournamentCreateForm label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px}
 .fixture-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
 #tournamentDetail{margin-top:24px}
+
+/* Tournament fixtures, deadlines and dashboard matches */
+.round-head{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:14px;padding:8px 0 4px}
+.round-head .secondary{margin-left:auto}
+.fixture-row{align-items:center}
+.fx-meta{color:var(--muted);font-size:12px;white-space:nowrap}
+.fx-pair{display:flex;align-items:center;flex-wrap:wrap;gap:8px;justify-content:flex-end;text-align:right}
+.fx-vs{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.fx-score{font-weight:800;padding:2px 8px;border-radius:8px;background:var(--sky)}
+.match-card{margin-bottom:12px}
+.match-card-head{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.match-card .fx-pair{justify-content:flex-start;text-align:left;font-size:16px;margin:8px 0}
+.modal-overlay{position:fixed;inset:0;background:rgba(16,29,53,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:1000}
+.modal-box{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:400px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.modal-box label{display:block;font-size:13px;font-weight:750;color:#39475e;margin:12px 0}
+.modal-box input[type=datetime-local]{display:block;width:100%;margin-top:7px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font:inherit}
+.modal-box .check-row{display:flex;align-items:center;gap:8px;font-weight:600}
+@media (max-width:560px){.fixture-row{flex-direction:column;align-items:flex-start}.fx-pair{justify-content:flex-start;text-align:left}}

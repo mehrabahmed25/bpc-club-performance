@@ -692,8 +692,45 @@ async function loadHistory(){
     ).join("")
     : '<tr><td colspan="9" class="empty">No match results found for this month.</td></tr>';
 }
+  async function loadMyTournamentMatches(){
+    const box=$("myTournamentSection");if(!box)return;
+    if(!client||!state.session){box.classList.add("hidden");return;}
+    const {data,error}=await client.rpc("tournament_my_matches");
+    if(error){box.classList.add("hidden");return;}
+    const rows=data||[];
+    if(!rows.length){box.classList.add("hidden");return;}
+    box.classList.remove("hidden");status("myTournamentStatus","");
+    const upcoming=rows.filter(r=>!["approved","completed","bye"].includes(r.status));
+    const results=rows.filter(r=>["approved","completed"].includes(r.status)).sort((a,b)=>new Date(b.approved_at||0)-new Date(a.approved_at||0));
+    // Which side of the fixture the player is on (needed to send each score to the right column).
+    const sideMap={};
+    const submittable=upcoming.filter(r=>r.can_submit).map(r=>r.match_id);
+    if(submittable.length){const q=await client.from("tournament_matches").select("id,participant_a_id").in("id",submittable);(q.data||[]).forEach(m=>{const r=rows.find(x=>x.match_id===m.id);if(r)sideMap[m.id]=m.participant_a_id===r.my_participant_id;});}
+    const where=r=>esc(r.stage_name)+(r.group_name?' · Group '+esc(r.group_name):'')+' · Round '+r.round_number;
+    $("myTournamentUpcoming").innerHTML=upcoming.length?upcoming.map(r=>{
+      const expired=r.deadline_at&&new Date(r.deadline_at)<=new Date();
+      const due=r.deadline_at?(expired&&["scheduled","rejected"].includes(r.status)?'<span class="pill bad">Deadline passed '+esc(fmtDeadline(r.deadline_at))+'</span>':'<span class="pill pending">Due '+esc(fmtDeadline(r.deadline_at))+'</span>'):'<span class="small">No deadline set</span>';
+      return '<article class="panel match-card"><div class="match-card-head"><b>'+esc(r.tournament_name)+'</b><span class="small">'+where(r)+'</span></div>'
+        +'<p class="fx-pair"><b>'+esc(r.my_name)+'</b><span class="fx-vs">vs</span><b>'+esc(r.opponent_name||"TBD")+'</b></p>'
+        +'<p>'+due+'</p>'+(r.note?'<p class="small">'+esc(r.note)+'</p>':'')
+        +'<div class="toolbar">'+(r.can_submit?'<button type="button" class="primary" data-my-submit="'+esc(r.match_id)+'">Submit score</button>':'')+'<button type="button" class="secondary" data-my-open="'+esc(r.tournament_id)+'">View tournament</button></div></article>';
+    }).join(""):'<div class="panel soft">No upcoming tournament matches right now.</div>';
+    $("myTournamentResults").innerHTML=results.length?'<div class="table-wrap"><table><thead><tr><th>Tournament</th><th>Stage</th><th>Opponent</th><th>Score</th><th>Result</th><th>Approved</th></tr></thead><tbody>'
+      +results.map(r=>'<tr><td>'+esc(r.tournament_name)+'</td><td>'+where(r)+'</td><td>'+esc(r.opponent_name||"—")+'</td><td><b>'+esc(r.my_score)+' – '+esc(r.opponent_score)+'</b></td><td><span class="pill '+(r.outcome==="win"?"good":r.outcome==="loss"?"bad":"pending")+'">'+esc(r.outcome)+'</span></td><td>'+(r.approved_at?esc(new Date(r.approved_at).toLocaleDateString([],{dateStyle:"medium"})):"—")+'</td></tr>').join("")+'</tbody></table></div>'
+      :'<div class="panel soft">No approved tournament results yet.</div>';
+    box.querySelectorAll("[data-my-submit]").forEach(b=>b.onclick=async()=>{
+      const r=rows.find(x=>x.match_id===b.dataset.mySubmit);if(!r)return;
+      const iAmA=sideMap[r.match_id]!==false;
+      const res=await promptTournamentScore(r.match_id,iAmA?r.my_name:r.opponent_name,iAmA?r.opponent_name:r.my_name);
+      if(res===null)return;
+      if(res.error){status("myTournamentStatus",res.error.message,"error");return;}
+      toast("Score submitted.");await loadMyTournamentMatches();
+    });
+    box.querySelectorAll("[data-my-open]").forEach(b=>b.onclick=async()=>{showView("tournaments");await openTournament(b.dataset.myOpen);});
+  }
   async function loadProfile(){
     if(!client||!state.session){showView("account");return;}
+    loadMyTournamentMatches();
     $("profileHeading").textContent=(state.player?.display_name||"My")+" dashboard";
     const {data,error}=await client.rpc("get_my_month_stats",{p_month:monthDate($("monthPicker").value||monthNow)});
     if(error){$("profileStats").innerHTML='<div class="panel">'+esc(error.message)+'</div>';return;}
@@ -1024,12 +1061,43 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(error){status("tournamentStatus",error.message,"error");return;}
     toast("Registration opened.");await loadTournaments();
   }
+  const fmtDeadline=d=>new Date(d).toLocaleString([],{dateStyle:"medium",timeStyle:"short"});
+  const toLocalInput=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  // Date/time picker dialog. Resolves to an ISO string, "" (no deadline) or null (cancelled).
+  function askDeadline(opts){
+    return new Promise(resolve=>{
+      const ov=document.createElement("div");ov.className="modal-overlay";
+      ov.innerHTML='<div class="modal-box" role="dialog" aria-modal="true"><h3>'+esc(opts.title)+'</h3><p class="small">'+esc(opts.text||"")+'</p>'
+        +'<label>Deadline<input type="datetime-local" id="dlInput" value="'+esc(opts.defaultValue||toLocalInput(new Date(Date.now()+7*864e5)))+'"></label>'
+        +(opts.allowNone?'<label class="check-row"><input type="checkbox" id="dlNone"> No deadline</label>':'')
+        +'<div class="toolbar"><button type="button" class="primary" id="dlOk">'+esc(opts.confirmText||"Save")+'</button><button type="button" class="secondary" id="dlCancel">Cancel</button></div><div class="status" id="dlErr"></div></div>';
+      document.body.appendChild(ov);
+      const close=v=>{ov.remove();resolve(v);};
+      ov.querySelector("#dlCancel").onclick=()=>close(null);
+      ov.addEventListener("click",e=>{if(e.target===ov)close(null);});
+      ov.querySelector("#dlOk").onclick=()=>{
+        if(ov.querySelector("#dlNone")?.checked)return close("");
+        const v=ov.querySelector("#dlInput").value,d=new Date(v);
+        if(!v||isNaN(d)){ov.querySelector("#dlErr").textContent="Choose a date and time"+(opts.allowNone?", or tick No deadline.":".");return;}
+        if(d<=new Date()){ov.querySelector("#dlErr").textContent="The deadline must be in the future.";return;}
+        close(d.toISOString());
+      };
+    });
+  }
+  // Participant score submission shared by the tournament page and the dashboard.
+  // Returns null when cancelled, otherwise the rpc result ({error} on failure).
+  async function promptTournamentScore(matchId,nameA,nameB){
+    const a=prompt("Score for "+nameA+":");if(a===null)return null;
+    const z=prompt("Score for "+nameB+":");if(z===null)return null;
+    if(!/^\d+$/.test(a.trim())||!/^\d+$/.test(z.trim()))return {error:{message:"Scores must be non-negative whole numbers."}};
+    return await client.rpc("tournament_submit_result",{p_match_id:matchId,p_score_a:Number(a),p_score_b:Number(z),p_note:null});
+  }
   async function openTournament(id){
     const {data:t,error}=await client.from("tournament_tournaments").select("*").eq("id",id).maybeSingle();
     if(error||!t){status("tournamentStatus",error?.message||"Tournament unavailable.","error");return;}
     const [pr,mr,sr,rr]=await Promise.all([
       client.from("tournament_participants").select("id,entrant_type,user_id,cobeg_member_id,external_name,status,seed,registered_at").eq("tournament_id",id).order("registered_at"),
-      client.from("tournament_matches").select("id,stage_id,round_number,match_number,participant_a_id,participant_b_id,score_a,score_b,status,scheduled_at").eq("tournament_id",id).order("round_number").order("match_number"),
+      client.from("tournament_matches").select("id,stage_id,round_number,match_number,participant_a_id,participant_b_id,score_a,score_b,status,scheduled_at,deadline_at").eq("tournament_id",id).order("round_number").order("match_number"),
       client.from("tournament_stages").select("id,name,stage_type,sequence_number,status").eq("tournament_id",id).order("sequence_number"),
       client.from("tournament_result_submissions").select("id,match_id,score_a,score_b,status,note,created_at,submitted_by").in("match_id", (await client.from("tournament_matches").select("id").eq("tournament_id",id)).data?.map(m=>m.id)||[]).in("status",["pending","disputed","awaiting_opponent"]).order("created_at")
     ]);
@@ -1046,8 +1114,35 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(memberIds.length){const q=await client.from("cobeg_members").select("id,name").in("id",memberIds);(q.data||[]).forEach(x=>entrantNames[x.id]=x.name);}
     if(participantIds.length){const q=await client.from("tournament_teams").select("participant_id,team_name").in("participant_id",participantIds);(q.data||[]).forEach(x=>entrantNames[x.participant_id]=x.team_name);}
     const entrantLabel=p=>p.external_name||entrantNames[p.id]||entrantNames[p.user_id]||entrantNames[p.cobeg_member_id]||"Registered entrant";
+    const myRes=state.session?await client.rpc("tournament_my_matches"):{data:[]};
+    const myRows=(myRes.data||[]).filter(x=>x.tournament_id===id);
+    const myMatchIds=new Set(myRows.map(x=>x.match_id));
+    const myCanSubmit=new Set(myRows.filter(x=>x.can_submit).map(x=>x.match_id));
+    const nameOf=pid=>{const p=participants.find(x=>x.id===pid);return p?entrantLabel(p):"TBD";};
+    const renderFixtures=list=>{
+      const rounds=[...new Set(list.map(m=>m.round_number))].sort((a,b)=>a-b);
+      return rounds.map(rn=>{
+        const rm=list.filter(m=>m.round_number===rn).sort((a,b)=>a.match_number-b.match_number);
+        const dl=rm.map(m=>m.deadline_at).find(Boolean);
+        const adminOpen=rm.some(m=>["scheduled","rejected"].includes(m.status));
+        const head='<div class="round-head"><b>Round '+rn+'</b><span class="small">'+(dl?'Deadline: '+esc(fmtDeadline(dl)):'No deadline set')+'</span>'
+          +(state.isAdmin&&adminOpen?'<button type="button" class="secondary" data-set-deadline="'+esc(rm[0].stage_id)+'" data-round="'+rn+'">'+(dl?'Change deadline':'Set deadline')+'</button>':'')+'</div>';
+        return head+rm.map(m=>{
+          const a=nameOf(m.participant_a_id),b=m.participant_b_id?nameOf(m.participant_b_id):null;
+          const done=["approved","completed"].includes(m.status),open=["scheduled","rejected"].includes(m.status);
+          const expired=m.deadline_at&&new Date(m.deadline_at)<=new Date();
+          const mid=done?'<span class="fx-score">'+esc(m.score_a)+' – '+esc(m.score_b)+'</span>':'<span class="fx-vs">vs</span>';
+          let action="";
+          if(state.isAdmin&&t.score_workflow==="admin_entered"&&open&&b)action='<button type="button" class="secondary" data-admin-score="'+esc(m.id)+'">Enter score</button>';
+          else if(myCanSubmit.has(m.id))action='<button type="button" class="primary" data-submit-score="'+esc(m.id)+'">Submit score</button>';
+          else if(open&&expired&&myMatchIds.has(m.id)&&t.score_workflow!=="admin_entered")action='<span class="pill bad">Deadline passed</span>';
+          const pill=m.status==="bye"?'<span class="pill">Bye</span>':done?'':open?'':'<span class="pill pending">'+esc(m.status.replaceAll("_"," "))+'</span>';
+          return '<div class="fixture-row"><span class="fx-meta">Match '+m.match_number+'</span><span class="fx-pair"><b>'+esc(a)+'</b>'+(b?mid+'<b>'+esc(b)+'</b>':'')+pill+action+'</span></div>';
+        }).join("");
+      }).join("");
+    };
     const detail=$("tournamentDetail");detail.classList.remove("hidden");
-    detail.innerHTML='<div class="section-head compact"><h2>'+esc(t.name)+'</h2><p>'+esc(t.description||"")+'</p></div><div class="panel"><p><b>Status:</b> '+esc(t.status.replaceAll("_"," "))+' · <b>Format:</b> '+esc(t.format.replaceAll("_"," "))+' · <b>Type:</b> '+esc(t.competition_type)+'</p>'+(canRegister?(t.competition_type==="team"?'<button type="button" class="primary" id="tournamentSelfRegister">Register a team</button>':'<button type="button" class="primary" id="tournamentSelfRegister">Register for this tournament</button>'):'')+(mine?'<p>Your registration: <b>'+esc(mine.status)+'</b></p>':'')+(state.isAdmin?'<div class="toolbar"><button type="button" class="secondary" id="tournamentAddEntrant">Add entrant</button><button type="button" class="secondary" id="tournamentAddStage">Create stage</button><button type="button" class="primary" id="tournamentSetupStages">Set up default stages</button></div>':'')+'</div>'+(state.isAdmin?'<div class="section-head compact"><h3>Result review queue ('+pendingSubmissions.length+')</h3></div>'+pendingSubmissions.map(x=>'<div class="panel"><b>Score: '+x.score_a+' – '+x.score_b+'</b><p>'+esc(x.status.replaceAll("_"," "))+' · '+esc(x.note||"No note")+'</p><button type="button" class="primary" data-review-result="'+esc(x.id)+'" data-review-decision="approve">Approve</button> <button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="reject">Reject</button> <button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="dispute">Dispute</button></div>').join(""):t.score_workflow==="participant_opponent_admin"?'<div class="section-head compact"><h3>Opponent score confirmation</h3></div>'+pendingSubmissions.filter(x=>x.status==="awaiting_opponent"&&x.submitted_by!==state.session?.user?.id&&matches.some(m=>m.id===x.match_id&&(m.participant_a_id===mine?.id||m.participant_b_id===mine?.id))).map(x=>'<div class="panel"><b>Proposed score: '+x.score_a+' – '+x.score_b+'</b><p>'+esc(x.note||"No note")+'</p><button type="button" class="primary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="true">Confirm score</button> <button type="button" class="secondary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="false">Dispute score</button></div>').join(""):'')+'<div class="section-head compact"><h3>Participants ('+visibleParticipants.length+')</h3></div><div class="table-wrap"><table><thead><tr><th>Entrant</th><th>Type</th><th>Status</th><th>Seed</th>'+(state.isAdmin?'<th>Actions</th>':'')+'</tr></thead><tbody>'+ (visibleParticipants.length?visibleParticipants.map(p=>'<tr><td>'+esc(entrantLabel(p))+'</td><td>'+esc(p.entrant_type)+'</td><td>'+esc(p.status)+'</td><td>'+esc(p.seed??"—")+'</td>'+(state.isAdmin?'<td>'+(p.status==="pending"?'<button type="button" class="primary" data-participant-approve="'+esc(p.id)+'">Approve</button> ':'')+(["pending","confirmed","waitlisted"].includes(p.status)?'<button type="button" class="reject-btn" data-participant-remove="'+esc(p.id)+'">Remove</button>':'<span class="small">—</span>')+'</td>':'')+'</tr>').join(""):'<tr><td colspan="'+(state.isAdmin?5:4)+'" class="empty">No participants yet.</td></tr>')+'</tbody></table></div><div class="section-head compact"><h3>Stages & fixtures</h3></div>'+ (stages.map(s=>'<div class="panel"><h3>'+esc(s.name)+' · '+esc(s.stage_type.replaceAll("_"," "))+'</h3><p>'+esc(s.status)+'</p>'+(state.isAdmin?'<div class="toolbar"><button type="button" class="secondary" data-generate-stage="'+esc(s.id)+'">Generate next round</button>'+(t.format==="group_knockout"&&s.stage_type==="group"?'<button type="button" class="secondary" data-advance-groups="'+esc(id)+'">Advance group qualifiers</button>':'')+'</div>':'')+'<div class="toolbar"><button type="button" class="secondary" data-stage-standings="'+esc(s.id)+'">View standings</button></div><div id="standings-'+esc(s.id)+'"></div>'+matches.filter(m=>m.stage_id===s.id).map(m=>'<div class="fixture-row"><span>Round '+m.round_number+' · Match '+m.match_number+'</span><b>'+esc(m.status==='approved'||m.status==='completed'?(m.score_a+" – "+m.score_b):m.status.replaceAll("_"," "))+'</b>'+(state.isAdmin&&t.score_workflow==="admin_entered"&&["scheduled","rejected"].includes(m.status)?' <button type="button" class="secondary" data-admin-score="'+esc(m.id)+'">Enter score</button>':'')+(state.session&&["scheduled","rejected"].includes(m.status)&&t.score_workflow!=="admin_entered"&&(m.participant_a_id||m.participant_b_id)?' <button type="button" class="secondary" data-submit-score="'+esc(m.id)+'">Submit score</button>':'')+'</div>').join("")+'</div>').join("")||'<div class="panel soft">Fixtures have not been generated yet.</div>');
+    detail.innerHTML='<div class="section-head compact"><h2>'+esc(t.name)+'</h2><p>'+esc(t.description||"")+'</p></div><div class="panel"><p><b>Status:</b> '+esc(t.status.replaceAll("_"," "))+' · <b>Format:</b> '+esc(t.format.replaceAll("_"," "))+' · <b>Type:</b> '+esc(t.competition_type)+'</p>'+(canRegister?(t.competition_type==="team"?'<button type="button" class="primary" id="tournamentSelfRegister">Register a team</button>':'<button type="button" class="primary" id="tournamentSelfRegister">Register for this tournament</button>'):'')+(mine?'<p>Your registration: <b>'+esc(mine.status)+'</b></p>':'')+(state.isAdmin?'<div class="toolbar"><button type="button" class="secondary" id="tournamentAddEntrant">Add entrant</button><button type="button" class="secondary" id="tournamentAddStage">Create stage</button><button type="button" class="primary" id="tournamentSetupStages">Set up default stages</button></div>':'')+'</div>'+(state.isAdmin?'<div class="section-head compact"><h3>Result review queue ('+pendingSubmissions.length+')</h3></div>'+pendingSubmissions.map(x=>'<div class="panel"><b>Score: '+x.score_a+' – '+x.score_b+'</b><p>'+esc(x.status.replaceAll("_"," "))+' · '+esc(x.note||"No note")+'</p><button type="button" class="primary" data-review-result="'+esc(x.id)+'" data-review-decision="approve">Approve</button> <button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="reject">Reject</button> <button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="dispute">Dispute</button></div>').join(""):t.score_workflow==="participant_opponent_admin"?'<div class="section-head compact"><h3>Opponent score confirmation</h3></div>'+pendingSubmissions.filter(x=>x.status==="awaiting_opponent"&&x.submitted_by!==state.session?.user?.id&&matches.some(m=>m.id===x.match_id&&(m.participant_a_id===mine?.id||m.participant_b_id===mine?.id))).map(x=>'<div class="panel"><b>Proposed score: '+x.score_a+' – '+x.score_b+'</b><p>'+esc(x.note||"No note")+'</p><button type="button" class="primary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="true">Confirm score</button> <button type="button" class="secondary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="false">Dispute score</button></div>').join(""):'')+'<div class="section-head compact"><h3>Participants ('+visibleParticipants.length+')</h3></div><div class="table-wrap"><table><thead><tr><th>Entrant</th><th>Type</th><th>Status</th><th>Seed</th>'+(state.isAdmin?'<th>Actions</th>':'')+'</tr></thead><tbody>'+ (visibleParticipants.length?visibleParticipants.map(p=>'<tr><td>'+esc(entrantLabel(p))+'</td><td>'+esc(p.entrant_type)+'</td><td>'+esc(p.status)+'</td><td>'+esc(p.seed??"—")+'</td>'+(state.isAdmin?'<td>'+(p.status==="pending"?'<button type="button" class="primary" data-participant-approve="'+esc(p.id)+'">Approve</button> ':'')+(["pending","confirmed","waitlisted"].includes(p.status)?'<button type="button" class="reject-btn" data-participant-remove="'+esc(p.id)+'">Remove</button>':'<span class="small">—</span>')+'</td>':'')+'</tr>').join(""):'<tr><td colspan="'+(state.isAdmin?5:4)+'" class="empty">No participants yet.</td></tr>')+'</tbody></table></div><div class="section-head compact"><h3>Stages & fixtures</h3></div>'+ (stages.map(s=>'<div class="panel"><h3>'+esc(s.name)+' · '+esc(s.stage_type.replaceAll("_"," "))+'</h3><p>'+esc(s.status)+'</p>'+(state.isAdmin?'<div class="toolbar"><button type="button" class="secondary" data-generate-stage="'+esc(s.id)+'">Generate next round</button>'+(t.format==="group_knockout"&&s.stage_type==="group"?'<button type="button" class="secondary" data-advance-groups="'+esc(id)+'">Advance group qualifiers</button>':'')+'</div>':'')+'<div class="toolbar"><button type="button" class="secondary" data-stage-standings="'+esc(s.id)+'">View standings</button></div><div id="standings-'+esc(s.id)+'"></div>'+renderFixtures(matches.filter(m=>m.stage_id===s.id))+'</div>').join("")||'<div class="panel soft">Fixtures have not been generated yet.</div>');
     $("tournamentSetupStages")?.addEventListener("click",async()=>{
       let groups=4;
       if(t.format==="group_knockout"){const answer=prompt("How many groups? Enter 2–8.","4");if(answer===null)return;groups=Number(answer);if(!Number.isInteger(groups)||groups<2||groups>8){status("tournamentStatus","Group count must be 2–8.","error");return;}}
@@ -1104,24 +1199,35 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     }));
     document.querySelectorAll("[data-generate-stage]").forEach(b=>b.addEventListener("click",async()=>{
       const stageId=b.dataset.generateStage;const prior=matches.filter(m=>m.stage_id===stageId);const round=Math.max(0,...prior.map(m=>m.round_number))+1;
-      const publish=confirm("Publish round "+round+" now? This creates real tournament fixtures. Cancel leaves the tournament unchanged.");
-      if(!publish)return;
-      const {error}=await client.rpc("tournament_admin_generate_round",{p_stage_id:stageId,p_round:round,p_publish:true,p_reason:null});
-      if(error){status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast("Round published.");
+      const deadline=await askDeadline({title:"Publish round "+round,text:"This creates real fixtures from the currently confirmed participants. Set the date players must submit their scores by.",allowNone:true,confirmText:"Publish round"});
+      if(deadline===null)return;
+      b.disabled=true;
+      const {error}=await client.rpc("tournament_admin_generate_round",{p_stage_id:stageId,p_round:round,p_publish:true,p_reason:null,p_deadline:deadline||null});
+      if(error){b.disabled=false;status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast("Round published.");
+    }));
+    document.querySelectorAll("[data-set-deadline]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!state.isAdmin)return;
+      const stageId=b.dataset.setDeadline,round=Number(b.dataset.round);
+      const current=matches.find(m=>m.stage_id===stageId&&m.round_number===round&&m.deadline_at)?.deadline_at;
+      const deadline=await askDeadline({title:"Round "+round+" deadline",text:"Applies to every match in this round that is still waiting for a score.",allowNone:true,defaultValue:current&&new Date(current)>new Date()?toLocalInput(new Date(current)):undefined});
+      if(deadline===null)return;
+      const {error}=await client.rpc("tournament_admin_set_round_deadline",{p_stage_id:stageId,p_round:round,p_deadline:deadline||null});
+      if(error){status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast(deadline?"Deadline saved.":"Deadline removed.");
     }));
     document.querySelectorAll("[data-admin-score]").forEach(b=>b.addEventListener("click",async()=>{
       const match=matches.find(m=>m.id===b.dataset.adminScore);if(!match)return;
       if(t.score_workflow!=="admin_entered"){status("tournamentStatus","Use the review queue for participant-submitted results.","error");return;}
-      const a=prompt("Score for participant A:");if(a===null)return;const z=prompt("Score for participant B:");if(z===null)return;
-      if(!/^\\d+$/.test(a)||!/^\\d+$/.test(z)){status("tournamentStatus","Scores must be non-negative whole numbers.","error");return;}
+      const a=prompt("Score for "+nameOf(match.participant_a_id)+":");if(a===null)return;const z=prompt("Score for "+nameOf(match.participant_b_id)+":");if(z===null)return;
+      if(!/^\d+$/.test(a.trim())||!/^\d+$/.test(z.trim())){status("tournamentStatus","Scores must be non-negative whole numbers.","error");return;}
       const {error:scoreError}=await client.rpc("tournament_admin_enter_result",{p_match_id:match.id,p_score_a:Number(a),p_score_b:Number(z),p_reason:"Admin-entered score"});
       if(scoreError){status("tournamentStatus",scoreError.message,"error");return;}await openTournament(id);toast("Score approved.");
     }));
     document.querySelectorAll("[data-submit-score]").forEach(b=>b.addEventListener("click",async()=>{
-      const a=prompt("Score for participant A:");if(a===null)return;const z=prompt("Score for participant B:");if(z===null)return;
-      if(!/^\\d+$/.test(a)||!/^\\d+$/.test(z)){status("tournamentStatus","Scores must be non-negative whole numbers.","error");return;}
-      const {error}=await client.rpc("tournament_submit_result",{p_match_id:b.dataset.submitScore,p_score_a:Number(a),p_score_b:Number(z),p_note:null});
-      if(error){status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast("Score submitted for review.");
+      const match=matches.find(m=>m.id===b.dataset.submitScore);if(!match)return;
+      const res=await promptTournamentScore(match.id,nameOf(match.participant_a_id),nameOf(match.participant_b_id));
+      if(res===null)return;
+      if(res.error){status("tournamentStatus",res.error.message,"error");return;}
+      await openTournament(id);toast(t.score_workflow==="participant_opponent_admin"?"Score submitted; your opponent must confirm it.":"Score submitted for admin approval.");
     }));
     document.querySelectorAll("[data-stage-standings]").forEach(b=>b.addEventListener("click",async()=>{
       const stageId=b.dataset.stageStandings;const {data,error}=await client.rpc("tournament_standings_for_stage",{p_stage_id:stageId});
