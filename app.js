@@ -742,15 +742,33 @@ async function loadHistory(){
     if(!client||!state.session){showView("account");return;}
     loadMyTournamentMatches();
     const dbName=state.player?.display_name||"";$("profileHeading").textContent=dbName?"Welcome back, "+dbName.split(" ")[0]:"Your dashboard";$("dbAvatar").textContent=initials(dbName||"?");$("dbSub").textContent="Fixtures, deadlines and results in one place.";
-    const {data,error}=await client.rpc("get_my_month_stats",{p_month:monthDate($("monthPicker").value||monthNow)});
-    if(error){$("profileStats").innerHTML='<div class="panel">'+esc(error.message)+'</div>';return;}
-    const s=data?.[0];
-    if(!s){$("profileStats").innerHTML="";return;}
-    const vals=[["Matches",s.matches_played,""],["Wins",s.wins,"good"],["Draws",s.draws,""],["Losses",s.losses,"bad"],["Goals for",s.goals_for,""],["Goals against",s.goals_against,""],["Goal difference",signed(s.goal_difference),""],["Points",s.points,"main"]];
+    // Same source as the leaderboard, so the dashboard always agrees with it. This counts matches
+    // you submitted AND matches another member logged against you.
+    const month=$("monthPicker").value||monthNow,pm=monthDate(month);
+    $("dbMonthHead").textContent="Friendly matches in "+new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
+    const [lb,ct,mine]=await Promise.all([
+      client.rpc("get_leaderboard",{p_month:pm}),
+      client.rpc("get_cobeg_match_totals",{p_month:pm}),
+      client.rpc("get_my_month_stats",{p_month:pm})
+    ]);
+    if(lb.error){$("profileStats").innerHTML='<div class="panel">'+esc(lb.error.message)+'</div>';return;}
+    const me=(lb.data||[]).find(r=>r.player_id===state.player?.id);
+    if(!me){$("profileStats").innerHTML="";$("eligibilityBars").innerHTML="";$("eligibilityText").textContent="Your player profile was not found. Contact an admin.";return;}
+    const n=v=>Number(v)||0,played=n(me.matches_played),opps=n(me.cobeg_opponents);
+    const cobegMatches=n((ct.data||[]).find(r=>r.player_id===me.player_id)?.total_mp_vs_cobeg_xi);
+    const pending=mine.error?0:n(mine.data?.[0]?.pending_matches);
+    const vals=[["Matches",played,""],["Wins",n(me.wins),"good"],["Draws",n(me.draws),""],["Losses",n(me.losses),"bad"],["Goals for",n(me.goals_for),""],["Goals against",n(me.goals_against),""],["Goal difference",signed(n(me.goal_difference)),""],["Points",n(me.points),"main"]];
     $("profileStats").innerHTML=vals.map(x=>'<div class="stat-card'+(x[2]?' tone-'+x[2]:'')+'"><small>'+x[0]+'</small><b>'+x[1]+'</b></div>').join("");
+    // Award rules: 40+ matches in the month, of which 25+ are against COBEG XI players, covering 5+ different COBEG XI players.
+    const need={total:40,cobeg:25,opps:5};
     const bar=(label,v,max)=>'<div class="db-bar-row"><span><b>'+v+'</b> of '+max+' '+label+'</span><div class="tn-track"><span class="'+(v>=max?'done':'')+'" style="width:'+Math.round(Math.min(v,max)/max*100)+'%"></span></div></div>';
-    $("eligibilityBars").innerHTML=bar("counted matches",Number(s.matches_played)||0,40)+bar("different COBEG XI opponents",Number(s.cobeg_opponents)||0,5);
-    $("eligibilityText").textContent=s.award_eligible?"You are currently eligible for the monthly award.":`You need at least 40 counted matches and 5 different COBEG XI opponents. Current progress: ${s.matches_played}/40 counted matches, ${s.cobeg_opponents}/5 COBEG XI opponents. Pending matches this month: ${s.pending_matches}.`;
+    $("eligibilityBars").innerHTML=bar("matches played this month",played,need.total)+bar("matches against COBEG XI players",cobegMatches,need.cobeg)+bar("different COBEG XI players faced",opps,need.opps);
+    const eligible=played>=need.total&&cobegMatches>=need.cobeg&&opps>=need.opps;
+    const gaps=[];
+    if(played<need.total)gaps.push((need.total-played)+" more match"+(need.total-played===1?"":"es")+" in total");
+    if(cobegMatches<need.cobeg)gaps.push((need.cobeg-cobegMatches)+" more match"+(need.cobeg-cobegMatches===1?"":"es")+" against COBEG XI players");
+    if(opps<need.opps)gaps.push((need.opps-opps)+" more different COBEG XI player"+(need.opps-opps===1?"":"s"));
+    $("eligibilityText").textContent=(eligible?"You are currently eligible for the monthly award.":"To be eligible you still need "+gaps.join(", ")+".")+" The award needs "+need.total+" matches in the month, including at least "+need.cobeg+" against COBEG XI players and "+need.opps+" different COBEG XI players."+(pending?" Pending matches this month: "+pending+".":"");
   }
 
   async function loadAdmin(){
