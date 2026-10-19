@@ -310,11 +310,11 @@
           if(result.error)throw result.error;
           status("authMessage","Account created. If email confirmation is enabled, check your inbox to confirm before signing in.","success");
           state.signup=false;
-          if(result.data.session){state.session=result.data.session;await loadIdentity();setAuthUI();toast("Account created.");showView("profile");}
+          if(result.data.session){state.session=result.data.session;await loadIdentity();setAuthUI();if(state.session){toast("Account created.");showView("profile");}else showView("account");}
         }else{
           result=await client.auth.signInWithPassword({email,password});
           if(result.error)throw result.error;
-          state.session=result.data.session;await loadIdentity();setAuthUI();toast("Welcome back.");showView("profile");
+          state.session=result.data.session;await loadIdentity();setAuthUI();if(state.session){toast("Welcome back.");showView("profile");}else showView("account");
         }
       }catch(err){status("authMessage",err.message||String(err),"error");}
       finally{if($("authSubmit"))$("authSubmit").disabled=false;}
@@ -332,6 +332,10 @@
     ]);
     state.profile=pr.data||{display_name:state.session.user.email,role:"player"};
     state.player=pl.data||null;state.isAdmin=state.profile.role==="admin";
+    if(state.player&&state.player.removed_at&&!state.isAdmin){
+      await client.auth.signOut();state.session=null;state.profile=null;state.player=null;state.isAdmin=false;state.tnAdmin=false;state.isTnManager=false;
+      toast("This account has been removed by an admin.");return;
+    }
     state.isTnManager=false;
     if(!state.isAdmin){const mg=await client.from("tournament_managers").select("user_id").eq("user_id",uid).maybeSingle();state.isTnManager=!mg.error&&!!mg.data;}
     state.tnAdmin=state.isAdmin||state.isTnManager;
@@ -808,29 +812,67 @@ async function loadHistory(){
 
 const ps = await client
   .from("players")
-  .select("id,display_name,active,created_at")
+  .select("id,user_id,display_name,active,created_at,removed_at")
   .order("created_at", { ascending: false })
-  .limit(100);
+  .limit(300);
 
 if (ps.error) {
   status("adminStatus", ps.error.message, "error");
   return;
 }
 
-$("playersBody").innerHTML = (ps.data || []).map(p =>
-  '<tr>' +
+const allPlayers = ps.data || [];
+const removedCount = allPlayers.filter(p => p.removed_at).length;
+const shown = allPlayers.filter(p => showRemovedPlayers || !p.removed_at);
+const bar = $("playersRemovedBar");
+if (bar) {
+  bar.hidden = !removedCount;
+  bar.innerHTML = '<span>' + removedCount + ' removed player' + (removedCount === 1 ? '' : 's') + ' hidden from the live site.</span>' +
+    '<button type="button" class="secondary" id="toggleRemovedPlayers">' + (showRemovedPlayers ? 'Hide removed' : 'Show removed') + '</button>';
+  const tg = $("toggleRemovedPlayers");
+  if (tg) tg.onclick = () => { showRemovedPlayers = !showRemovedPlayers; loadAdmin(); };
+}
+
+$("playersBody").innerHTML = shown.map(p =>
+  '<tr' + (p.removed_at ? ' class="is-removed"' : '') + '>' +
     '<td>' + esc(p.display_name) + '</td>' +
-    '<td><span class="pill ' + (p.active ? 'good' : 'bad') + '">' +
-      (p.active ? 'Active' : 'Inactive') +
+    '<td><span class="pill ' + (p.removed_at ? 'bad' : p.active ? 'good' : 'bad') + '">' +
+      (p.removed_at ? 'Removed' : p.active ? 'Active' : 'Inactive') +
     '</span></td>' +
     '<td>' + prettyDate(p.created_at?.slice(0, 10)) + '</td>' +
-    '<td><button type="button" class="recovery-btn" data-recover="' +
-      esc(p.id) + '">Recover Account</button></td>' +
+    '<td class="player-actions">' +
+      '<button type="button" class="recovery-btn" data-recover="' + esc(p.id) + '">Recover Account</button> ' +
+      (p.removed_at
+        ? '<button type="button" class="recovery-btn" data-restore="' + esc(p.id) + '">Restore</button>'
+        : (p.user_id === state.session?.user?.id ? '' : '<button type="button" class="recovery-btn danger-btn" data-remove="' + esc(p.id) + '">Remove</button>')) +
+    '</td>' +
   '</tr>'
-).join("");
+).join("") || '<tr><td colspan="4" class="small">No players yet.</td></tr>';
     $("playersBody").querySelectorAll("[data-recover]").forEach(button=>{
       button.onclick=()=>recoverPlayerAccount(button.dataset.recover,button);
     });
+    $("playersBody").querySelectorAll("[data-remove]").forEach(button=>{
+      button.onclick=()=>setPlayerRemoved(button.dataset.remove,true,button);
+    });
+    $("playersBody").querySelectorAll("[data-restore]").forEach(button=>{
+      button.onclick=()=>setPlayerRemoved(button.dataset.restore,false,button);
+    });
+  }
+
+  var showRemovedPlayers=false;
+  async function setPlayerRemoved(playerId,remove,button){
+    if(!state.isAdmin||!state.session)return;
+    const name=button.closest("tr")?.querySelector("td")?.textContent?.trim()||"this player";
+    const msg=remove
+      ?"Remove "+name+"?\n\nThey will disappear from the leaderboard, player lists and tournaments on the live site, and will be signed out. All their matches and data are kept, and you can restore them later."
+      :"Restore "+name+"? They will appear on the live site again and can sign in.";
+    if(!confirm(msg))return;
+    button.disabled=true;
+    const {error}=await client.rpc(remove?"admin_remove_player":"admin_restore_player",{p_player_id:playerId});
+    if(error){button.disabled=false;status("adminStatus",error.message,"error");return;}
+    status("adminStatus",name+(remove?" was removed from the live site.":" was restored."),"success");
+    toast(remove?"Player removed.":"Player restored.");
+    loadAdmin();
   }
 
   let headToHeadFilter={a:"",b:""};

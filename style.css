@@ -605,3 +605,10 @@ tr.tn-q td:first-child{box-shadow:inset 4px 0 0 var(--turf)}
 .tn-hidebar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:14px;background:#e9eff9;color:var(--muted);font-size:13.5px}
 .tn-hidebar .secondary{padding:8px 14px;font-size:13px}
 .tn-card.is-hidden{opacity:.72;border-style:dashed}
+
+/* Removed players */
+tr.is-removed td{opacity:.6}
+tr.is-removed td:last-child{opacity:1}
+.player-actions{white-space:nowrap}
+.recovery-btn.danger-btn{background:#fff;color:#c62f3b;border:1px solid #e9a3a9}
+.recovery-btn.danger-btn:hover{background:#c62f3b;color:#fff}
