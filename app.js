@@ -1154,7 +1154,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       if(!chosen){status("tournamentAddEntrantStatus","Please select a member.","error");return;}
       const {error}=await client.rpc("tournament_admin_add_entrant",{
         p_tournament_id:tournamentId,p_entrant_type:"individual",
-        p_display_name:chosen.label.split(" · ")[0],
+        p_display_name:(chosen.user_id||chosen.cobeg_member_id)?null:chosen.label.split(" · ")[0],
         p_user_id:chosen.user_id||null,p_cobeg_member_id:chosen.cobeg_member_id||null,p_seed:null
       });
       if(error){status("tournamentAddEntrantStatus",error.message,"error");return;}
