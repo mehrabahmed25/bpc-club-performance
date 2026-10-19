@@ -310,3 +310,24 @@
 .tn-person{flex-wrap:wrap}
 .tn-person-act{margin-left:auto}
 .tn-person-main .small,.tn-stage-head .small,.db-result-main .small{margin:0}
+
+/* Tournament managers (full admins only) */
+.tn-mgr-panel{margin:14px 0 18px;background:linear-gradient(135deg,var(--pitch),var(--pitch-2));border:0;color:#fff;position:relative;overflow:hidden}
+.tn-mgr-panel:after{content:"";position:absolute;right:-70px;top:-70px;width:200px;height:200px;border:1px solid #ffffff1c;border-radius:50%;box-shadow:0 0 0 28px #ffffff08;pointer-events:none}
+.tn-mgr-panel summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:14px;position:relative;z-index:1}
+.tn-mgr-panel summary::-webkit-details-marker{display:none}
+.tn-mgr-key{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:#ffffff1a;border:1px solid #ffffff2b;font-size:20px;flex:0 0 44px}
+.tn-mgr-title{display:flex;flex-direction:column;flex:1;min-width:0}
+.tn-mgr-title b{font-size:17px}
+.tn-mgr-panel .small,.tn-mgr-panel .status{color:#c5d1e9}
+.tn-mgr-panel[open] summary{margin-bottom:16px}
+.tn-mgr-panel .tn-count{background:#ffffff26}
+.tn-mgr-panel form,.tn-mgr-panel .tn-mgr-note,.tn-mgr-panel .tn-mgr-list,.tn-mgr-panel .status{position:relative;z-index:1}
+.tn-mgr-panel select{margin:0;flex:1}
+.tn-mgr-list{display:grid;gap:8px;margin-top:6px}
+.tn-mgr{display:flex;align-items:center;gap:12px;background:#ffffff14;border:1px solid #ffffff22;border-radius:13px;padding:10px 12px}
+.tn-mgr>div{flex:1;min-width:0;display:flex;flex-direction:column}
+.tn-mgr .small{margin:0}
+.tn-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:900;flex:0 0 36px}
+.tn-mgr-list .tn-empty{background:#ffffff10;border-color:#ffffff30;color:#c5d1e9}
+@media(max-width:680px){.tn-mgr{flex-wrap:wrap}.tn-mgr .reject-btn{width:100%}}

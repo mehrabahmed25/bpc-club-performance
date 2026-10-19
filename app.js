@@ -9,6 +9,7 @@
   profile:null,
   player:null,
   isAdmin:false,
+  tnAdmin:false,
   signup:false,
   recoveryMode:false,
   members:[],
@@ -319,7 +320,7 @@
     };
     $("toggleAuth").onclick=()=>{state.signup=!state.signup;setAuthUI();};
   }
-  async function signOut(){await client.auth.signOut();state.session=null;state.profile=null;state.player=null;state.isAdmin=false;setAuthUI();toast("Signed out.");showView("home");}
+  async function signOut(){await client.auth.signOut();state.session=null;state.profile=null;state.player=null;state.isAdmin=false;state.tnAdmin=false;state.isTnManager=false;setAuthUI();toast("Signed out.");showView("home");}
   async function loadIdentity(){
     if(!client||!state.session)return;
     const uid=state.session.user.id;
@@ -329,6 +330,9 @@
     ]);
     state.profile=pr.data||{display_name:state.session.user.email,role:"player"};
     state.player=pl.data||null;state.isAdmin=state.profile.role==="admin";
+    state.isTnManager=false;
+    if(!state.isAdmin){const mg=await client.from("tournament_managers").select("user_id").eq("user_id",uid).maybeSingle();state.isTnManager=!mg.error&&!!mg.data;}
+    state.tnAdmin=state.isAdmin||state.isTnManager;
     if(state.player&&!state.player.active)toast("Your player profile is inactive. Contact an admin.");
   }
   
@@ -1035,12 +1039,44 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(!value)return "Not set";
     const d=new Date(value);return Number.isNaN(d.getTime())?"Not set":d.toLocaleString();
   }
+  // Tournament managers: accounts a full admin allows to run the Tournaments page only.
+  async function loadTnManagers(){
+    if(!state.isAdmin||!client)return;
+    const [acc,acs]=await Promise.all([
+      client.from("players").select("user_id,display_name").not("user_id","is",null).order("display_name"),
+      client.from("tournament_managers").select("user_id,granted_at").order("granted_at",{ascending:true})
+    ]);
+    if(acc.error||acs.error){status("tnManagersStatus",(acc.error||acs.error).message,"error");return;}
+    const accounts=acc.data||[],granted=acs.data||[],names={};
+    accounts.forEach(a=>{names[a.user_id]=a.display_name||"Registered account";});
+    $("tnManagerAccount").innerHTML='<option value="">Choose a registered account</option>'+accounts.filter(a=>!granted.some(g=>g.user_id===a.user_id)).map(a=>'<option value="'+esc(a.user_id)+'">'+esc(a.display_name||"Registered account")+'</option>').join("");
+    $("tnManagersCount").textContent=granted.length;
+    $("tnManagersList").innerHTML=granted.length?granted.map(g=>{const nm=names[g.user_id]||"Registered account";return '<div class="tn-mgr"><span class="tn-avatar" aria-hidden="true">'+esc(initials(nm))+'</span><div><b>'+esc(nm)+'</b><span class="small">Manager since '+esc(tournamentDate(g.granted_at))+'</span></div><button type="button" class="reject-btn" data-tn-mgr-revoke="'+esc(g.user_id)+'">Remove access</button></div>';}).join(""):'<div class="tn-empty">No managers yet. Full admins always have access.</div>';
+    $("tnManagersList").querySelectorAll("[data-tn-mgr-revoke]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!state.isAdmin)return;
+      const uid=b.dataset.tnMgrRevoke;
+      if(!confirm("Remove tournament access for "+(names[uid]||"this account")+"?"))return;
+      const {error}=await client.rpc("tournament_admin_set_manager",{p_user_id:uid,p_grant:false});
+      if(error){status("tnManagersStatus",error.message,"error");return;}
+      toast("Tournament access removed.");await loadTnManagers();
+    }));
+  }
+  $("tnManagerForm").addEventListener("submit",async ev=>{
+    ev.preventDefault();
+    if(!state.isAdmin){status("tnManagersStatus","Only a full admin can grant tournament access.","error");return;}
+    const uid=$("tnManagerAccount").value;
+    if(!uid){status("tnManagersStatus","Choose an account first.","error");return;}
+    const {error}=await client.rpc("tournament_admin_set_manager",{p_user_id:uid,p_grant:true});
+    if(error){status("tnManagersStatus",error.message,"error");return;}
+    status("tnManagersStatus","");toast("Tournament access granted.");await loadTnManagers();
+  });
   function applyTnVisibility(){
     const open=!!tnOpen;
     $("tournamentDetail").classList.toggle("hidden",!open);
     $("tournamentList").classList.toggle("hidden",open);
     $("tournamentTabs").classList.toggle("hidden",open||!tnRows.length);
-    $("tournamentAdminPanel").classList.toggle("hidden",open||!state.isAdmin);
+    $("tournamentAdminPanel").classList.toggle("hidden",open||!state.tnAdmin);
+    $("tnManagersPanel").classList.toggle("hidden",open||!state.isAdmin);
   }
   function tournamentCard(t){
     const cat=tnCategory(t),c=tnCounts[t.id]||{confirmed:0,pending:0},limit=t.participant_limit,id=esc(t.id);
@@ -1048,24 +1084,25 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const fill=limit?'<div class="tn-track" role="img" aria-label="'+c.confirmed+' of '+limit+' places filled"><span style="width:'+Math.min(100,Math.round(c.confirmed/limit*100))+'%"></span></div>':'';
     const reg=t.status==="registration_open"&&t.registration_deadline?'<span>Registration closes '+esc(tournamentDate(t.registration_deadline))+'</span>':'';
     let admin="";
-    if(state.isAdmin){
+    if(state.tnAdmin){
       if(t.status==="draft")admin='<button type="button" class="primary" data-tournament-publish="'+id+'">Open registration</button>';
       else if(cat==="live")admin='<button type="button" class="secondary" data-tn-end="'+id+'">End tournament</button><button type="button" class="secondary quiet" data-tn-archive="'+id+'">Archive</button>';
       else if(cat==="finished")admin='<button type="button" class="secondary quiet" data-tn-archive="'+id+'">Archive</button>';
       else if(cat==="archived")admin='<button type="button" class="secondary" data-tn-restore="'+id+'">Restore</button>';
     }
-    return '<article class="tn-card tn-'+cat+' tn-st-'+esc(t.status)+'"><div class="tn-card-top"><span class="tn-glyph">'+tnGlyph(t.format)+'</span><div class="tn-card-title"><h3>'+esc(t.name)+'</h3><div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span>'+(state.isAdmin&&c.pending?'<span class="tn-chip warn">'+c.pending+' waiting for approval</span>':'')+'</div></div>'+tnStateHtml(t.status)+'</div>'
+    return '<article class="tn-card tn-'+cat+' tn-st-'+esc(t.status)+'"><div class="tn-card-top"><span class="tn-glyph">'+tnGlyph(t.format)+'</span><div class="tn-card-title"><h3>'+esc(t.name)+'</h3><div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span>'+(state.tnAdmin&&c.pending?'<span class="tn-chip warn">'+c.pending+' waiting for approval</span>':'')+'</div></div>'+tnStateHtml(t.status)+'</div>'
       +'<p class="tn-desc">'+esc(t.description||"No description yet.")+'</p><div class="tn-fill"><span><b>'+esc(players)+'</b></span>'+fill+reg+'</div>'
       +'<div class="tn-actions"><button type="button" class="'+(t.status==="draft"?"secondary":"primary")+'" data-tournament-open="'+id+'">View tournament</button>'+admin+'</div></article>';
   }
   function renderTournamentList(){
     const groups={live:[],finished:[],archived:[],drafts:[]};
     tnRows.forEach(t=>groups[tnCategory(t)].push(t));
-    const tabs=[["live","Live"],["finished","Finished"],["archived","Archived"]];
-    if(state.isAdmin&&groups.drafts.length)tabs.push(["drafts","Drafts"]);
+    const tabs=[["live","Live"],["finished","Finished"]];
+    if(state.tnAdmin)tabs.push(["archived","Archived"]);
+    if(state.tnAdmin&&groups.drafts.length)tabs.push(["drafts","Drafts"]);
     if(!tabs.some(x=>x[0]===tnFilter))tnFilter="live";
     $("tournamentTabs").innerHTML=tabs.map(x=>'<button type="button" role="tab" class="tn-tab" aria-selected="'+(x[0]===tnFilter)+'" data-tn-tab="'+x[0]+'">'+x[1]+'<i>'+groups[x[0]].length+'</i></button>').join("");
-    const empty={live:'No live tournaments right now.'+(state.isAdmin?' Create one above to get started.':' Check back soon.'),finished:'Nothing has finished yet. Ended tournaments and their results will show up here.',archived:'No archived tournaments.',drafts:'No drafts.'}[tnFilter];
+    const empty={live:'No live tournaments right now.'+(state.tnAdmin?' Create one above to get started.':' Check back soon.'),finished:'Nothing has finished yet. Ended tournaments and their results will show up here.',archived:'No archived tournaments.',drafts:'No drafts.'}[tnFilter];
     const list=groups[tnFilter];
     $("tournamentList").innerHTML=list.length?list.map(tournamentCard).join(""):'<div class="tn-empty" style="grid-column:1/-1">'+esc(empty)+'</div>';
     $("tournamentTabs").querySelectorAll("[data-tn-tab]").forEach(b=>b.addEventListener("click",()=>{tnFilter=b.dataset.tnTab;renderTournamentList();}));
@@ -1079,7 +1116,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
   }
   // End, archive or restore a tournament (admin). Records are kept in every case.
   async function tnLifecycle(t,target){
-    if(!state.isAdmin||!t)return;
+    if(!state.tnAdmin||!t)return;
     const restoring=t.status==="archived"&&target==="completed";
     const msg=restoring?"Restore “"+t.name+"” to the Finished tab?"
       :target==="completed"?"End “"+t.name+"”? Results and history stay visible, but new fixtures and score submissions close. You can archive it afterwards."
@@ -1110,10 +1147,11 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     status("tournamentStatus","");
     renderTournamentList();
     applyTnVisibility();
+    if(state.isAdmin)loadTnManagers();
   }
   $("tournamentCreateForm").addEventListener("submit",async ev=>{
     ev.preventDefault();
-    if(!state.isAdmin||!state.session){status("tournamentStatus","Only a website administrator can create tournaments.","error");return;}
+    if(!state.tnAdmin||!state.session){status("tournamentStatus","Only a website administrator can create tournaments.","error");return;}
     const name=$("tournamentName").value.trim(),slug=tournamentSlug(name);
     if(!name||!slug){status("tournamentStatus","Enter a valid tournament name.","error");return;}
     const limit=$("tournamentLimit").value;
@@ -1123,7 +1161,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     $("tournamentCreateForm").reset();toast("Tournament draft created.");await loadTournaments();
   });
   async function publishTournament(id){
-    if(!state.isAdmin)return;
+    if(!state.tnAdmin)return;
     const {error}=await client.from("tournament_tournaments").update({status:"registration_open",updated_at:new Date().toISOString()}).eq("id",id).eq("status","draft");
     if(error){status("tournamentStatus",error.message,"error");return;}
     toast("Registration opened.");await loadTournaments();
@@ -1221,7 +1259,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(pr.error||mr.error||sr.error||rr.error){status("tournamentStatus",pr.error?.message||mr.error?.message||sr.error?.message||rr.error?.message||"Could not load tournament details.","error");return;}
     const participants=pr.data||[],matches=mr.data||[],stages=sr.data||[],pendingSubmissions=rr.data||[];
     const mine=participants.find(p=>p.user_id===state.session?.user?.id);
-    const visibleParticipants=state.isAdmin?participants:participants.filter(p=>p.status==="confirmed");
+    const visibleParticipants=state.tnAdmin?participants:participants.filter(p=>p.status==="confirmed");
     const canRegister=!!state.session&&t.status==="registration_open"&&["self","both"].includes(t.registration_mode)&&!mine&&(!t.registration_deadline||new Date(t.registration_deadline)>new Date())&&(!t.participant_limit||participants.filter(p=>["pending","confirmed","waitlisted"].includes(p.status)).length<t.participant_limit);
     const entrantNames={};
     const accountIds=participants.map(p=>p.user_id).filter(Boolean);
@@ -1244,13 +1282,13 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         const rm=list.filter(m=>m.round_number===rn).sort((a,b)=>a.match_number-b.match_number);
         const dl=rm.map(m=>m.deadline_at).find(Boolean);
         const roundOpen=rm.some(m=>["scheduled","rejected"].includes(m.status));
-        const head='<div class="tn-round"><b>Round '+rn+'</b>'+(roundOpen&&!ended?dueChip(dl,true):'')+(state.isAdmin&&roundOpen&&!ended?'<button type="button" class="secondary" data-set-deadline="'+esc(rm[0].stage_id)+'" data-round="'+rn+'">'+(dl?'Change deadline':'Set deadline')+'</button>':'')+'</div>';
+        const head='<div class="tn-round"><b>Round '+rn+'</b>'+(roundOpen&&!ended?dueChip(dl,true):'')+(state.tnAdmin&&roundOpen&&!ended?'<button type="button" class="secondary" data-set-deadline="'+esc(rm[0].stage_id)+'" data-round="'+rn+'">'+(dl?'Change deadline':'Set deadline')+'</button>':'')+'</div>';
         const cards=rm.map(m=>{
           const a=nameOf(m.participant_a_id);
           if(!m.participant_b_id)return '<div class="tn-bye"><span class="tn-av" aria-hidden="true">'+esc(initials(a))+'</span><span><b>'+esc(a)+'</b> advances with a bye</span></div>';
           const b=nameOf(m.participant_b_id),done=["approved","completed"].includes(m.status),open=["scheduled","rejected"].includes(m.status);
           let mode="view";
-          if(!ended&&state.isAdmin&&t.score_workflow==="admin_entered"&&open)mode="admin";
+          if(!ended&&state.tnAdmin&&t.score_workflow==="admin_entered"&&open)mode="admin";
           else if(myCanSubmit.has(m.id))mode="player";
           const foot='<span class="tn-meta">Match '+m.match_number+'</span>'
             +(open&&ended?'<span class="tn-due none">Not played</span>':open?dueChip(m.deadline_at,false):'')
@@ -1272,7 +1310,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const regBtn=canRegister?'<div class="tn-reg"><button type="button" class="primary" id="tournamentSelfRegister">'+(t.competition_type==="team"?"Register a team":"Register for this tournament")+'</button></div>':'';
     const mineLine=mine?'<p class="tn-mine">Your registration: <b>'+esc(mine.status)+'</b></p>':'';
     let adminBar="";
-    if(state.isAdmin){
+    if(state.tnAdmin){
       const setup=ended?'':'<button type="button" class="secondary" id="tournamentAddEntrant">Add entrant</button><button type="button" class="secondary" id="tournamentAddStage">Create stage</button><button type="button" class="secondary" id="tournamentSetupStages">Set up default stages</button>';
       const life=t.status==="draft"?'':t.status==="archived"?'<button type="button" class="secondary" id="tnRestore">Restore tournament</button>':ended?'<button type="button" class="secondary danger" id="tnArchive">Archive</button>':'<button type="button" class="secondary danger" id="tnEnd">End tournament</button><button type="button" class="secondary danger" id="tnArchive">Archive</button>';
       adminBar='<div class="tn-admin-bar" data-tn-actions>'+setup+life+'</div>';
@@ -1280,14 +1318,14 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const hero='<header class="tn-hero" id="tnHero"><div class="tn-hero-top"><button type="button" class="tn-back" id="tnBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All tournaments</button>'+tnStateHtml(t.status)+'</div><h2>'+esc(t.name)+'</h2>'+(t.description?'<p class="tn-lede">'+esc(t.description)+'</p>':'')
       +'<div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span></div><ul class="tn-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'</ul>'+regBtn+mineLine+adminBar+'</header>';
     const banner=ended?'<div class="tn-banner"><span><b>'+(t.status==="archived"?"This tournament is archived.":t.status==="cancelled"?"This tournament was cancelled.":"This tournament has ended.")+'</b> Fixtures and approved results stay here for reference. New fixtures and scores are closed.</span></div>':'';
-    const queue=state.isAdmin?'<section class="tn-section"><div class="tn-section-head"><h3>Results waiting for review</h3>'+(pendingSubmissions.length?'<span class="tn-count">'+pendingSubmissions.length+'</span>':'')+'</div>'+(pendingSubmissions.length?pendingSubmissions.map(x=>'<div class="tn-review">'+queueBoard(x)+'<div class="tn-actions"><button type="button" class="primary" data-review-result="'+esc(x.id)+'" data-review-decision="approve">Approve</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="reject">Reject</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="dispute">Dispute</button></div></div>').join(""):'<div class="tn-empty">Nothing waiting. Submitted scores will show up here for approval.</div>')+'</section>':'';
-    const confirmList=!state.isAdmin&&t.score_workflow==="participant_opponent_admin"?pendingSubmissions.filter(x=>x.status==="awaiting_opponent"&&x.submitted_by!==uid&&matches.some(m=>m.id===x.match_id&&(myPartIds.has(m.participant_a_id)||myPartIds.has(m.participant_b_id)))):[];
+    const queue=state.tnAdmin?'<section class="tn-section"><div class="tn-section-head"><h3>Results waiting for review</h3>'+(pendingSubmissions.length?'<span class="tn-count">'+pendingSubmissions.length+'</span>':'')+'</div>'+(pendingSubmissions.length?pendingSubmissions.map(x=>'<div class="tn-review">'+queueBoard(x)+'<div class="tn-actions"><button type="button" class="primary" data-review-result="'+esc(x.id)+'" data-review-decision="approve">Approve</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="reject">Reject</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="dispute">Dispute</button></div></div>').join(""):'<div class="tn-empty">Nothing waiting. Submitted scores will show up here for approval.</div>')+'</section>':'';
+    const confirmList=!state.tnAdmin&&t.score_workflow==="participant_opponent_admin"?pendingSubmissions.filter(x=>x.status==="awaiting_opponent"&&x.submitted_by!==uid&&matches.some(m=>m.id===x.match_id&&(myPartIds.has(m.participant_a_id)||myPartIds.has(m.participant_b_id)))):[];
     const confirmHtml=confirmList.length?'<section class="tn-section"><div class="tn-section-head"><h3>Confirm your opponent’s score</h3></div>'+confirmList.map(x=>'<div class="tn-review">'+queueBoard(x)+'<div class="tn-actions"><button type="button" class="primary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="true">Confirm score</button><button type="button" class="secondary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="false">Dispute score</button></div></div>').join("")+'</section>':'';
-    const fixturesHtml='<section class="tn-section"><div class="tn-section-head"><h3>Fixtures</h3></div>'+(stages.length?stages.map(s=>'<div class="tn-stage"><div class="tn-stage-head"><div><h4>'+esc(s.name)+'</h4><span class="small">'+esc(s.stage_type.replaceAll("_"," "))+', '+esc(s.status)+'</span></div><div class="tn-stage-actions">'+(state.isAdmin&&!ended?'<button type="button" class="primary" data-generate-stage="'+esc(s.id)+'">Generate next round</button>'+(t.format==="group_knockout"&&s.stage_type==="group"?'<button type="button" class="secondary" data-advance-groups="'+esc(id)+'">Advance group qualifiers</button>':''):'')+'<button type="button" class="secondary" data-stage-standings="'+esc(s.id)+'">Standings</button></div></div><div id="standings-'+esc(s.id)+'"></div>'+(renderFixtures(matches.filter(m=>m.stage_id===s.id))||'<div class="tn-empty">No fixtures in this stage yet.'+(state.isAdmin&&!ended?' Generate round 1 once entrants are confirmed.':'')+'</div>')+'</div>').join(""):'<div class="tn-empty">Fixtures have not been generated yet.'+(state.isAdmin&&!ended?' Set up stages, then generate round 1.':'')+'</div>')+'</section>';
+    const fixturesHtml='<section class="tn-section"><div class="tn-section-head"><h3>Fixtures</h3></div>'+(stages.length?stages.map(s=>'<div class="tn-stage"><div class="tn-stage-head"><div><h4>'+esc(s.name)+'</h4><span class="small">'+esc(s.stage_type.replaceAll("_"," "))+', '+esc(s.status)+'</span></div><div class="tn-stage-actions">'+(state.tnAdmin&&!ended?'<button type="button" class="primary" data-generate-stage="'+esc(s.id)+'">Generate next round</button>'+(t.format==="group_knockout"&&s.stage_type==="group"?'<button type="button" class="secondary" data-advance-groups="'+esc(id)+'">Advance group qualifiers</button>':''):'')+'<button type="button" class="secondary" data-stage-standings="'+esc(s.id)+'">Standings</button></div></div><div id="standings-'+esc(s.id)+'"></div>'+(renderFixtures(matches.filter(m=>m.stage_id===s.id))||'<div class="tn-empty">No fixtures in this stage yet.'+(state.tnAdmin&&!ended?' Generate round 1 once entrants are confirmed.':'')+'</div>')+'</div>').join(""):'<div class="tn-empty">Fixtures have not been generated yet.'+(state.tnAdmin&&!ended?' Set up stages, then generate round 1.':'')+'</div>')+'</section>';
     const peopleHtml='<section class="tn-section"><div class="tn-section-head"><h3>Participants</h3><span class="tn-count">'+visibleParticipants.length+'</span></div>'+(visibleParticipants.length?'<div class="tn-people">'+visibleParticipants.map(p=>{
       const nm=entrantLabel(p);
       const pill=p.status==="confirmed"?'<span class="pill good">confirmed</span>':p.status==="pending"?'<span class="pill pending">pending</span>':'<span class="pill">'+esc(p.status)+'</span>';
-      const act=state.isAdmin&&!ended?'<div class="tn-person-act">'+(p.status==="pending"?'<button type="button" class="approve-btn" data-participant-approve="'+esc(p.id)+'">Approve</button>':'')+(["pending","confirmed","waitlisted"].includes(p.status)?'<button type="button" class="reject-btn" data-participant-remove="'+esc(p.id)+'">Remove</button>':'')+'</div>':'';
+      const act=state.tnAdmin&&!ended?'<div class="tn-person-act">'+(p.status==="pending"?'<button type="button" class="approve-btn" data-participant-approve="'+esc(p.id)+'">Approve</button>':'')+(["pending","confirmed","waitlisted"].includes(p.status)?'<button type="button" class="reject-btn" data-participant-remove="'+esc(p.id)+'">Remove</button>':'')+'</div>':'';
       return '<div class="tn-person'+(p.status==="withdrawn"?' is-out':'')+'"><span class="tn-av" aria-hidden="true">'+esc(initials(nm))+'</span><div class="tn-person-main"><b>'+esc(nm)+(p.user_id===uid?'<em class="tn-you">You</em>':'')+'</b>'+(p.seed?'<span class="small">Seed '+esc(p.seed)+'</span>':'')+'</div>'+pill+act+'</div>';
     }).join("")+'</div>':'<div class="tn-empty">No participants yet.</div>')+'</section>';
     tnOpen=id;
@@ -1304,7 +1342,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     });
     $("tournamentAddEntrant")?.addEventListener("click",()=>tournamentShowAddEntrant(id));
     document.querySelectorAll("[data-participant-approve]").forEach(b=>b.addEventListener("click",async()=>{
-      if(!state.isAdmin)return;
+      if(!state.tnAdmin)return;
       const p=participants.find(x=>x.id===b.dataset.participantApprove);if(!p)return;
       if(!confirm("Approve "+entrantLabel(p)+"? They will become a confirmed participant."))return;
       b.disabled=true;
@@ -1313,7 +1351,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       await openTournament(id);toast("Registration approved.");
     }));
     document.querySelectorAll("[data-participant-remove]").forEach(b=>b.addEventListener("click",async()=>{
-      if(!state.isAdmin)return;
+      if(!state.tnAdmin)return;
       const p=participants.find(x=>x.id===b.dataset.participantRemove);if(!p)return;
       if(!confirm("Remove "+entrantLabel(p)+" from this tournament? Their record is kept for audit and history."))return;
       const reason=prompt("Reason for removal (optional):");if(reason===null)return;
@@ -1357,7 +1395,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       if(error){b.disabled=false;status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast("Round published.");
     }));
     document.querySelectorAll("[data-set-deadline]").forEach(b=>b.addEventListener("click",async()=>{
-      if(!state.isAdmin)return;
+      if(!state.tnAdmin)return;
       const stageId=b.dataset.setDeadline,round=Number(b.dataset.round);
       const current=matches.find(m=>m.stage_id===stageId&&m.round_number===round&&m.deadline_at)?.deadline_at;
       const deadline=await askDeadline({title:"Round "+round+" deadline",text:"Applies to every match in this round that is still waiting for a score.",allowNone:true,defaultValue:current&&new Date(current)>new Date()?toLocalInput(new Date(current)):undefined});
@@ -1392,7 +1430,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
 
 
   async function tournamentShowAddEntrant(tournamentId){
-    if(!state.isAdmin)return;
+    if(!state.tnAdmin)return;
     const detail=$("tournamentDetail");
     let panel=$("tournamentAddEntrantPanel");
     if(panel){panel.remove();return;}
@@ -1542,7 +1580,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         return;
       }
       if(session){try{await loadIdentity();}catch(e){console.error(e);}}
-      else{state.profile=null;state.player=null;state.isAdmin=false;state.canAccessFunds=false;}
+      else{state.profile=null;state.player=null;state.isAdmin=false;state.tnAdmin=false;state.isTnManager=false;state.canAccessFunds=false;}
       await refreshFundsAccess();
       setAuthUI();
     });

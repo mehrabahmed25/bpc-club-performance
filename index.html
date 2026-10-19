@@ -256,6 +256,13 @@
       </form>
       </details>
     </div>
+    <details id="tnManagersPanel" class="panel tn-mgr-panel hidden">
+      <summary><span class="tn-mgr-key" aria-hidden="true">&#128273;</span><span class="tn-mgr-title"><b>Tournament managers</b><span class="small">Give a trusted member control of this page only. Full admins only.</span></span><span class="tn-count" id="tnManagersCount">0</span></summary>
+      <form id="tnManagerForm" class="inline-form"><select id="tnManagerAccount" required aria-label="Registered account"></select><button class="primary" type="submit">Grant access</button></form>
+      <p class="small tn-mgr-note">Managers can create tournaments, approve entrants and scores, set deadlines, and end or archive tournaments. They cannot reach Funds, Admin, branding, or other site settings.</p>
+      <div id="tnManagersStatus" class="status"></div>
+      <div id="tnManagersList" class="tn-mgr-list"></div>
+    </details>
     <div id="tournamentTabs" class="tn-tabs hidden" role="tablist" aria-label="Tournament groups"></div>
     <div id="tournamentList" class="tournament-list"><div class="panel soft">Loading tournaments…</div></div>
     <div id="tournamentDetail" class="hidden"></div>
