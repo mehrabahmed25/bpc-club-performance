@@ -728,3 +728,21 @@ tr.is-removed td:last-child{opacity:1}
 .h2h-name{overflow-wrap:anywhere}
 .h2h-form{flex-wrap:wrap;justify-content:center}
 @media(max-width:680px){.h2h-arena{gap:4px;padding:22px 6px}.h2h-wins{font-size:34px}.h2h-wins small{display:none}.fm{width:20px;height:20px;font-size:10px;border-radius:6px}.h2h-form{gap:3px}.h2h-name{font-size:15px}.h2h-played{max-width:60px}}
+
+/* Home: calmer, image banner first */
+#view-home{display:flex;flex-direction:column;gap:22px}
+#view-home>*{margin-top:0;margin-bottom:0}
+#view-home .home-banner-section{margin:0;max-width:none}
+.home-hero{display:block;padding:30px 34px;border-radius:22px;margin:0}
+.home-hero h1{font-size:clamp(26px,3.6vw,40px);line-height:1.08;letter-spacing:-1px}
+.home-hero p{max-width:560px;margin:10px 0 0;font-size:15px}
+.home-cta{margin-top:18px;gap:10px}
+.home-cta .primary{padding:11px 18px;font-size:14px}
+.home-cta .ghost{padding:11px 18px;font-size:14px}
+#view-home .home-legends{margin:0}
+#view-home .poster-section{margin:0 auto;width:100%;max-width:none}
+#view-home .home-news-intro{margin:6px 0 0}
+@media(max-width:680px){.home-hero{padding:24px 20px}#view-home{gap:18px}}
+.hl-head h2{position:relative;padding-left:14px;font-size:clamp(20px,2.6vw,26px);letter-spacing:-.4px}
+.hl-head h2:before{content:"";position:absolute;left:0;top:.16em;bottom:.16em;width:4px;border-radius:4px;background:var(--turf)}
+#view-home .home-news-intro h2{font-size:clamp(20px,2.6vw,26px)}
