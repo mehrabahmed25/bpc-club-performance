@@ -1600,7 +1600,7 @@ $("playersBody").innerHTML = shown.map(p =>
       const g=top("goals_for"),c=top("clean_sheets");
       if(!g&&!c){box.classList.add("hidden");return;}
       const one=(x,k,label,unit)=>x?'<button type="button" class="hl-card" data-view="h2h">'+avBig(x.player_name,x.player_id,"hl-av")+'<span class="hl-txt"><small>'+label+'</small><b>'+esc(x.player_name)+'</b><em>'+x[k]+' '+unit+'</em></span></button>':'';
-      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; club legends</button></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
+      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; BPC Stars</button></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
