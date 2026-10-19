@@ -144,11 +144,19 @@ begin
        end if;
      end loop;
    else
+     -- If an odd number of winners advance, give one entrant a bye rather than dropping them.
+     if v_n%2=1 then v_ids:=array_append(v_ids,null); v_n:=v_n+1; end if;
      for v_i in 1..(v_n/2) loop
        v_a:=v_ids[2*v_i-1]; v_b:=v_ids[2*v_i];
        v_match:=v_match+1;
-       insert into public.tournament_matches(tournament_id,stage_id,round_number,match_number,participant_a_id,participant_b_id,pairing_run_id,status)
-       values(v_t.id,p_stage_id,p_round,v_match,v_a,v_b,v_run,'scheduled');
+       if v_a is null or v_b is null then
+         v_candidate:=coalesce(v_a,v_b);
+         insert into public.tournament_matches(tournament_id,stage_id,round_number,match_number,participant_a_id,winner_participant_id,pairing_run_id,status)
+         values(v_t.id,p_stage_id,p_round,v_match,v_candidate,v_candidate,v_run,'bye');
+       else
+         insert into public.tournament_matches(tournament_id,stage_id,round_number,match_number,participant_a_id,participant_b_id,pairing_run_id,status)
+         values(v_t.id,p_stage_id,p_round,v_match,v_a,v_b,v_run,'scheduled');
+       end if;
      end loop;
    end if;
 
