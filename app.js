@@ -1117,15 +1117,17 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
       if(t.status==="draft")admin='<button type="button" class="primary" data-tournament-publish="'+id+'">Open registration</button>';
       else if(cat==="live")admin='<button type="button" class="secondary" data-tn-end="'+id+'">End tournament</button><button type="button" class="secondary quiet" data-tn-archive="'+id+'">Archive</button>';
       else if(cat==="finished")admin='<button type="button" class="secondary quiet" data-tn-archive="'+id+'">Archive</button>';
-      else if(cat==="archived")admin='<button type="button" class="secondary" data-tn-restore="'+id+'">Restore</button>'+(state.isAdmin?'<button type="button" class="secondary danger-soft" data-tn-delete="'+id+'">Delete permanently</button>':'');
+      else if(cat==="archived")admin='<button type="button" class="secondary" data-tn-restore="'+id+'">Restore</button>'+(t.hidden_at?'<button type="button" class="secondary" data-tn-unhide="'+id+'">Unhide</button>':'<button type="button" class="secondary quiet" data-tn-hide="'+id+'">Hide</button>');
     }
-    return '<article class="tn-card tn-'+cat+' tn-st-'+esc(t.status)+'"><div class="tn-card-top"><span class="tn-glyph">'+tnGlyph(t.format)+'</span><div class="tn-card-title"><h3>'+esc(t.name)+'</h3><div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span>'+(state.tnAdmin&&c.pending?'<span class="tn-chip warn">'+c.pending+' waiting for approval</span>':'')+'</div></div>'+tnStateHtml(t.status)+'</div>'
+    return '<article class="tn-card tn-'+cat+' tn-st-'+esc(t.status)+(t.hidden_at?' is-hidden':'')+'"><div class="tn-card-top"><span class="tn-glyph">'+tnGlyph(t.format)+'</span><div class="tn-card-title"><h3>'+esc(t.name)+'</h3><div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span>'+(state.tnAdmin&&c.pending?'<span class="tn-chip warn">'+c.pending+' waiting for approval</span>':'')+'</div></div>'+tnStateHtml(t.status)+'</div>'
       +'<p class="tn-desc">'+esc(t.description||"No description yet.")+'</p><div class="tn-fill"><span><b>'+esc(players)+'</b></span>'+fill+reg+'</div>'
       +'<div class="tn-actions"><button type="button" class="'+(t.status==="draft"?"secondary":"primary")+'" data-tournament-open="'+id+'">View tournament</button>'+admin+'</div></article>';
   }
   function renderTournamentList(){
     const groups={live:[],finished:[],archived:[],drafts:[]};
     tnRows.forEach(t=>groups[tnCategory(t)].push(t));
+    const hiddenCount=groups.archived.filter(t=>t.hidden_at).length;
+    if(!tnShowHidden)groups.archived=groups.archived.filter(t=>!t.hidden_at);
     const tabs=[["live","Live"],["finished","Finished"]];
     if(state.tnAdmin)tabs.push(["archived","Archived"]);
     if(state.tnAdmin&&groups.drafts.length)tabs.push(["drafts","Drafts"]);
@@ -1133,7 +1135,9 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     $("tournamentTabs").innerHTML=tabs.map(x=>'<button type="button" role="tab" class="tn-tab" aria-selected="'+(x[0]===tnFilter)+'" data-tn-tab="'+x[0]+'">'+x[1]+'<i>'+groups[x[0]].length+'</i></button>').join("");
     const empty={live:'No live tournaments right now.'+(state.tnAdmin?' Create one above to get started.':' Check back soon.'),finished:'Nothing has finished yet. Ended tournaments and their results will show up here.',archived:'No archived tournaments.',drafts:'No drafts.'}[tnFilter];
     const list=groups[tnFilter];
-    $("tournamentList").innerHTML=list.length?list.map(tournamentCard).join(""):'<div class="tn-empty" style="grid-column:1/-1">'+esc(empty)+'</div>';
+    const hideBar=tnFilter==="archived"&&hiddenCount?'<div class="tn-hidebar"><span>'+(tnShowHidden?"Showing "+hiddenCount+" hidden tournament"+(hiddenCount===1?"":"s")+".":hiddenCount+" tournament"+(hiddenCount===1?" is":"s are")+" hidden.")+'</span><button type="button" class="secondary" data-tn-togglehidden>'+(tnShowHidden?"Hide them again":"Show hidden")+'</button></div>':'';
+    $("tournamentList").innerHTML=hideBar+(list.length?list.map(tournamentCard).join(""):'<div class="tn-empty" style="grid-column:1/-1">'+esc(empty)+'</div>');
+    $("tournamentList").querySelector("[data-tn-togglehidden]")?.addEventListener("click",()=>{tnShowHidden=!tnShowHidden;renderTournamentList();});
     $("tournamentTabs").querySelectorAll("[data-tn-tab]").forEach(b=>b.addEventListener("click",()=>{tnFilter=b.dataset.tnTab;renderTournamentList();}));
     const L=$("tournamentList");
     L.querySelectorAll("[data-tournament-open]").forEach(b=>b.addEventListener("click",()=>openTournament(b.dataset.tournamentOpen)));
@@ -1141,32 +1145,18 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const row=id=>tnRows.find(x=>x.id===id);
     L.querySelectorAll("[data-tn-end]").forEach(b=>b.addEventListener("click",()=>tnLifecycle(row(b.dataset.tnEnd),"completed")));
     L.querySelectorAll("[data-tn-archive]").forEach(b=>b.addEventListener("click",()=>tnLifecycle(row(b.dataset.tnArchive),"archived")));
-    L.querySelectorAll("[data-tn-delete]").forEach(b=>b.addEventListener("click",()=>tnDelete(row(b.dataset.tnDelete))));
+    L.querySelectorAll("[data-tn-hide]").forEach(b=>b.addEventListener("click",()=>tnHide(row(b.dataset.tnHide),true)));
+    L.querySelectorAll("[data-tn-unhide]").forEach(b=>b.addEventListener("click",()=>tnHide(row(b.dataset.tnUnhide),false)));
     L.querySelectorAll("[data-tn-restore]").forEach(b=>b.addEventListener("click",()=>tnLifecycle(row(b.dataset.tnRestore),"completed")));
   }
   // End, archive or restore a tournament (admin). Records are kept in every case.
-  // Permanently delete an archived tournament (full admins only). The name must be typed to confirm.
-  function tnDelete(t){
-    if(!state.isAdmin||!t||t.status!=="archived")return;
-    const ov=document.createElement("div");ov.className="modal-overlay";
-    ov.innerHTML='<div class="modal-box tn-del" role="alertdialog" aria-modal="true" aria-labelledby="delT"><h3 id="delT">Delete this tournament?</h3>'
-      +'<p>“'+esc(t.name)+'” will be removed for good, including its players, fixtures, scores and announcements. This cannot be undone.</p>'
-      +'<p class="small">Players’ friendly-match stats and the leaderboard are not touched. A note that the tournament was deleted stays in the audit log.</p>'
-      +'<label>Type the tournament name to confirm<input id="delName" autocomplete="off" placeholder="'+esc(t.name)+'"></label>'
-      +'<div class="toolbar"><button type="button" class="reject-btn" id="delOk" disabled>Delete permanently</button><button type="button" class="secondary" id="delCancel">Keep it</button></div><div class="status" id="delErr" role="alert"></div></div>';
-    document.body.appendChild(ov);
-    const inp=ov.querySelector("#delName"),ok=ov.querySelector("#delOk"),err=ov.querySelector("#delErr");
-    const close=()=>ov.remove();
-    inp.focus();
-    inp.addEventListener("input",()=>{ok.disabled=inp.value.trim().toLowerCase()!==t.name.trim().toLowerCase();});
-    ov.querySelector("#delCancel").onclick=close;
-    ov.addEventListener("click",e=>{if(e.target===ov)close();});
-    ok.onclick=async()=>{
-      ok.disabled=true;ok.textContent="Deleting…";err.textContent="";
-      const {error}=await client.rpc("tournament_admin_delete",{p_tournament_id:t.id,p_confirm_name:inp.value.trim()});
-      if(error){ok.disabled=false;ok.textContent="Delete permanently";err.textContent=/could not find the function|schema cache/i.test(error.message)?"Delete is not enabled in the database yet. Ask the site admin to run the delete SQL.":error.message;return;}
-      close();toast("Tournament deleted.");tnOpen=null;tnFilter="archived";await loadTournaments();
-    };
+  // Hide or unhide an archived tournament (nothing is deleted).
+  async function tnHide(t,hide){
+    if(!state.tnAdmin||!t)return;
+    const {error}=await client.rpc("tournament_admin_set_hidden",{p_tournament_id:t.id,p_hidden:hide});
+    if(error){const m=/could not find the function|schema cache/i.test(error.message)?"Hiding is not enabled in the database yet.":error.message;status("tournamentStatus",m,"error");toast(m);return;}
+    toast(hide?"Hidden. Use “Show hidden” in the Archived tab to bring it back.":"Tournament is visible again.");
+    tnOpen=null;tnFilter="archived";await loadTournaments();
   }
   async function tnLifecycle(t,target){
     if(!state.tnAdmin||!t)return;
@@ -1186,7 +1176,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(!client){status("tournamentStatus","Supabase connection is not configured.","error");return;}
     status("tournamentStatus","Loading tournaments…");
     const {data,error}=await client.from("tournament_tournaments")
-      .select("id,name,slug,description,competition_type,format,status,visibility,registration_mode,registration_requires_approval,registration_deadline,participant_limit,score_workflow,created_at")
+      .select("id,name,slug,description,competition_type,format,status,visibility,registration_mode,registration_requires_approval,registration_deadline,participant_limit,score_workflow,created_at,hidden_at")
       .order("created_at",{ascending:false});
     if(error){
       $("tournamentList").innerHTML='<div class="panel soft">Tournament storage is not ready yet. An administrator must run the reviewed BPC Tournaments SQL migration in Supabase.</div>';
@@ -1362,7 +1352,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     });
   }
   // ---- Tournament presentation helpers ----
-  var tnFilter="live",tnOpen=null,tnRows=[],tnCounts={};
+  var tnFilter="live",tnOpen=null,tnRows=[],tnCounts={},tnShowHidden=false;
   const TN_ENDED=["completed","archived","cancelled"];
   const TN_STATE={draft:["Draft",""],registration_open:["Registration open","open"],registration_closed:["Registration closed",""],in_progress:["Live","live"],paused:["Paused",""],completed:["Finished","done"],archived:["Archived","done"],cancelled:["Cancelled","done"]};
   const TN_FORMAT={round_robin:"Round robin",knockout:"Knockout",group_knockout:"Groups + knockout",swiss:"Swiss"};
@@ -1518,7 +1508,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     let adminBar="";
     if(state.tnAdmin){
       const setup=ended?'':'<button type="button" class="secondary" id="tournamentAddEntrant">Add entrant</button><button type="button" class="secondary" id="tournamentAddStage">Create stage</button><button type="button" class="secondary" id="tournamentSetupStages">Set up default stages</button>';
-      const life=t.status==="draft"?'':t.status==="archived"?'<button type="button" class="secondary" id="tnRestore">Restore tournament</button>'+(state.isAdmin?'<button type="button" class="secondary danger" id="tnDelete">Delete permanently</button>':''):ended?'<button type="button" class="secondary danger" id="tnArchive">Archive</button>':'<button type="button" class="secondary danger" id="tnEnd">End tournament</button><button type="button" class="secondary danger" id="tnArchive">Archive</button>';
+      const life=t.status==="draft"?'':t.status==="archived"?'<button type="button" class="secondary" id="tnRestore">Restore tournament</button>'+(t.hidden_at?'<button type="button" class="secondary" id="tnUnhide">Unhide</button>':'<button type="button" class="secondary" id="tnHide">Hide from list</button>'):ended?'<button type="button" class="secondary danger" id="tnArchive">Archive</button>':'<button type="button" class="secondary danger" id="tnEnd">End tournament</button><button type="button" class="secondary danger" id="tnArchive">Archive</button>';
       adminBar='<div class="tn-admin-bar" data-tn-actions>'+setup+life+'</div>';
     }
     const hero='<header class="tn-hero" id="tnHero"><div class="tn-hero-top"><button type="button" class="tn-back" id="tnBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All tournaments</button>'+tnStateHtml(t.status)+'</div><h2>'+esc(t.name)+'</h2>'+(t.description?'<p class="tn-lede">'+esc(t.description)+'</p>':'')
@@ -1641,7 +1631,8 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     $("tnEnd")?.addEventListener("click",()=>tnLifecycle(t,"completed"));
     $("tnArchive")?.addEventListener("click",()=>tnLifecycle(t,"archived"));
     $("tnRestore")?.addEventListener("click",()=>tnLifecycle(t,"completed"));
-    $("tnDelete")?.addEventListener("click",()=>tnDelete(t));
+    $("tnHide")?.addEventListener("click",()=>tnHide(t,true));
+    $("tnUnhide")?.addEventListener("click",()=>tnHide(t,false));
     detail.querySelectorAll("[data-redraw-groups]").forEach(b=>b.addEventListener("click",async()=>{
       if(!state.tnAdmin)return;
       if(!confirm("Draw the groups again at random? Players will be shuffled between groups. This is only possible before fixtures exist."))return;

@@ -602,3 +602,6 @@ tr.tn-q td:first-child{box-shadow:inset 4px 0 0 var(--turf)}
 .secondary.danger-soft{background:#fdecee;color:#b42332}
 .secondary.danger-soft:hover{background:#fbdadf}
 .modal-box.tn-del .status{color:var(--red);font-weight:600}
+.tn-hidebar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:14px;background:#e9eff9;color:var(--muted);font-size:13.5px}
+.tn-hidebar .secondary{padding:8px 14px;font-size:13px}
+.tn-card.is-hidden{opacity:.72;border-style:dashed}
