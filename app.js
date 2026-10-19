@@ -556,6 +556,15 @@ $("matchForm").addEventListener("submit", async e => {
       const eligible=!!r.award_eligible;
       return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell"><span class="avatar">'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
     }).join("");
+    renderPodium(data);
+  }
+  function renderPodium(rows){
+    const el=$("lbPodium");if(!el)return;
+    const top=(rows||[]).filter(r=>Number(r.matches_played)>0).slice(0,3);
+    if(top.length<3){el.classList.add("hidden");el.innerHTML="";return;}
+    const slot=(r,i)=>'<div class="pod pod-'+(i+1)+'"><span class="pod-rank">'+(i+1)+'</span><span class="pod-avatar">'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
+    el.innerHTML=[1,0,2].map(i=>slot(top[i],i)).join("");
+    el.classList.remove("hidden");
   }
   function signed(n){return n>0?"+"+n:n;}
 

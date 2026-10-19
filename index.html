@@ -4,6 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101d35">
 <title>Brahmanbaria Pes Club — Official Website</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap">
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
@@ -26,7 +28,11 @@
 </header>
 <main>
   <section id="view-home" class="view">
-    <div class="section-head"><p class="eyebrow">BPC CLUB UPDATES</p><h2>Home</h2><p>Latest club announcements, news and updates.</p></div>
+    <div class="home-hero">
+      <div class="home-hero-copy"><h1>Brahmanbaria <br>Pes Club</h1><p>Friendly leagues, monthly awards and club tournaments. Play your matches, send in the score, and watch yourself climb the table.</p>
+        <div class="home-cta"><button class="primary" data-view="leaderboard">See the leaderboard</button><button class="ghost" data-view="tournaments">Join a tournament</button></div></div>
+      <div class="home-hero-card" aria-hidden="true"><div class="hh-row"><span>Win</span><b>3</b></div><div class="hh-row"><span>Draw</span><b>1</b></div><div class="hh-row"><span>Loss</span><b>0</b></div><p>Every approved result counts toward the monthly table.</p></div>
+    </div>
     <section id="homeBannerSection" class="home-banner-section hidden" aria-label="Club performance banner"><img id="homeBannerImage" class="home-banner-image" alt="BPC club performance banner"></section>
   <section id="uclPosterSection" class="poster-section hidden" aria-label="UCL finalists poster">
     <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">UCL Finalists</h2></div><span class="poster-badge">Featured</span></div>
@@ -46,6 +52,7 @@
       <div><p class="eyebrow">BPC SEASON · MONTHLY RANKINGS</p><h1>Every match counts.<br><span>Every point matters.</span></h1><p class="hero-sub">Follow the leaderboard, compare performance, and track the road to monthly awards.</p></div>
       <div class="hero-stat"><span class="trophy">🏆</span><b id="leaderboardMonthLabel">Monthly leaderboard</b><small>Updated from approved results</small></div>
     </div>
+    <div id="lbPodium" class="lb-podium hidden" aria-label="Top three players"></div>
     <div class="toolbar"><div><label for="monthPicker">Competition month</label><input id="monthPicker" type="month"></div><button class="secondary" id="refreshLeaderboard">↻ Refresh</button></div>
     <div id="leaderboardStatus" class="status"></div>
     <div class="table-wrap"><table><thead><tr><th>#</th><th>Player</th><th>MP</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th>COBEG XI</th><th>Total MP vs COBEG XI</th><th>Award</th></tr></thead><tbody id="leaderboardBody"><tr><td colspan="13" class="empty">Loading leaderboard…</td></tr></tbody></table></div>
@@ -53,17 +60,20 @@
   </section>
 
   <section id="view-account" class="view hidden">
-    <div class="section-head"><p class="eyebrow">MEMBER ACCESS</p><h2 id="authTitle">Welcome back</h2><p>Sign in to submit results and view your personal match records.</p></div>
     <div class="auth-grid">
-      <form id="authForm" class="panel">
-        <label id="displayNameLabel" class="hidden">Display name<input id="displayName" autocomplete="name" placeholder="Your name"></label>
-        <label>Email address<input id="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
-        <label>Password<input id="password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
-        <button id="authSubmit" class="primary" type="submit">Sign in</button>
-        <button id="toggleAuth" class="text-button" type="button">Need an account? Create one</button>
-        <div id="authMessage" class="status"></div>
-      </form>
-      <aside class="panel soft"><h3>Member account</h3><p>Use one account per player. Your match submissions are linked to your account and remain pending until an admin approves them.</p><p>Already registered? Sign in with the same email and password.</p></aside>
+      <aside class="auth-side"><span class="auth-mark">BPC</span><h3>Your matches.<br>Your table.</h3><p>One account per player. Send in your results, follow your fixtures and see where you stand in the monthly race.</p>
+        <ul class="auth-points"><li>Results count once an admin approves them</li><li>Your dashboard shows stats, deadlines and tournament fixtures</li><li>Reach the monthly award with 40 matches, 25 of them against COBEG XI</li></ul></aside>
+      <div class="auth-main">
+        <div class="section-head"><h2 id="authTitle">Welcome back</h2><p>Sign in to submit results and view your personal match records.</p></div>
+        <form id="authForm" class="panel">
+          <label id="displayNameLabel" class="hidden">Display name<input id="displayName" autocomplete="name" placeholder="Your name"></label>
+          <label>Email address<input id="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+          <label>Password<input id="password" type="password" autocomplete="current-password" minlength="8" required placeholder="At least 8 characters"></label>
+          <button id="authSubmit" class="primary" type="submit">Sign in</button>
+          <button id="toggleAuth" class="text-button" type="button">Need an account? Create one</button>
+          <div id="authMessage" class="status"></div>
+        </form>
+      </div>
     </div>
   </section>
 
