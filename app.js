@@ -1055,9 +1055,10 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     });
     document.querySelectorAll("[data-generate-stage]").forEach(b=>b.addEventListener("click",async()=>{
       const stageId=b.dataset.generateStage;const prior=matches.filter(m=>m.stage_id===stageId);const round=Math.max(0,...prior.map(m=>m.round_number))+1;
-      const publish=confirm("Publish round "+round+" now? Choose Cancel to create a preview.");
-      const {error}=await client.rpc("tournament_admin_generate_round",{p_stage_id:stageId,p_round:round,p_publish:publish,p_reason:null});
-      if(error){status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast(publish?"Round published.":"Round preview generated.");
+      const publish=confirm("Publish round "+round+" now? This creates real tournament fixtures. Cancel leaves the tournament unchanged.");
+      if(!publish)return;
+      const {error}=await client.rpc("tournament_admin_generate_round",{p_stage_id:stageId,p_round:round,p_publish:true,p_reason:null});
+      if(error){status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast("Round published.");
     }));
     document.querySelectorAll("[data-admin-score]").forEach(b=>b.addEventListener("click",async()=>{
       const match=matches.find(m=>m.id===b.dataset.adminScore);if(!match)return;
