@@ -79,9 +79,10 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeLegends();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
+    if(name==="h2h")loadH2hPage();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
     if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();}
@@ -1474,6 +1475,136 @@ $("playersBody").innerHTML = shown.map(p =>
   }
   function avUrl(o){o=o||{};return (o.id&&avMap.id[o.id])||(o.uid&&avMap.uid[o.uid])||avMap.name[avKey(o.name)]||"";}
   function av(name,o){const u=avUrl(Object.assign({name},o));return u?' data-av="1" style="background-image:url(\''+esc(u)+'\')"':'';}
+
+  // ================= Head to Head + club legends =================
+  var h2hReady=false;
+  function nameOf(p){return p?p.display_name:"";}
+  function avBig(name,id,cls){return '<span class="'+cls+'" aria-hidden="true"'+av(name,{id:id})+'>'+esc(initials(name))+'</span>';}
+  async function loadH2hPage(){
+    if(!client)return;
+    $("legendsMonth").value=$("legendsMonth").value||monthNow;
+    await ensureAvatars();
+    if(!h2hReady){
+      const {data}=await client.from("active_player_directory").select("id,display_name").order("display_name");
+      state.h2hPlayers=data||[];
+      const opts='<option value="">Choose player</option>'+state.h2hPlayers.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.display_name)+'</option>').join("");
+      $("h2hA").innerHTML=opts;$("h2hB").innerHTML=opts;
+      if(state.player&&state.player.active)$("h2hA").value=state.player.id;
+      h2hReady=true;
+    }
+    renderH2h();loadLegends();
+  }
+  async function renderH2h(){
+    const a=$("h2hA").value,b=$("h2hB").value,box=$("h2hResult");
+    const P=id=>(state.h2hPlayers||[]).find(p=>p.id===id);
+    if(!a||!b||a===b){
+      box.innerHTML='<div class="h2h-empty"><b>'+(a&&a===b?"Pick two different players.":"Choose two players to start the rivalry.")+'</b><span>Every counted result between them shows up here.</span></div>';return;
+    }
+    box.innerHTML='<div class="h2h-empty"><span>Loading the rivalry…</span></div>';
+    const {data,error}=await client.rpc("get_head_to_head",{p_a:a,p_b:b});
+    if(error){box.innerHTML='<div class="h2h-empty"><b>Could not load this rivalry.</b><span>'+esc(error.message)+'</span></div>';return;}
+    const A=nameOf(P(a)),B=nameOf(P(b)),ms=data||[];
+    const n=ms.length;
+    const t={w:[0,0],gf:[0,0],cs:[0,0],big:[0,0],d:0,streak:[0,0]};
+    let run=[0,0];
+    // oldest first for streaks; ms arrives newest first
+    [...ms].reverse().forEach(m=>{
+      t.gf[0]+=m.a_goals;t.gf[1]+=m.b_goals;
+      if(m.b_goals===0)t.cs[0]++;if(m.a_goals===0)t.cs[1]++;
+      if(m.a_goals>m.b_goals){t.w[0]++;run[0]++;run[1]=0;t.big[0]=Math.max(t.big[0],m.a_goals-m.b_goals);}
+      else if(m.a_goals<m.b_goals){t.w[1]++;run[1]++;run[0]=0;t.big[1]=Math.max(t.big[1],m.b_goals-m.a_goals);}
+      else{t.d++;run=[0,0];}
+      t.streak[0]=Math.max(t.streak[0],run[0]);t.streak[1]=Math.max(t.streak[1],run[1]);
+    });
+    const pct=v=>n?Math.round(v/n*100):0;
+    const share=[pct(t.w[0]),pct(t.d),pct(t.w[1])];
+    // keep the three segments adding to 100
+    share[1]=Math.max(0,100-share[0]-share[2]);
+    const lead=t.w[0]===t.w[1]?-1:(t.w[0]>t.w[1]?0:1);
+    const names=[A,B];
+    let verdict;
+    if(!n)verdict={t:"No clashes on record",s:"Somebody has to start this rivalry. Play it, submit it, settle it."};
+    else if(lead===-1)verdict=t.d>=Math.max(t.w[0],t.w[1])?{t:"The draw merchants",s:"Nobody can separate them. "+t.d+" draw"+(t.d===1?"":"s")+" in "+n+" meetings."}:{t:"Dead level",s:t.w[0]+" wins each. The next meeting decides who gets bragging rights."};
+    else{
+      const W=names[lead],L=names[1-lead],w=t.w[lead],l=t.w[1-lead];
+      if(n>=3&&l===0)verdict={t:W+" owns "+L,s:"Unbeaten in "+n+" meetings. "+L+" is still waiting for a first win."};
+      else if(w>=2*l&&n>=3)verdict={t:W+" is in "+L+"'s head",s:w+" wins to "+l+". "+L+" needs a miracle, or at least a plan."};
+      else verdict={t:W+" holds the edge",s:w+"–"+l+" in wins. "+L+" will want revenge."};
+    }
+    const last=ms[0];
+    const lastTxt=last?'Last meeting: '+esc(A)+' '+last.a_goals+'–'+last.b_goals+' '+esc(B)+' · '+prettyDate(last.match_date):'';
+    const row=(label,x,y,fmt)=>{
+      const f=fmt||(v=>v),tot=(Number(x)+Number(y))||1;
+      const xw=x>y?"lead":"",yw=y>x?"lead":"";
+      return '<div class="h2h-row"><b class="'+xw+'">'+esc(f(x))+'</b><div class="h2h-meter"><i style="width:'+Math.round(Number(x)/tot*100)+'%"></i><u style="width:'+Math.round(Number(y)/tot*100)+'%"></u><span>'+esc(label)+'</span></div><b class="'+yw+'">'+esc(f(y))+'</b></div>';
+    };
+    const avg=g=>n?(g/n).toFixed(2):"0.00";
+    const form=side=>ms.slice(0,5).map(m=>{
+      const x=side?m.b_goals:m.a_goals,y=side?m.a_goals:m.b_goals;
+      return '<i class="fm '+(x>y?'w':x<y?'l':'d')+'">'+(x>y?'W':x<y?'L':'D')+'</i>';
+    }).join("")||'<em>—</em>';
+    box.innerHTML=
+      '<div class="h2h-arena">'+
+        '<div class="h2h-side h2h-left'+(lead===0?' is-lead':'')+'">'+avBig(A,a,"h2h-av")+'<b class="h2h-name">'+esc(A)+'</b><span class="h2h-wins">'+t.w[0]+'<small>wins</small></span><span class="h2h-form">'+form(0)+'</span></div>'+
+        '<div class="h2h-mid"><span class="h2h-vs">VS</span><span class="h2h-played">'+n+' meeting'+(n===1?'':'s')+'</span></div>'+
+        '<div class="h2h-side h2h-right'+(lead===1?' is-lead':'')+'">'+avBig(B,b,"h2h-av")+'<b class="h2h-name">'+esc(B)+'</b><span class="h2h-wins">'+t.w[1]+'<small>wins</small></span><span class="h2h-form">'+form(1)+'</span></div>'+
+      '</div>'+
+      (n?'<div class="h2h-share" role="img" aria-label="Win share"><i class="s-a" style="width:'+share[0]+'%"></i><i class="s-d" style="width:'+share[1]+'%"></i><i class="s-b" style="width:'+share[2]+'%"></i></div>'+
+         '<div class="h2h-share-key"><span>'+esc(A)+' '+share[0]+'%</span><span>Draws '+share[1]+'%</span><span>'+esc(B)+' '+share[2]+'%</span></div>':'')+
+      '<div class="h2h-verdict"><b>'+esc(verdict.t)+'</b><span>'+esc(verdict.s)+'</span>'+(lastTxt?'<small>'+lastTxt+'</small>':'')+'</div>'+
+      (n?'<div class="h2h-stats">'+
+        row("Wins",t.w[0],t.w[1])+row("Goals scored",t.gf[0],t.gf[1])+row("Goals per match",avg(t.gf[0]),avg(t.gf[1]),v=>v)+
+        row("Clean sheets",t.cs[0],t.cs[1])+row("Biggest win (margin)",t.big[0],t.big[1],v=>v?"+"+v:"—")+row("Best winning run",t.streak[0],t.streak[1])+
+      '</div>'+
+      '<h3 class="h2h-hist-title">Match history</h3><div class="h2h-hist">'+ms.map(m=>{
+        const r=m.a_goals>m.b_goals?"a":m.a_goals<m.b_goals?"b":"d";
+        return '<div class="h2h-m r-'+r+'"><span class="d">'+prettyDate(m.match_date)+'</span><span class="n l'+(r==="a"?' win':'')+'">'+esc(A)+'</span><span class="sc">'+m.a_goals+' – '+m.b_goals+'</span><span class="n r'+(r==="b"?' win':'')+'">'+esc(B)+'</span></div>';
+      }).join("")+'</div>':'');
+  }
+  $("h2hA").addEventListener("change",renderH2h);
+  $("h2hB").addEventListener("change",renderH2h);
+  $("h2hSwap").addEventListener("click",()=>{const x=$("h2hA").value;$("h2hA").value=$("h2hB").value;$("h2hB").value=x;renderH2h();});
+  $("legendsMonth").addEventListener("change",loadLegends);
+
+  setTimeout(loadHomeLegends,0);
+  function legendCard(kind,scope,rows,monthLabel){
+    const isG=kind==="goals";
+    const key=isG?"goals_for":"clean_sheets";
+    const list=[...(rows||[])].filter(r=>Number(r[key])>0).sort((x,y)=>Number(y[key])-Number(x[key])||Number(x.matches_played)-Number(y.matches_played)||String(x.player_name).localeCompare(y.player_name));
+    const title=(isG?"Top scorer":"Top clean sheets")+' · '+(scope==="all"?"All time":monthLabel);
+    if(!list.length)return '<article class="lg-card"><p class="lg-title">'+esc(title)+'</p><div class="lg-empty">No counted matches yet.</div></article>';
+    const w=list[0];
+    const sub=isG?(Number(w.matches_played)?(Number(w.goals_for)/Number(w.matches_played)).toFixed(2):"0.00")+' goals per match · '+w.matches_played+' matches'
+                 :'in '+w.matches_played+' matches · '+Math.round(Number(w.clean_sheets)/Math.max(1,Number(w.matches_played))*100)+'% kept clean';
+    const rest=list.slice(1,5).map((r,i)=>'<li>'+avBig(r.player_name,r.player_id,"lg-mini")+'<span class="lg-rn">'+esc(r.player_name)+'</span><b>'+r[key]+'</b><em>'+(i+2)+'</em></li>').join("");
+    return '<article class="lg-card"><p class="lg-title">'+esc(title)+'</p>'+
+      '<div class="lg-top"><div class="lg-crown">'+avBig(w.player_name,w.player_id,"lg-av")+'<span class="lg-badge">'+(isG?"⚽":"🧤")+'</span></div>'+
+      '<div class="lg-who"><b class="lg-name">'+esc(w.player_name)+'</b><span class="lg-num">'+w[key]+'<small>'+(isG?" goals":" clean sheets")+'</small></span><span class="lg-sub">'+esc(sub)+'</span></div></div>'+
+      (rest?'<ol class="lg-rest">'+rest+'</ol>':'')+'</article>';
+  }
+  async function loadLegends(){
+    const grid=$("legendsGrid");if(!grid||!client)return;
+    const mv=$("legendsMonth").value||monthNow;
+    const label=new Date(mv+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
+    grid.innerHTML='<div class="lg-empty">Loading…</div>';
+    const [all,mon]=await Promise.all([client.rpc("get_top_performers",{p_month:null}),client.rpc("get_top_performers",{p_month:monthDate(mv)}),ensureAvatars()]);
+    if(all.error||mon.error){grid.innerHTML='<div class="lg-empty">Could not load the stats.</div>';return;}
+    grid.innerHTML=legendCard("goals","all",all.data,label)+legendCard("goals","month",mon.data,label)+legendCard("cs","all",all.data,label)+legendCard("cs","month",mon.data,label);
+  }
+  async function loadHomeLegends(){
+    const box=$("homeLegends");if(!box||!client)return;
+    try{
+      const [r]=await Promise.all([client.rpc("get_top_performers",{p_month:monthDate(monthNow)}),ensureAvatars()]);
+      const rows=r.data||[];
+      const top=(k)=>[...rows].filter(x=>Number(x[k])>0).sort((x,y)=>Number(y[k])-Number(x[k])||Number(x.matches_played)-Number(y.matches_played)||String(x.player_name).localeCompare(y.player_name))[0];
+      const g=top("goals_for"),c=top("clean_sheets");
+      if(!g&&!c){box.classList.add("hidden");return;}
+      const one=(x,k,label,unit)=>x?'<button type="button" class="hl-card" data-view="h2h">'+avBig(x.player_name,x.player_id,"hl-av")+'<span class="hl-txt"><small>'+label+'</small><b>'+esc(x.player_name)+'</b><em>'+x[k]+' '+unit+'</em></span></button>':'';
+      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; club legends</button></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
+      box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+      box.classList.remove("hidden");
+    }catch(e){console.warn(e);}
+  }
   function initials(n){return String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";}
   function tnGlyph(format){
     const g={

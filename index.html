@@ -17,6 +17,7 @@
   <nav id="nav">
     <button data-view="home" class="navlink active">Home</button>
     <button data-view="leaderboard" class="navlink">Leaderboard</button>
+    <button data-view="h2h" class="navlink">Head to Head</button>
     <button data-view="history" class="navlink">Match history</button>
     <button data-view="official" class="navlink">Official Matches</button>
     <button data-view="tournaments" class="navlink">Tournaments</button>
@@ -33,6 +34,7 @@
         <div class="home-cta"><button class="primary" data-view="leaderboard">See the leaderboard</button><button class="ghost" data-view="tournaments">Join a tournament</button></div></div>
       <div class="home-hero-card" aria-hidden="true"><div class="hh-row"><span>Win</span><b>3</b></div><div class="hh-row"><span>Draw</span><b>1</b></div><div class="hh-row"><span>Loss</span><b>0</b></div><p>Every approved result counts toward the monthly table.</p></div>
     </div>
+    <section id="homeLegends" class="home-legends hidden" aria-label="This month's stars"></section>
     <section id="homeBannerSection" class="home-banner-section hidden" aria-label="Club performance banner"><img id="homeBannerImage" class="home-banner-image" alt="BPC club performance banner"></section>
   <section id="uclPosterSection" class="poster-section hidden" aria-label="UCL finalists poster">
     <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">UCL Finalists</h2></div><span class="poster-badge">Featured</span></div>
@@ -59,6 +61,20 @@
     <p class="table-note">MP = counted matches · GF/GA = goals for/against · GD = goal difference. Pending or rejected results do not affect rankings.</p>
   </section>
 
+  <section id="view-h2h" class="view hidden">
+    <div class="h2h-hero">
+      <div class="h2h-hero-copy"><h1>Head to Head</h1><p>Pick any two players and see who really rules the rivalry.</p></div>
+      <div class="h2h-pick">
+        <label><span>Player one</span><select id="h2hA"><option value="">Choose player</option></select></label>
+        <button type="button" class="h2h-swap" id="h2hSwap" title="Swap players" aria-label="Swap players">⇄</button>
+        <label><span>Player two</span><select id="h2hB"><option value="">Choose player</option></select></label>
+      </div>
+    </div>
+    <div id="h2hResult" class="h2h-result"></div>
+    <div class="section-head compact legends-head"><div><h2>Club legends</h2><p>Top scorers and clean-sheet kings, across all time and any month you pick.</p></div></div>
+    <div class="toolbar"><div><label for="legendsMonth">Month</label><input id="legendsMonth" type="month"></div></div>
+    <div id="legendsGrid" class="legends-grid"></div>
+  </section>
   <section id="view-account" class="view hidden">
     <div class="auth-grid">
       <aside class="auth-side"><span class="auth-mark">BPC</span><h3>Your matches.<br>Your table.</h3><p>One account per player. Send in your results, follow your fixtures and see where you stand in the monthly race.</p>
