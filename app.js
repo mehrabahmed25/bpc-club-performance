@@ -321,6 +321,10 @@
     };
     $("toggleAuth").onclick=()=>{state.signup=!state.signup;setAuthUI();};
   }
+  $("dbPhotoPick").addEventListener("click",()=>$("dbPhotoFile").click());
+  $("dbAvatar").addEventListener("click",()=>$("dbPhotoFile").click());
+  $("dbPhotoFile").addEventListener("change",e=>{const f=e.target.files[0];e.target.value="";changePhoto(f);});
+  $("dbPhotoRemove").addEventListener("click",removePhoto);
   $("dbSignOut").addEventListener("click",()=>signOut());
   async function signOut(){await client.auth.signOut();state.session=null;state.profile=null;state.player=null;state.isAdmin=false;state.tnAdmin=false;state.isTnManager=false;setAuthUI();toast("Signed out.");showView("home");}
   async function loadIdentity(){
@@ -546,7 +550,7 @@ $("matchForm").addEventListener("submit", async e => {
     const month=$("monthPicker").value||monthNow;
     $("leaderboardMonthLabel").textContent=new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"})+" leaderboard";
     status("leaderboardStatus","Loading rankings…");
-    const {data,error}=await client.rpc("get_leaderboard",{p_month:monthDate(month)});
+    const [{data,error}]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),ensureAvatars()]);
     if(error){status("leaderboardStatus",error.message,"error");return;}
     const {data:cobegTotals,error:cobegError}=await client.rpc("get_cobeg_match_totals",{p_month:monthDate(month)});
     if(cobegError){status("leaderboardStatus","Leaderboard loaded, but COBEG XI match totals could not be loaded: "+cobegError.message,"error");return;}
@@ -558,7 +562,7 @@ $("matchForm").addEventListener("submit", async e => {
     body.innerHTML=data.map(r=>{
       const total=cobegByPlayer[r.player_id]||0;
       const eligible=!!r.award_eligible;
-      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell"><span class="avatar">'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
+      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
     }).join("");
     renderPodium(data);
   }
@@ -566,7 +570,7 @@ $("matchForm").addEventListener("submit", async e => {
     const el=$("lbPodium");if(!el)return;
     const top=(rows||[]).filter(r=>Number(r.matches_played)>0).slice(0,3);
     if(top.length<3){el.classList.add("hidden");el.innerHTML="";return;}
-    const slot=(r,i)=>'<div class="pod pod-'+(i+1)+'"><span class="pod-rank">'+(i+1)+'</span><span class="pod-avatar">'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
+    const slot=(r,i)=>'<div class="pod pod-'+(i+1)+'"><span class="pod-rank">'+(i+1)+'</span><span class="pod-avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
     el.innerHTML=[1,0,2].map(i=>slot(top[i],i)).join("");
     el.classList.remove("hidden");
   }
@@ -756,7 +760,7 @@ async function loadHistory(){
   async function loadProfile(){
     if(!client||!state.session){showView("account");return;}
     loadMyTournamentMatches();
-    const dbName=state.player?.display_name||"";$("profileHeading").textContent=dbName?"Welcome back, "+dbName.split(" ")[0]:"Your dashboard";$("dbAvatar").textContent=initials(dbName||"?");$("dbSub").textContent="Fixtures, deadlines and results in one place.";
+    const dbName=state.player?.display_name||"";$("profileHeading").textContent=dbName?"Welcome back, "+dbName.split(" ")[0]:"Your dashboard";paintDbAvatar();$("dbSub").textContent="Fixtures, deadlines and results in one place.";
     // Same source as the leaderboard, so the dashboard always agrees with it. This counts matches
     // you submitted AND matches another member logged against you.
     const month=$("monthPicker").value||monthNow,pm=monthDate(month);
@@ -1122,7 +1126,7 @@ $("playersBody").innerHTML = shown.map(p =>
     accounts.forEach(a=>{names[a.user_id]=a.display_name||"Registered account";});
     $("tnManagerAccount").innerHTML='<option value="">Choose a registered account</option>'+accounts.filter(a=>!granted.some(g=>g.user_id===a.user_id)).map(a=>'<option value="'+esc(a.user_id)+'">'+esc(a.display_name||"Registered account")+'</option>').join("");
     $("tnManagersCount").textContent=granted.length;
-    $("tnManagersList").innerHTML=granted.length?granted.map(g=>{const nm=names[g.user_id]||"Registered account";return '<div class="tn-mgr"><span class="tn-avatar" aria-hidden="true">'+esc(initials(nm))+'</span><div><b>'+esc(nm)+'</b><span class="small">Manager since '+esc(tournamentDate(g.granted_at))+'</span></div><button type="button" class="reject-btn" data-tn-mgr-revoke="'+esc(g.user_id)+'">Remove access</button></div>';}).join(""):'<div class="tn-empty">No managers yet. Full admins always have access.</div>';
+    $("tnManagersList").innerHTML=granted.length?granted.map(g=>{const nm=names[g.user_id]||"Registered account";return '<div class="tn-mgr"><span class="tn-avatar" aria-hidden="true"'+av(nm,{uid:g.user_id})+'>'+esc(initials(nm))+'</span><div><b>'+esc(nm)+'</b><span class="small">Manager since '+esc(tournamentDate(g.granted_at))+'</span></div><button type="button" class="reject-btn" data-tn-mgr-revoke="'+esc(g.user_id)+'">Remove access</button></div>';}).join(""):'<div class="tn-empty">No managers yet. Full admins always have access.</div>';
     $("tnManagersList").querySelectorAll("[data-tn-mgr-revoke]").forEach(b=>b.addEventListener("click",async()=>{
       if(!state.isAdmin)return;
       const uid=b.dataset.tnMgrRevoke;
@@ -1215,6 +1219,7 @@ $("playersBody").innerHTML = shown.map(p =>
     await loadTournaments();
   }
   async function loadTournaments(){
+    await ensureAvatars();
     if(!client){status("tournamentStatus","Supabase connection is not configured.","error");return;}
     status("tournamentStatus","Loading tournaments…");
     const {data,error}=await client.from("tournament_tournaments")
@@ -1402,6 +1407,73 @@ $("playersBody").innerHTML = shown.map(p =>
   const TN_MATCH={pending_result:"Awaiting admin approval",pending_confirmation:"Awaiting opponent confirmation",disputed:"Under admin review",postponed:"Postponed",cancelled:"Cancelled"};
   function tnCategory(t){return t.status==="draft"?"drafts":t.status==="archived"?"archived":["completed","cancelled"].includes(t.status)?"finished":"live";}
   function tnStateHtml(st){const x=TN_STATE[st]||[String(st).replaceAll("_"," "),""];return '<span class="tn-state '+x[1]+'">'+esc(x[0])+'</span>';}
+  // ---- Profile pictures: tiny JPEGs in the public "avatars" bucket, looked up by id, user id or name ----
+  function paintDbAvatar(){
+    const el=$("dbAvatar");if(!el)return;
+    const name=state.player?.display_name||"";
+    el.textContent=initials(name||"?");
+    const u=avUrl({uid:state.session?.user?.id,name});
+    el.style.backgroundImage=u?"url('"+u+"')":"";
+    el.toggleAttribute("data-av",!!u);
+    const rm=$("dbPhotoRemove");if(rm)rm.hidden=!u;
+  }
+  // Shrink to a 192px square JPEG (about 8-15 KB) before upload so storage stays tiny.
+  function shrinkImage(file){
+    return new Promise((resolve,reject)=>{
+      const img=new Image(),url=URL.createObjectURL(file);
+      img.onload=()=>{
+        URL.revokeObjectURL(url);
+        const side=Math.min(img.width,img.height),size=192,c=document.createElement("canvas");
+        c.width=c.height=size;
+        c.getContext("2d").drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,size,size);
+        c.toBlob(b=>b?resolve(b):reject(new Error("Could not process this image.")),"image/jpeg",0.78);
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("That file is not a readable image."));};
+      img.src=url;
+    });
+  }
+  async function changePhoto(file){
+    if(!file||!state.session||!state.player)return;
+    const msg=$("dbPhotoMsg");msg.textContent="Uploading…";
+    try{
+      if(!/^image\//.test(file.type))throw new Error("Choose an image file.");
+      const blob=await shrinkImage(file);
+      const path=state.session.user.id+"/avatar.jpg";
+      const up=await client.storage.from("avatars").upload(path,blob,{upsert:true,contentType:"image/jpeg",cacheControl:"3600"});
+      if(up.error)throw up.error;
+      const r=await client.rpc("set_my_avatar",{p_set:true});if(r.error)throw r.error;
+      await ensureAvatars(true);paintDbAvatar();msg.textContent="Photo updated.";toast("Profile photo updated.");
+    }catch(e){msg.textContent=e.message||"Could not upload the photo.";}
+  }
+  async function removePhoto(){
+    if(!state.session)return;const msg=$("dbPhotoMsg");msg.textContent="Removing…";
+    try{
+      await client.storage.from("avatars").remove([state.session.user.id+"/avatar.jpg"]);
+      const r=await client.rpc("set_my_avatar",{p_set:false});if(r.error)throw r.error;
+      await ensureAvatars(true);paintDbAvatar();msg.textContent="Photo removed.";
+    }catch(e){msg.textContent=e.message||"Could not remove the photo.";}
+  }
+  var avMap={id:{},uid:{},name:{}},avP=null;
+  function avKey(n){return String(n||"").trim().replace(/\s+/g," ").toLowerCase();}
+  function ensureAvatars(force){
+    if(!client)return Promise.resolve();
+    if(avP&&!force)return avP;
+    avP=(async()=>{try{
+      const {data}=await client.from("player_avatars").select("id,user_id,display_name,avatar_updated_at");
+      const m={id:{},uid:{},name:{}};
+      // Only use pictures that actually load, so a broken link falls back to initials.
+      await Promise.all((data||[]).map(r=>new Promise(res=>{
+        const u=client.storage.from("avatars").getPublicUrl(r.user_id+"/avatar.jpg").data.publicUrl+"?v="+encodeURIComponent(r.avatar_updated_at);
+        const im=new Image();
+        const done=ok=>{if(ok){m.id[r.id]=u;m.uid[r.user_id]=u;m.name[avKey(r.display_name)]=u;}res();};
+        im.onload=()=>done(true);im.onerror=()=>done(false);setTimeout(()=>done(false),6000);im.src=u;
+      })));
+      avMap=m;
+    }catch(e){console.warn("Avatars unavailable",e);}})();
+    return avP;
+  }
+  function avUrl(o){o=o||{};return (o.id&&avMap.id[o.id])||(o.uid&&avMap.uid[o.uid])||avMap.name[avKey(o.name)]||"";}
+  function av(name,o){const u=avUrl(Object.assign({name},o));return u?' data-av="1" style="background-image:url(\''+esc(u)+'\')"':'';}
   function initials(n){return String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";}
   function tnGlyph(format){
     const g={
@@ -1427,7 +1499,7 @@ $("playersBody").innerHTML = shown.map(p =>
   function boardSide(sd,side,mode,done,res){
     const box=mode==="view"?(done?'<span class="tn-box tn-box-final">'+esc(sd.score)+'</span>':'')
       :'<input class="tn-box tn-box-in" type="number" inputmode="numeric" min="0" max="99" step="1" placeholder="0" data-side="'+side+'" aria-label="Score for '+esc(sd.name)+'" required>';
-    return '<div class="tn-side tn-'+side+(sd.you?' is-you':'')+(res==="win"?' is-win':res==="lose"?' is-lose':'')+'"><span class="tn-av" aria-hidden="true">'+esc(initials(sd.name))+'</span><span class="tn-name">'+esc(sd.name)+(sd.you?'<em class="tn-you">You</em>':'')+'</span>'+box+'</div>';
+    return '<div class="tn-side tn-'+side+(sd.you?' is-you':'')+(res==="win"?' is-win':res==="lose"?' is-lose':'')+'"><span class="tn-av" aria-hidden="true"'+av(sd.name)+'>'+esc(initials(sd.name))+'</span><span class="tn-name">'+esc(sd.name)+(sd.you?'<em class="tn-you">You</em>':'')+'</span>'+box+'</div>';
   }
   function renderBoard(o){
     const lw=o.done&&o.left.score>o.right.score,rw=o.done&&o.right.score>o.left.score,entry=o.mode!=="view";
@@ -1500,7 +1572,7 @@ $("playersBody").innerHTML = shown.map(p =>
         const head='<div class="tn-round"><b>Round '+rn+'</b>'+(roundOpen&&!ended?dueChip(dl,true):'')+(state.tnAdmin&&roundOpen&&!ended?'<button type="button" class="secondary" data-set-deadline="'+esc(rm[0].stage_id)+'" data-round="'+rn+'">'+(dl?'Change deadline':'Set deadline')+'</button>':'')+'</div>';
         const mkCard=m=>{
           const a=nameOf(m.participant_a_id);
-          if(!m.participant_b_id)return '<div class="tn-bye"><span class="tn-av" aria-hidden="true">'+esc(initials(a))+'</span><span><b>'+esc(a)+'</b> advances with a bye</span></div>';
+          if(!m.participant_b_id)return '<div class="tn-bye"><span class="tn-av" aria-hidden="true"'+av(a)+'>'+esc(initials(a))+'</span><span><b>'+esc(a)+'</b> advances with a bye</span></div>';
           const b=nameOf(m.participant_b_id),done=["approved","completed"].includes(m.status),open=["scheduled","rejected"].includes(m.status);
           let mode="view";
           if(!ended&&state.tnAdmin&&t.score_workflow==="admin_entered"&&open)mode="admin";
@@ -1577,7 +1649,7 @@ $("playersBody").innerHTML = shown.map(p =>
       const nm=entrantLabel(p);
       const pill=p.status==="confirmed"?'<span class="pill good">confirmed</span>':p.status==="pending"?'<span class="pill pending">pending</span>':'<span class="pill">'+esc(p.status)+'</span>';
       const act=state.tnAdmin&&!ended?'<div class="tn-person-act">'+(p.status==="pending"?'<button type="button" class="approve-btn" data-participant-approve="'+esc(p.id)+'">Approve</button>':'')+(["pending","confirmed","waitlisted"].includes(p.status)?'<button type="button" class="reject-btn" data-participant-remove="'+esc(p.id)+'">Remove</button>':'')+'</div>':'';
-      return '<div class="tn-person'+(p.status==="withdrawn"?' is-out':'')+'"><span class="tn-av" aria-hidden="true">'+esc(initials(nm))+'</span><div class="tn-person-main"><b>'+esc(nm)+(p.user_id===uid?'<em class="tn-you">You</em>':'')+'</b>'+(p.seed?'<span class="small">Seed '+esc(p.seed)+'</span>':'')+'</div>'+(groupOf[p.id]?'<span class="tn-gchip">Group '+esc(groupOf[p.id])+'</span>':'')+pill+act+'</div>';
+      return '<div class="tn-person'+(p.status==="withdrawn"?' is-out':'')+'"><span class="tn-av" aria-hidden="true"'+av(nm,{uid:p.user_id})+'>'+esc(initials(nm))+'</span><div class="tn-person-main"><b>'+esc(nm)+(p.user_id===uid?'<em class="tn-you">You</em>':'')+'</b>'+(p.seed?'<span class="small">Seed '+esc(p.seed)+'</span>':'')+'</div>'+(groupOf[p.id]?'<span class="tn-gchip">Group '+esc(groupOf[p.id])+'</span>':'')+pill+act+'</div>';
     }).join("")+'</div>':'<div class="tn-empty">No participants yet.</div>')+'</section>';
     tnOpen=id;
     const detail=$("tournamentDetail");

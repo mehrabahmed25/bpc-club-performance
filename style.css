@@ -612,3 +612,13 @@ tr.is-removed td:last-child{opacity:1}
 .player-actions{white-space:nowrap}
 .recovery-btn.danger-btn{background:#fff;color:#c62f3b;border:1px solid #e9a3a9}
 .recovery-btn.danger-btn:hover{background:#c62f3b;color:#fff}
+
+/* Profile pictures */
+[data-av]{background-size:cover!important;background-position:center!important;background-repeat:no-repeat;color:transparent!important;font-size:0!important}
+.db-avatar{cursor:pointer;position:relative;overflow:hidden}
+.db-avatar:focus-visible{outline:2px solid var(--amber,#f6b73c);outline-offset:2px}
+.db-photo{margin:6px 0 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px}
+.db-photo-btn{background:#ffffff1f;color:#fff;border:1px solid #ffffff40;border-radius:999px;padding:4px 12px;font-weight:600;font-size:12px;cursor:pointer}
+.db-photo-btn:hover{background:#ffffff33}
+#dbPhotoMsg{color:#cfd8ea}
+.avatar,.pod-avatar,.tn-av,.tn-avatar{background-clip:padding-box}
