@@ -1271,6 +1271,28 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     render();
   }
   $("tnCreateBtn").addEventListener("click",openTnWizard);
+  // Group setup dialog: how many groups, and how players are split. Resolves to {groups,random} or null.
+  function askGroups(confirmed){
+    return new Promise(resolve=>{
+      const ov=document.createElement("div");ov.className="modal-overlay";
+      ov.innerHTML='<div class="modal-box" role="dialog" aria-modal="true"><h3>Set up groups</h3><p class="small">'+confirmed+' confirmed player'+(confirmed===1?"":"s")+'. Each group needs at least two.</p>'
+        +'<label>Number of groups (2 to 8)<input id="agN" type="number" min="2" max="8" value="'+Math.min(8,Math.max(2,Math.min(4,Math.floor(confirmed/2))))+'"></label>'
+        +'<fieldset class="tn-set"><legend>How are players split?</legend><div class="tn-opts">'
+        +tnOpt("agMode","order","In sign-up order","Players are dealt into the groups one by one, so each group gets an even spread.",true)
+        +tnOpt("agMode","random","Random draw","Players are placed in the groups at random. You can redraw until fixtures are generated.",false)+'</div></fieldset>'
+        +'<div class="toolbar"><button type="button" class="primary" id="agOk">Set up groups</button><button type="button" class="secondary" id="agCancel">Cancel</button></div><div class="status" id="agErr" role="alert"></div></div>';
+      document.body.appendChild(ov);
+      const close=v=>{ov.remove();resolve(v);};
+      ov.querySelector("#agCancel").onclick=()=>close(null);
+      ov.addEventListener("click",e=>{if(e.target===ov)close(null);});
+      ov.querySelector("#agOk").onclick=()=>{
+        const n=Number(ov.querySelector("#agN").value);
+        if(!Number.isInteger(n)||n<2||n>8){ov.querySelector("#agErr").textContent="Enter a whole number from 2 to 8.";return;}
+        if(confirmed<n*2){ov.querySelector("#agErr").textContent="You need at least "+(n*2)+" confirmed players for "+n+" groups.";return;}
+        close({groups:n,random:ov.querySelector("input[name=agMode]:checked").value==="random"});
+      };
+    });
+  }
   // Small text/number prompt dialog. Resolves to the entered string, or null if cancelled.
   function askText(o){
     return new Promise(resolve=>{
@@ -1378,12 +1400,23 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     if(error||!t){status("tournamentStatus",error?.message||"Tournament unavailable.","error");return;}
     const [pr,mr,sr,rr]=await Promise.all([
       client.from("tournament_participants").select("id,entrant_type,user_id,cobeg_member_id,external_name,status,seed,registered_at").eq("tournament_id",id).order("registered_at"),
-      client.from("tournament_matches").select("id,stage_id,round_number,match_number,participant_a_id,participant_b_id,score_a,score_b,status,scheduled_at,deadline_at").eq("tournament_id",id).order("round_number").order("match_number"),
+      client.from("tournament_matches").select("id,stage_id,group_id,round_number,match_number,participant_a_id,participant_b_id,score_a,score_b,status,scheduled_at,deadline_at").eq("tournament_id",id).order("round_number").order("match_number"),
       client.from("tournament_stages").select("id,name,stage_type,sequence_number,status").eq("tournament_id",id).order("sequence_number"),
       client.from("tournament_result_submissions").select("id,match_id,score_a,score_b,status,note,created_at,submitted_by").in("match_id", (await client.from("tournament_matches").select("id").eq("tournament_id",id)).data?.map(m=>m.id)||[]).in("status",["pending","disputed","awaiting_opponent"]).order("created_at")
     ]);
     if(pr.error||mr.error||sr.error||rr.error){status("tournamentStatus",pr.error?.message||mr.error?.message||sr.error?.message||rr.error?.message||"Could not load tournament details.","error");return;}
     const participants=pr.data||[],matches=mr.data||[],stages=sr.data||[],pendingSubmissions=rr.data||[];
+    // Group stage layout: group names, and which group each entrant sits in.
+    const groupStageIds=stages.filter(s=>s.stage_type==="group").map(s=>s.id);
+    const groupList=[],groupOf={};
+    if(groupStageIds.length){
+      const [gq,eq]=await Promise.all([
+        client.from("tournament_groups").select("id,stage_id,name,sequence_number").in("stage_id",groupStageIds).order("sequence_number"),
+        client.from("tournament_stage_entries").select("stage_id,participant_id,group_id,entry_status").in("stage_id",groupStageIds)
+      ]);
+      (gq.data||[]).forEach(g=>groupList.push(g));
+      (eq.data||[]).filter(e=>e.group_id&&["active","qualified"].includes(e.entry_status)).forEach(e=>{const g=groupList.find(x=>x.id===e.group_id);if(g)groupOf[e.participant_id]=g.name;});
+    }
     const mine=participants.find(p=>p.user_id===state.session?.user?.id&&!["withdrawn","rejected"].includes(p.status));
     const visibleParticipants=state.tnAdmin?participants:participants.filter(p=>p.status==="confirmed");
     const canRegister=!!state.session&&t.status==="registration_open"&&["self","both"].includes(t.registration_mode)&&!mine&&(!t.registration_deadline||new Date(t.registration_deadline)>new Date())&&(!t.participant_limit||participants.filter(p=>["pending","confirmed","waitlisted"].includes(p.status)).length<t.participant_limit);
@@ -1409,7 +1442,7 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
         const dl=rm.map(m=>m.deadline_at).find(Boolean);
         const roundOpen=rm.some(m=>["scheduled","rejected"].includes(m.status));
         const head='<div class="tn-round"><b>Round '+rn+'</b>'+(roundOpen&&!ended?dueChip(dl,true):'')+(state.tnAdmin&&roundOpen&&!ended?'<button type="button" class="secondary" data-set-deadline="'+esc(rm[0].stage_id)+'" data-round="'+rn+'">'+(dl?'Change deadline':'Set deadline')+'</button>':'')+'</div>';
-        const cards=rm.map(m=>{
+        const mkCard=m=>{
           const a=nameOf(m.participant_a_id);
           if(!m.participant_b_id)return '<div class="tn-bye"><span class="tn-av" aria-hidden="true">'+esc(initials(a))+'</span><span><b>'+esc(a)+'</b> advances with a bye</span></div>';
           const b=nameOf(m.participant_b_id),done=["approved","completed"].includes(m.status),open=["scheduled","rejected"].includes(m.status);
@@ -1422,8 +1455,13 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
             +(TN_MATCH[m.status]?'<span class="tn-due none">'+esc(TN_MATCH[m.status])+'</span>':'');
           const mineA=myPartIds.has(m.participant_a_id),mineB=myPartIds.has(m.participant_b_id);
           return renderBoard({id:m.id,mode,done,foot,mine:mineA||mineB,left:{name:a,you:mineA,score:m.score_a},right:{name:b,you:mineB,score:m.score_b}});
-        }).join("");
-        return head+'<div class="tn-matches">'+cards+'</div>';
+        };
+        const gids=[...new Set(rm.map(m=>m.group_id).filter(Boolean))];
+        if(gids.length){
+          const ordered=groupList.filter(g=>gids.includes(g.id));
+          return head+ordered.map(g=>'<div class="tn-group-tag"><span>Group '+esc(g.name)+'</span></div><div class="tn-matches">'+rm.filter(m=>m.group_id===g.id).map(mkCard).join("")+'</div>').join("");
+        }
+        return head+'<div class="tn-matches">'+rm.map(mkCard).join("")+'</div>';
       }).join("");
     };
     const matchOf=mid=>matches.find(m=>m.id===mid);
@@ -1478,25 +1516,29 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     const queue=state.tnAdmin?'<section class="tn-section"><div class="tn-section-head"><h3>Results waiting for review</h3>'+(pendingSubmissions.length?'<span class="tn-count">'+pendingSubmissions.length+'</span>':'')+'</div>'+(pendingSubmissions.length?pendingSubmissions.map(x=>'<div class="tn-review">'+queueBoard(x)+'<div class="tn-actions"><button type="button" class="primary" data-review-result="'+esc(x.id)+'" data-review-decision="approve">Approve</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="reject">Reject</button><button type="button" class="secondary" data-review-result="'+esc(x.id)+'" data-review-decision="dispute">Dispute</button></div></div>').join(""):'<div class="tn-empty">Nothing waiting. Submitted scores will show up here for approval.</div>')+'</section>':'';
     const confirmList=!state.tnAdmin&&t.score_workflow==="participant_opponent_admin"?pendingSubmissions.filter(x=>x.status==="awaiting_opponent"&&x.submitted_by!==uid&&matches.some(m=>m.id===x.match_id&&(myPartIds.has(m.participant_a_id)||myPartIds.has(m.participant_b_id)))):[];
     const confirmHtml=confirmList.length?'<section class="tn-section"><div class="tn-section-head"><h3>Confirm your opponent’s score</h3></div>'+confirmList.map(x=>'<div class="tn-review">'+queueBoard(x)+'<div class="tn-actions"><button type="button" class="primary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="true">Confirm score</button><button type="button" class="secondary" data-confirm-result="'+esc(x.id)+'" data-confirm-value="false">Dispute score</button></div></div>').join("")+'</section>':'';
-    const fixturesHtml='<section class="tn-section"><div class="tn-section-head"><h3>Fixtures</h3></div>'+(stages.length?stages.map(s=>'<div class="tn-stage"><div class="tn-stage-head"><div><h4>'+esc(s.name)+'</h4><span class="small">'+esc(s.stage_type.replaceAll("_"," "))+', '+esc(s.status)+'</span></div><div class="tn-stage-actions">'+(state.tnAdmin&&!ended?'<button type="button" class="primary" data-generate-stage="'+esc(s.id)+'">Generate next round</button>'+(t.format==="group_knockout"&&s.stage_type==="group"?'<button type="button" class="secondary" data-advance-groups="'+esc(id)+'">Advance group qualifiers</button>':''):'')+'<button type="button" class="secondary" data-stage-standings="'+esc(s.id)+'">Standings</button></div></div><div id="standings-'+esc(s.id)+'"></div>'+(renderFixtures(matches.filter(m=>m.stage_id===s.id))||'<div class="tn-empty">No fixtures in this stage yet.'+(state.tnAdmin&&!ended?' Generate round 1 once entrants are confirmed.':'')+'</div>')+'</div>').join(""):'<div class="tn-empty">Fixtures have not been generated yet.'+(state.tnAdmin&&!ended?' Set up stages, then generate round 1.':'')+'</div>')+'</section>';
+    const fixturesHtml='<section class="tn-section"><div class="tn-section-head"><h3>Fixtures</h3></div>'+(stages.length?stages.map(s=>'<div class="tn-stage"><div class="tn-stage-head"><div><h4>'+esc(s.name)+'</h4><span class="small">'+esc(s.stage_type.replaceAll("_"," "))+', '+esc(s.status)+'</span></div><div class="tn-stage-actions">'+(state.tnAdmin&&!ended?(s.stage_type==="group"&&!matches.some(m=>m.stage_id===s.id)?'<button type="button" class="secondary" data-redraw-groups="'+esc(s.id)+'">Redraw groups</button>':'')+'<button type="button" class="primary" data-generate-stage="'+esc(s.id)+'">Generate next round</button>'+(t.format==="group_knockout"&&s.stage_type==="group"?'<button type="button" class="secondary" data-advance-groups="'+esc(id)+'">Advance group qualifiers</button>':''):'')+'<button type="button" class="secondary" data-stage-standings="'+esc(s.id)+'">Standings</button></div></div><div id="standings-'+esc(s.id)+'"></div>'+(renderFixtures(matches.filter(m=>m.stage_id===s.id))||'<div class="tn-empty">No fixtures in this stage yet.'+(state.tnAdmin&&!ended?' Generate round 1 once entrants are confirmed.':'')+'</div>')+'</div>').join(""):'<div class="tn-empty">Fixtures have not been generated yet.'+(state.tnAdmin&&!ended?' Set up stages, then generate round 1.':'')+'</div>')+'</section>';
     const peopleHtml='<section class="tn-section"><div class="tn-section-head"><h3>Participants</h3><span class="tn-count">'+visibleParticipants.length+'</span></div>'+(visibleParticipants.length?'<div class="tn-people">'+visibleParticipants.map(p=>{
       const nm=entrantLabel(p);
       const pill=p.status==="confirmed"?'<span class="pill good">confirmed</span>':p.status==="pending"?'<span class="pill pending">pending</span>':'<span class="pill">'+esc(p.status)+'</span>';
       const act=state.tnAdmin&&!ended?'<div class="tn-person-act">'+(p.status==="pending"?'<button type="button" class="approve-btn" data-participant-approve="'+esc(p.id)+'">Approve</button>':'')+(["pending","confirmed","waitlisted"].includes(p.status)?'<button type="button" class="reject-btn" data-participant-remove="'+esc(p.id)+'">Remove</button>':'')+'</div>':'';
-      return '<div class="tn-person'+(p.status==="withdrawn"?' is-out':'')+'"><span class="tn-av" aria-hidden="true">'+esc(initials(nm))+'</span><div class="tn-person-main"><b>'+esc(nm)+(p.user_id===uid?'<em class="tn-you">You</em>':'')+'</b>'+(p.seed?'<span class="small">Seed '+esc(p.seed)+'</span>':'')+'</div>'+pill+act+'</div>';
+      return '<div class="tn-person'+(p.status==="withdrawn"?' is-out':'')+'"><span class="tn-av" aria-hidden="true">'+esc(initials(nm))+'</span><div class="tn-person-main"><b>'+esc(nm)+(p.user_id===uid?'<em class="tn-you">You</em>':'')+'</b>'+(p.seed?'<span class="small">Seed '+esc(p.seed)+'</span>':'')+'</div>'+(groupOf[p.id]?'<span class="tn-gchip">Group '+esc(groupOf[p.id])+'</span>':'')+pill+act+'</div>';
     }).join("")+'</div>':'<div class="tn-empty">No participants yet.</div>')+'</section>';
     tnOpen=id;
     const detail=$("tournamentDetail");
     detail.innerHTML=hero+banner+checklist+confirmHtml+queue+fixturesHtml+peopleHtml;
     applyTnVisibility();
     $("tournamentSetupStages")?.addEventListener("click",async()=>{
-      let groups=4;
+      let groups=4,random=false;
       if(t.format==="group_knockout"){
-        const answer=await askText({title:"How many groups?",text:"Players are split evenly across the groups. You need at least two confirmed players per group.",label:"Number of groups (2 to 8)",type:"number",min:2,max:8,value:"4",confirmText:"Set up stages",validate:v=>{const n=Number(v);return Number.isInteger(n)&&n>=2&&n<=8?"":"Enter a whole number from 2 to 8.";}});
-        if(answer===null)return;groups=Number(answer);
+        const ans=await askGroups(confirmedCount);
+        if(!ans)return;groups=ans.groups;random=ans.random;
       }
       const {data,error}=await client.rpc("tournament_admin_setup_stages",{p_tournament_id:id,p_group_count:groups});
       if(error){status("tournamentStatus",error.message,"error");return;}
+      if(random&&data?.group_stage_id){
+        const sh=await client.rpc("tournament_admin_shuffle_groups",{p_stage_id:data.group_stage_id});
+        if(sh.error){status("tournamentStatus",sh.error.message,"error");}
+      }
       await openTournament(id);toast("Default stages created.");
     });
     $("tournamentAddEntrant")?.addEventListener("click",()=>tournamentShowAddEntrant(id));
@@ -1575,11 +1617,27 @@ $("playersBody").innerHTML = (ps.data || []).map(p =>
     $("tnEnd")?.addEventListener("click",()=>tnLifecycle(t,"completed"));
     $("tnArchive")?.addEventListener("click",()=>tnLifecycle(t,"archived"));
     $("tnRestore")?.addEventListener("click",()=>tnLifecycle(t,"completed"));
+    detail.querySelectorAll("[data-redraw-groups]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!state.tnAdmin)return;
+      if(!confirm("Draw the groups again at random? Players will be shuffled between groups. This is only possible before fixtures exist."))return;
+      const {error}=await client.rpc("tournament_admin_shuffle_groups",{p_stage_id:b.dataset.redrawGroups});
+      if(error){status("tournamentStatus",error.message,"error");return;}
+      toast("Groups redrawn.");await openTournament(id);
+    }));
     document.querySelectorAll("[data-stage-standings]").forEach(b=>b.addEventListener("click",async()=>{
       const stageId=b.dataset.stageStandings;const {data,error}=await client.rpc("tournament_standings_for_stage",{p_stage_id:stageId});
       if(error){status("tournamentStatus",error.message,"error");return;}
-      const target=$("standings-"+stageId);target.innerHTML='<div class="table-wrap"><table><thead><tr><th>Entrant</th><th>P</th><th>W</th><th>D</th><th>L</th><th>Diff</th><th>Pts</th></tr></thead><tbody>'+(data||[]).map(x=>'<tr><td>'+esc(x.entrant_name)+'</td><td>'+x.played+'</td><td>'+x.wins+'</td><td>'+x.draws+'</td><td>'+x.losses+'</td><td>'+x.score_difference+'</td><td>'+x.points+'</td></tr>').join("")+'</tbody></table></div>';
+      const target=$("standings-"+stageId);
+      const stg=stages.find(x=>x.id===stageId);
+      const row=(x,i,q)=>'<tr'+(q&&i<q?' class="tn-q"':'')+'><td>'+esc(x.entrant_name)+'</td><td>'+x.played+'</td><td>'+x.wins+'</td><td>'+x.draws+'</td><td>'+x.losses+'</td><td>'+x.score_difference+'</td><td>'+x.points+'</td></tr>';
+      const tbl=(rows,q)=>'<div class="table-wrap"><table><thead><tr><th>Entrant</th><th>P</th><th>W</th><th>D</th><th>L</th><th>Diff</th><th>Pts</th></tr></thead><tbody>'+rows.map((x,i)=>row(x,i,q)).join("")+'</tbody></table></div>';
+      if(stg?.stage_type==="group"&&groupList.length){
+        const rows=data||[],qn=t.format==="group_knockout"?2:0;
+        const byGroup=groupList.filter(g=>g.stage_id===stageId).map(g=>({g,rows:rows.filter(x=>groupOf[x.participant_id]===g.name)}));
+        target.innerHTML='<div class="tn-gstand">'+byGroup.map(x=>'<div><div class="tn-group-tag"><span>Group '+esc(x.g.name)+'</span></div>'+tbl(x.rows,qn)+'</div>').join("")+'</div>'+(qn?'<p class="small">The top '+qn+' in each group go through to the knockout stage.</p>':'');
+      }else target.innerHTML=tbl(data||[],0);
     }));
+    stages.filter(x=>x.stage_type==="group"&&matches.some(m=>m.stage_id===x.id)).forEach(x=>detail.querySelector('[data-stage-standings="'+x.id+'"]')?.click());
     $("tournamentSelfRegister")?.addEventListener("click",async()=>{
       if(!state.session||!["self","both"].includes(t.registration_mode))return;
       let error;
