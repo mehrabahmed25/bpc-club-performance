@@ -75,6 +75,7 @@
   function showView(name){
     if(name==="account"&&state.session&&!state.recoveryMode)name="profile";
     if(name==="funds"&&!state.canAccessFunds){toast("BPC Funds is restricted to authorized accounts.");name="home";}
+    if(name==="player"){const cur=document.querySelector(".view:not(.hidden)");if(cur&&cur.id!=="view-player")state.pfFrom=cur.id.replace("view-","");}
     document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
@@ -83,6 +84,7 @@
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
+    if(name==="player")renderPlayerPage();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
     if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();}
@@ -563,7 +565,7 @@ $("matchForm").addEventListener("submit", async e => {
     body.innerHTML=data.map(r=>{
       const total=cobegByPlayer[r.player_id]||0;
       const eligible=!!r.award_eligible;
-      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
+      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
     }).join("");
     renderPodium(data);
   }
@@ -571,7 +573,7 @@ $("matchForm").addEventListener("submit", async e => {
     const el=$("lbPodium");if(!el)return;
     const top=(rows||[]).filter(r=>Number(r.matches_played)>0).slice(0,3);
     if(top.length<3){el.classList.add("hidden");el.innerHTML="";return;}
-    const slot=(r,i)=>'<div class="pod pod-'+(i+1)+'"><span class="pod-rank">'+(i+1)+'</span><span class="pod-avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
+    const slot=(r,i)=>'<div class="pod pod-'+(i+1)+' link-player" data-player="'+esc(r.player_id)+'"><span class="pod-rank">'+(i+1)+'</span><span class="pod-avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
     el.innerHTML=[1,0,2].map(i=>slot(top[i],i)).join("");
     el.classList.remove("hidden");
   }
@@ -1545,9 +1547,9 @@ $("playersBody").innerHTML = shown.map(p =>
     }).join("")||'<em>—</em>';
     box.innerHTML=
       '<div class="h2h-arena">'+
-        '<div class="h2h-side h2h-left'+(lead===0?' is-lead':'')+'">'+avBig(A,a,"h2h-av")+'<b class="h2h-name">'+esc(A)+'</b><span class="h2h-wins">'+t.w[0]+'<small>wins</small></span><span class="h2h-form">'+form(0)+'</span></div>'+
+        '<div class="h2h-side h2h-left link-player'+(lead===0?' is-lead':'')+'" data-player="'+esc(a)+'">'+avBig(A,a,"h2h-av")+'<b class="h2h-name">'+esc(A)+'</b><span class="h2h-wins">'+t.w[0]+'<small>wins</small></span><span class="h2h-form">'+form(0)+'</span></div>'+
         '<div class="h2h-mid"><span class="h2h-vs">VS</span><span class="h2h-played">'+n+' meeting'+(n===1?'':'s')+'</span></div>'+
-        '<div class="h2h-side h2h-right'+(lead===1?' is-lead':'')+'">'+avBig(B,b,"h2h-av")+'<b class="h2h-name">'+esc(B)+'</b><span class="h2h-wins">'+t.w[1]+'<small>wins</small></span><span class="h2h-form">'+form(1)+'</span></div>'+
+        '<div class="h2h-side h2h-right link-player'+(lead===1?' is-lead':'')+'" data-player="'+esc(b)+'">'+avBig(B,b,"h2h-av")+'<b class="h2h-name">'+esc(B)+'</b><span class="h2h-wins">'+t.w[1]+'<small>wins</small></span><span class="h2h-form">'+form(1)+'</span></div>'+
       '</div>'+
       (n?'<div class="h2h-share" role="img" aria-label="Win share"><i class="s-a" style="width:'+share[0]+'%"></i><i class="s-d" style="width:'+share[1]+'%"></i><i class="s-b" style="width:'+share[2]+'%"></i></div>'+
          '<div class="h2h-share-key"><span>'+esc(A)+' '+share[0]+'%</span><span>Draws '+share[1]+'%</span><span>'+esc(B)+' '+share[2]+'%</span></div>':'')+
@@ -1566,6 +1568,109 @@ $("playersBody").innerHTML = shown.map(p =>
   $("h2hSwap").addEventListener("click",()=>{const x=$("h2hA").value;$("h2hA").value=$("h2hB").value;$("h2hB").value=x;renderH2h();});
   $("legendsMonth").addEventListener("change",loadLegends);
 
+
+  // ================= Public player profile =================
+  var pfScope={mode:"all",month:monthNow},pfCache={};
+  function openPlayer(id){if(!id)return;state.viewPlayerId=id;pfScope={mode:"all",month:monthNow};showView("player");}
+  document.addEventListener("click",e=>{
+    const t=e.target.closest("[data-player]");
+    if(t&&t.dataset.player){e.preventDefault();openPlayer(t.dataset.player);}
+  });
+  $("pfBack").addEventListener("click",()=>showView(state.pfFrom||"leaderboard"));
+  $("dbPublicProfile").addEventListener("click",()=>{if(state.player)openPlayer(state.player.id);});
+  function pfStats(rows){
+    const o={n:rows.length,w:0,d:0,l:0,gf:0,ga:0,cs:0};
+    rows.forEach(r=>{o.gf+=r.gf;o.ga+=r.ga;if(r.ga===0)o.cs++;if(r.gf>r.ga)o.w++;else if(r.gf<r.ga)o.l++;else o.d++;});
+    o.pts=o.w*3+o.d;o.rate=o.n?Math.round(o.w/o.n*100):0;return o;
+  }
+  const pfRes=r=>r.gf>r.ga?"w":r.gf<r.ga?"l":"d";
+  function pfBadges(all){
+    const asc=[...all].reverse();
+    let bestW=0,bestU=0,w=0,u=0;
+    asc.forEach(r=>{const x=pfRes(r);w=x==="w"?w+1:0;u=x!=="l"?u+1:0;bestW=Math.max(bestW,w);bestU=Math.max(bestU,u);});
+    const byMonth={};all.forEach(r=>{const k=r.match_date.slice(0,7);byMonth[k]=(byMonth[k]||0)+1;});
+    const maxMonth=Math.max(0,...Object.values(byMonth));
+    const opps=new Set(all.map(r=>(r.opponent_id||r.opponent_name))).size;
+    const st=pfStats(all);
+    const defs=[
+      ["⚽","Hat-trick hero","Score 3+ goals in a match",Math.max(0,...all.map(r=>r.gf)),3],
+      ["💥","Goal machine","Score 5+ goals in a match",Math.max(0,...all.map(r=>r.gf)),5],
+      ["🧤","Brick wall","Keep 5 clean sheets",st.cs,5],
+      ["🔥","On fire","Win 5 matches in a row",bestW,5],
+      ["🛡️","Unbeaten","Go 8 matches without a loss",bestU,8],
+      ["🤝","Social player","Play 10 different opponents",opps,10],
+      ["📅","Busy month","Play 40 matches in a month",maxMonth,40],
+      ["💯","Century club","Play 100 matches",st.n,100]
+    ];
+    return {defs,bestW,bestU};
+  }
+  async function renderPlayerPage(){
+    const box=$("playerPage"),id=state.viewPlayerId;
+    if(!client||!id){box.innerHTML="";return;}
+    box.innerHTML='<div class="h2h-empty"><span>Loading profile…</span></div>';
+    const lbMonth=monthDate(pfScope.mode==="month"?pfScope.month:monthNow);
+    const [mres,dir,lb]=await Promise.all([client.rpc("get_player_matches",{p_player:id}),client.from("active_player_directory").select("id,display_name").eq("id",id).maybeSingle(),client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
+    const me=dir.data;
+    if(!me||mres.error){box.innerHTML='<div class="h2h-empty"><b>Player not found.</b><span>This profile is not available.</span></div>';return;}
+    const all=(mres.data||[]).map(r=>({...r,gf:Number(r.gf),ga:Number(r.ga)}));
+    const rows=pfScope.mode==="month"?all.filter(r=>r.match_date.slice(0,7)===pfScope.month):all;
+    const st=pfStats(rows);
+    const lbRow=(lb.data||[]).find(r=>r.player_id===id);
+    const monthLabel=d=>new Date(d+"-01T12:00:00").toLocaleDateString(undefined,{month:"short",year:"numeric"});
+    // form + streak (always all-time)
+    const form=all.slice(0,10),f0=form.map(pfRes);
+    let streak=0,kind=f0[0];for(const x of f0){if(x===kind)streak++;else break;}
+    let unb=0;for(const x of f0){if(x!=="l")unb++;else break;}
+    const streakTxt=!all.length?"":kind==="w"&&streak>=2?"On a "+streak+"-match winning run":unb>=3?"Unbeaten in "+unb:kind==="l"&&streak>=2?"Lost the last "+streak:"";
+    // rivalries within scope
+    const opp={};
+    rows.forEach(r=>{const k=r.opponent_id||("n:"+r.opponent_name);(opp[k]=opp[k]||{id:r.opponent_id,name:r.opponent_name,rows:[]}).rows.push(r);});
+    const oppList=Object.values(opp).map(o=>({...o,s:pfStats(o.rows)}));
+    const most=[...oppList].sort((a,b)=>b.s.n-a.s.n||a.name.localeCompare(b.name))[0];
+    const eligible=oppList.filter(o=>o.s.n>=3);
+    const nemesis=[...eligible].filter(o=>o.s.rate<50).sort((a,b)=>a.s.rate-b.s.rate||b.s.n-a.s.n)[0];
+    const victim=[...eligible].filter(o=>o.s.rate>50).sort((a,b)=>b.s.rate-a.s.rate||b.s.n-a.s.n)[0];
+    const rivalCard=(label,o,note)=>o?'<div class="pf-riv'+(o.id?' link-player':'')+'"'+(o.id?' data-player="'+esc(o.id)+'"':'')+'>'+avBig(o.name,o.id,"pf-mini")+'<div><small>'+label+'</small><b>'+esc(o.name)+'</b><span>'+o.s.w+'W '+o.s.d+'D '+o.s.l+'L · '+o.s.n+' played</span></div></div>':'<div class="pf-riv is-empty"><div><small>'+label+'</small><span>'+note+'</span></div></div>';
+    // highlights
+    const bigWin=[...rows].filter(r=>r.gf>r.ga).sort((a,b)=>(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf)[0];
+    const topScore=[...rows].sort((a,b)=>(b.gf+b.ga)-(a.gf+a.ga))[0];
+    const hl=(label,r,txt)=>r?'<div class="pf-hl"><small>'+label+'</small><b>'+txt+'</b><span>vs '+esc(r.opponent_name)+' · '+prettyDate(r.match_date)+'</span></div>':'<div class="pf-hl"><small>'+label+'</small><span>Nothing yet</span></div>';
+    // monthly points (last 12 months, all-time data)
+    const months=[];const base=new Date();base.setDate(1);
+    for(let i=11;i>=0;i--){const d=new Date(base.getFullYear(),base.getMonth()-i,1);months.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));}
+    const pts=months.map(k=>{const s=pfStats(all.filter(r=>r.match_date.slice(0,7)===k));return {k,p:s.pts,n:s.n};});
+    const maxP=Math.max(1,...pts.map(x=>x.p));
+    const bestM=[...pts].sort((a,b)=>b.p-a.p)[0];
+    const chart='<div class="pf-bars" role="img" aria-label="Points per month">'+pts.map(x=>'<div class="pf-bar'+(x.k===(bestM&&bestM.p?bestM.k:"")?' is-best':'')+'" title="'+monthLabel(x.k)+': '+x.p+' pts"><i style="height:'+Math.max(x.p?6:2,Math.round(x.p/maxP*100))+'%"></i><span>'+monthLabel(x.k).slice(0,3)+'</span></div>').join("")+'</div>';
+    const bd=pfBadges(all);
+    const badges=bd.defs.map(d=>{const ok=d[3]>=d[4];return '<div class="pf-badge'+(ok?' is-on':'')+'" title="'+esc(d[2])+'"><span class="g">'+d[0]+'</span><b>'+d[1]+'</b><small>'+(ok?"Earned":Math.min(d[3],d[4])+" / "+d[4])+'</small></div>';}).join("");
+    const earned=bd.defs.filter(d=>d[3]>=d[4]).length;
+    const recent=all.slice(0,8).map(r=>'<div class="pf-m r-'+pfRes(r)+'"><span class="d">'+prettyDate(r.match_date)+'</span><span class="o'+(r.opponent_id?' link-player':'')+'"'+(r.opponent_id?' data-player="'+esc(r.opponent_id)+'"':'')+'>'+esc(r.opponent_name)+'</span><span class="s">'+r.gf+' – '+r.ga+'</span></div>').join("")||'<div class="pf-none">No counted matches yet.</div>';
+    const signed=!!state.session&&state.player&&state.player.id!==id;
+    box.innerHTML=
+      '<div class="pf-head">'+avBig(me.display_name,me.id,"pf-av")+
+        '<div class="pf-id"><h2>'+esc(me.display_name)+'</h2><p>'+(lbRow?'Rank #'+lbRow.rank+' this month · '+lbRow.points+' pts':'Not ranked this month')+(streakTxt?' · '+esc(streakTxt):'')+'</p></div>'+
+        '<div class="pf-actions"><button type="button" class="pf-btn" id="pfCompare">Compare'+(signed?' with me':'')+'</button></div></div>'+
+      '<div class="pf-scope"><button type="button" class="'+(pfScope.mode==="all"?'on':'')+'" data-pfs="all">All time</button><button type="button" class="'+(pfScope.mode==="month"?'on':'')+'" data-pfs="month">Month</button>'+(pfScope.mode==="month"?'<input type="month" id="pfMonth" value="'+esc(pfScope.month)+'">':'')+'</div>'+
+      '<div class="pf-tiles">'+
+        [["Matches",st.n],["Win rate",st.rate+"%"],["W · D · L",st.w+" · "+st.d+" · "+st.l],["Goals",st.gf+" – "+st.ga],["Clean sheets",st.cs],["Points",st.pts]].map(t=>'<div class="pf-tile"><b>'+t[1]+'</b><span>'+t[0]+'</span></div>').join("")+'</div>'+
+      '<div class="pf-grid">'+
+        '<section class="pf-card"><h3>Recent form</h3><div class="pf-form">'+(form.map(r=>'<i class="fm '+pfRes(r)+'">'+pfRes(r).toUpperCase()+'</i>').join("")||'<em>No matches yet</em>')+'</div>'+
+          '<h3>Points by month</h3>'+chart+(bestM&&bestM.p?'<p class="pf-note">Best month: '+monthLabel(bestM.k)+' with '+bestM.p+' points.</p>':'')+'</section>'+
+        '<section class="pf-card"><h3>Rivalries</h3><div class="pf-rivs">'+rivalCard("Most played",most,"No matches yet")+rivalCard("Nemesis",nemesis,"Needs 3+ meetings")+rivalCard("Favourite opponent",victim,"Needs 3+ meetings")+'</div>'+
+          '<h3>Highlights</h3><div class="pf-hls">'+hl("Biggest win",bigWin,bigWin?bigWin.gf+" – "+bigWin.ga:"")+hl("Highest scoring",topScore,topScore?topScore.gf+" – "+topScore.ga:"")+'</div></section>'+
+      '</div>'+
+      '<section class="pf-card pf-wide"><h3>Badges <small>'+earned+' of '+bd.defs.length+' earned</small></h3><div class="pf-badges">'+badges+'</div></section>'+
+      '<section class="pf-card pf-wide"><h3>Latest matches</h3><div class="pf-ms">'+recent+'</div></section>';
+    box.querySelectorAll("[data-pfs]").forEach(b=>b.addEventListener("click",()=>{pfScope.mode=b.dataset.pfs;renderPlayerPage();}));
+    const pm=$("pfMonth");if(pm)pm.addEventListener("change",()=>{pfScope.month=pm.value||monthNow;renderPlayerPage();});
+    $("pfCompare").addEventListener("click",async()=>{
+      showView("h2h");await loadH2hPage();
+      const mine=state.player&&state.player.active?state.player.id:"";
+      if(mine&&mine!==id){$("h2hA").value=mine;$("h2hB").value=id;}else{$("h2hA").value=id;$("h2hB").value="";}
+      renderH2h();
+    });
+  }
   setTimeout(loadHomeLegends,0);
   function legendCard(kind,scope,rows,monthLabel){
     const isG=kind==="goals";
@@ -1576,9 +1681,9 @@ $("playersBody").innerHTML = shown.map(p =>
     const w=list[0];
     const sub=isG?(Number(w.matches_played)?(Number(w.goals_for)/Number(w.matches_played)).toFixed(2):"0.00")+' goals per match · '+w.matches_played+' matches'
                  :'in '+w.matches_played+' matches · '+Math.round(Number(w.clean_sheets)/Math.max(1,Number(w.matches_played))*100)+'% kept clean';
-    const rest=list.slice(1,5).map((r,i)=>'<li>'+avBig(r.player_name,r.player_id,"lg-mini")+'<span class="lg-rn">'+esc(r.player_name)+'</span><b>'+r[key]+'</b><em>'+(i+2)+'</em></li>').join("");
+    const rest=list.slice(1,5).map((r,i)=>'<li class="link-player" data-player="'+esc(r.player_id)+'">'+avBig(r.player_name,r.player_id,"lg-mini")+'<span class="lg-rn">'+esc(r.player_name)+'</span><b>'+r[key]+'</b><em>'+(i+2)+'</em></li>').join("");
     return '<article class="lg-card"><p class="lg-title">'+esc(title)+'</p>'+
-      '<div class="lg-top"><div class="lg-crown">'+avBig(w.player_name,w.player_id,"lg-av")+'<span class="lg-badge">'+(isG?"⚽":"🧤")+'</span></div>'+
+      '<div class="lg-top link-player" data-player="'+esc(w.player_id)+'"><div class="lg-crown">'+avBig(w.player_name,w.player_id,"lg-av")+'<span class="lg-badge">'+(isG?"⚽":"🧤")+'</span></div>'+
       '<div class="lg-who"><b class="lg-name">'+esc(w.player_name)+'</b><span class="lg-num">'+w[key]+'<small>'+(isG?" goals":" clean sheets")+'</small></span><span class="lg-sub">'+esc(sub)+'</span></div></div>'+
       (rest?'<ol class="lg-rest">'+rest+'</ol>':'')+'</article>';
   }
@@ -1599,7 +1704,7 @@ $("playersBody").innerHTML = shown.map(p =>
       const top=(k)=>[...rows].filter(x=>Number(x[k])>0).sort((x,y)=>Number(y[k])-Number(x[k])||Number(x.matches_played)-Number(y.matches_played)||String(x.player_name).localeCompare(y.player_name))[0];
       const g=top("goals_for"),c=top("clean_sheets");
       if(!g&&!c){box.classList.add("hidden");return;}
-      const one=(x,k,label,unit)=>x?'<button type="button" class="hl-card" data-view="h2h">'+avBig(x.player_name,x.player_id,"hl-av")+'<span class="hl-txt"><small>'+label+'</small><b>'+esc(x.player_name)+'</b><em>'+x[k]+' '+unit+'</em></span></button>':'';
+      const one=(x,k,label,unit)=>x?'<button type="button" class="hl-card" data-player="'+esc(x.player_id)+'">'+avBig(x.player_name,x.player_id,"hl-av")+'<span class="hl-txt"><small>'+label+'</small><b>'+esc(x.player_name)+'</b><em>'+x[k]+' '+unit+'</em></span></button>':'';
       box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; BPC Stars</button></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
       box.classList.remove("hidden");

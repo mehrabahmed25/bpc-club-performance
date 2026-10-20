@@ -74,6 +74,10 @@
     <div class="toolbar"><div><label for="legendsMonth">Month</label><input id="legendsMonth" type="month"></div></div>
     <div id="legendsGrid" class="legends-grid"></div>
   </section>
+  <section id="view-player" class="view hidden">
+    <button type="button" class="pf-back" id="pfBack">← Back</button>
+    <div id="playerPage"></div>
+  </section>
   <section id="view-account" class="view hidden">
     <div class="auth-grid">
       <aside class="auth-side"><span class="auth-mark">BPC</span><h3>Your matches.<br>Your table.</h3><p>One account per player. Send in your results, follow your fixtures and see where you stand in the monthly race.</p>
@@ -239,7 +243,7 @@
 
   <section id="view-profile" class="view hidden">
     <div class="db-hero">
-      <div class="db-left"><div class="db-who"><span class="db-avatar" id="dbAvatar" role="button" tabindex="0" title="Change profile photo">?</span><div><h2 id="profileHeading">My dashboard</h2><p class="db-sub" id="dbSub">Your fixtures and results in one place.</p><p class="db-photo"><input type="file" id="dbPhotoFile" accept="image/*" hidden><button type="button" class="db-photo-btn" id="dbPhotoPick">Change photo</button><button type="button" class="db-photo-btn" id="dbPhotoRemove" hidden>Remove</button><span id="dbPhotoMsg" role="status"></span></p></div></div><button type="button" class="db-signout" id="dbSignOut">Sign out</button></div>
+      <div class="db-left"><div class="db-who"><span class="db-avatar" id="dbAvatar" role="button" tabindex="0" title="Change profile photo">?</span><div><h2 id="profileHeading">My dashboard</h2><p class="db-sub" id="dbSub">Your fixtures and results in one place.</p><p class="db-photo"><input type="file" id="dbPhotoFile" accept="image/*" hidden><button type="button" class="db-photo-btn" id="dbPhotoPick">Change photo</button><button type="button" class="db-photo-btn" id="dbPhotoRemove" hidden>Remove</button><span id="dbPhotoMsg" role="status"></span></p></div></div><button type="button" class="db-signout" id="dbSignOut">Sign out</button><button type="button" class="db-signout" id="dbPublicProfile">Public profile</button></div>
       <div class="db-next" id="dbNext"></div>
     </div>
     <div id="myTournamentSection" class="hidden">
