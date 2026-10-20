@@ -1766,12 +1766,11 @@ $("playersBody").innerHTML = shown.map(p =>
   // Photo card: blurred picture behind, sharp portrait, headline over the image.
   function storyPhoto(art,t,hero){
     const p=storyHero(art),u=avUrl({id:p.id,name:p.name}),l=artLang;
-    const chips=storyChips(art,l).map(c=>'<span>'+esc(c)+'</span>').join("");
     const rank=p.rank?'<span class="st-rank">'+(l==="bn"?"র‍্যাংক ":"Rank ")+numL(p.rank,l)+'</span>':"";
     return '<div class="st-ph-bg"'+(u?' style="background-image:url(\''+esc(u)+'\')"':'')+'></div><div class="st-ph-shade"></div>'+
       (u?'<img class="st-ph-pic" alt="" src="'+esc(u)+'">':'<span class="st-ph-ini">'+esc(initials(p.name))+'</span>')+
       '<span class="st-tag">'+esc(t.tag)+'</span>'+rank+
-      '<div class="st-ph-cap"><h3>'+storyHeadline(t.headline,p.name)+'</h3><div class="st-chips">'+chips+'</div></div>';
+      '<div class="st-ph-cap"><h3>'+storyHeadline(t.headline,p.name)+'</h3></div>';
   }
   function storyLangBar(){return '<span class="st-lang" role="group" aria-label="Language"><button type="button" data-artlang="en" class="'+(artLang==="en"?"on":"")+'">EN</button><button type="button" data-artlang="bn" class="'+(artLang==="bn"?"on":"")+'">বাংলা</button></span>';}
   function storyDate(art){return new Date(art.match_date+"T12:00:00").toLocaleDateString(artLang==="bn"?"bn-BD":"en-GB",{day:"numeric",month:"short",year:"numeric"});}
