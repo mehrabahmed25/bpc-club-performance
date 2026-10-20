@@ -85,7 +85,7 @@
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
     if(name==="player")renderPlayerPage();
-    if(name==="weekly")loadWeekly();
+    if(name==="stories")loadStories();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
     if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();}
@@ -1638,89 +1638,6 @@ $("playersBody").innerHTML = shown.map(p =>
     }));
   }
 
-  // ================= BPC Weekly newsletter =================
-  var weeklyStart=null;
-  function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());const k=(x.getDay()+6)%7;x.setDate(x.getDate()-k);return x;}
-  function fmtRange(a,b){
-    const o={day:"numeric",month:"short"};
-    return a.toLocaleDateString(undefined,o)+" – "+b.toLocaleDateString(undefined,{...o,year:"numeric"});
-  }
-  async function fetchWeek(start){
-    const end=addDays(start,6);
-    const r=await client.rpc("get_week_matches",{p_start:ymd(start),p_end:ymd(end)});
-    return r.error?null:(r.data||[]).map(m=>({...m,a_goals:Number(m.a_goals),b_goals:Number(m.b_goals)}));
-  }
-  async function loadWeekly(){
-    const box=$("weeklyPage");if(!client||!box)return;
-    box.innerHTML='<div class="h2h-empty"><span>Loading this week…</span></div>';
-    await ensureAvatars();
-    let rows=null;
-    if(!weeklyStart){
-      // open on the latest week that has results (looking back up to 8 weeks)
-      let s=mondayOf(new Date());
-      for(let i=0;i<8;i++){rows=await fetchWeek(s);if(rows&&rows.length){break;}if(i<7)s=addDays(s,-7);}
-      weeklyStart=s;
-    }else rows=await fetchWeek(weeklyStart);
-    renderWeekly(rows||[]);
-  }
-  async function renderWeekly(rows){
-    const box=$("weeklyPage"),start=weeklyStart,end=addDays(start,6);
-    const thisWeek=ymd(start)===ymd(mondayOf(new Date()));
-    // per-player perspectives (registered players only)
-    const P={};
-    const add=(id,name,gf,ga)=>{if(!id)return;const o=P[id]=P[id]||{id,name,n:0,w:0,d:0,l:0,gf:0,ga:0,cs:0,pts:0};o.n++;o.gf+=gf;o.ga+=ga;if(ga===0)o.cs++;if(gf>ga){o.w++;o.pts+=3;}else if(gf===ga){o.d++;o.pts+=1;}else o.l++;};
-    rows.forEach(m=>{add(m.a_id,m.a_name,m.a_goals,m.b_goals);add(m.b_id,m.b_name,m.b_goals,m.a_goals);});
-    const pl=Object.values(P);
-    const goals=rows.reduce((s,m)=>s+m.a_goals+m.b_goals,0);
-    const best=(arr,fn)=>arr.length?[...arr].sort(fn)[0]:null;
-    const potw=best(pl.filter(p=>p.n>=2),(x,y)=>y.pts-x.pts||(y.gf-y.ga)-(x.gf-x.ga)||y.gf-x.gf||x.name.localeCompare(y.name));
-    const scorer=best(pl.filter(p=>p.gf>0),(x,y)=>y.gf-x.gf||x.n-y.n||x.name.localeCompare(y.name));
-    const wall=best(pl.filter(p=>p.cs>0),(x,y)=>y.cs-x.cs||x.n-y.n||x.name.localeCompare(y.name));
-    const busy=best(pl,(x,y)=>y.n-x.n||y.pts-x.pts||x.name.localeCompare(y.name));
-    const bigWin=best(rows.filter(m=>m.a_goals!==m.b_goals),(x,y)=>Math.abs(y.a_goals-y.b_goals)-Math.abs(x.a_goals-x.b_goals)||(y.a_goals+y.b_goals)-(x.a_goals+x.b_goals));
-    const thriller=best(rows,(x,y)=>(y.a_goals+y.b_goals)-(x.a_goals+x.b_goals)||Math.abs(x.a_goals-x.b_goals)-Math.abs(y.a_goals-y.b_goals));
-    // rivalry of the week: registered pair that met most often
-    const pairs={};
-    rows.forEach(m=>{if(!m.a_id||!m.b_id)return;const k=[m.a_id,m.b_id].sort().join("|");const o=pairs[k]=pairs[k]||{a:m.a_id,an:m.a_name,b:m.b_id,bn:m.b_name,n:0,aw:0,bw:0,d:0};o.n++;
-      const ag=m.a_id===o.a?m.a_goals:m.b_goals,bg=m.a_id===o.a?m.b_goals:m.a_goals;if(ag>bg)o.aw++;else if(ag<bg)o.bw++;else o.d++;});
-    const rival=best(Object.values(pairs).filter(p=>p.n>=2),(x,y)=>y.n-x.n||x.an.localeCompare(y.an));
-    // standings at the end of the week, with movement vs the week before
-    const cutoff=end>new Date()?new Date():end;
-    const monthStr=ymd(cutoff).slice(0,7);
-    const prevCut=addDays(cutoff,-7);
-    const [nowR,prevR]=await Promise.all([
-      client.rpc("get_leaderboard_asof",{p_month:monthStr+"-01",p_cutoff:ymd(cutoff)}),
-      ymd(prevCut).slice(0,7)===monthStr?client.rpc("get_leaderboard_asof",{p_month:monthStr+"-01",p_cutoff:ymd(prevCut)}):Promise.resolve({data:null})
-    ]);
-    const table=(nowR.data||[]).filter(r=>Number(r.matches_played)>0).slice(0,5);
-    const mv=rankMoves(nowR.data,prevR.data);
-    const nm=(id,n)=>avBig(n,id,"wk-av");
-    const award=(label,p,val,unit)=>p?'<div class="wk-award link-player" data-player="'+esc(p.id)+'">'+nm(p.id,p.name)+'<div><small>'+label+'</small><b>'+esc(p.name)+'</b><span>'+val+' '+unit+'</span></div></div>':'';
-    const matchCard=(label,m)=>m?'<div class="wk-match"><small>'+label+'</small><div class="wk-score"><span class="'+(m.a_goals>m.b_goals?'win':'')+'">'+esc(m.a_name)+'</span><b>'+m.a_goals+' – '+m.b_goals+'</b><span class="'+(m.b_goals>m.a_goals?'win':'')+'">'+esc(m.b_name)+'</span></div><em>'+prettyDate(m.match_date)+'</em></div>':'';
-    const headline=!rows.length?"A quiet week on the pitch":
-      (potw?esc(potw.name)+" had the week: "+potw.w+" win"+(potw.w===1?"":"s")+" from "+potw.n+" played.":rows.length+" matches played this week.");
-    const awards=[award("Player of the week",potw,potw?potw.pts:0,"pts"),award("Top scorer",scorer,scorer?scorer.gf:0,"goals"),award("Clean sheet king",wall,wall?wall.cs:0,"clean sheets"),award("Busiest player",busy,busy?busy.n:0,"matches")].join("");
-    box.innerHTML=
-      '<div class="wk-mast"><div><h2>BPC Weekly</h2><p>'+fmtRange(start,end)+'</p></div><div class="wk-nav"><button type="button" id="wkPrev" aria-label="Previous week">←</button><button type="button" id="wkNext" aria-label="Next week"'+(thisWeek?' disabled':'')+'>→</button></div></div>'+
-      '<p class="wk-headline">'+headline+'</p>'+
-      '<section id="wkStories" class="wk-stories"></section>'+
-      (rows.length?
-      '<div class="wk-nums"><div><b>'+rows.length+'</b><span>Matches</span></div><div><b>'+goals+'</b><span>Goals</span></div><div><b>'+(goals/rows.length).toFixed(1)+'</b><span>Goals per match</span></div><div><b>'+pl.length+'</b><span>Players in action</span></div></div>'+
-      '<div class="wk-grid">'+
-        '<section class="pf-card"><h3>Awards of the week</h3><div class="wk-awards">'+awards+'</div></section>'+
-        '<section class="pf-card"><h3>Table after the week <small>'+new Date(monthStr+"-01T12:00:00").toLocaleDateString(undefined,{month:"long"})+'</small></h3>'+
-          '<ol class="wk-table">'+table.map(r=>'<li class="link-player" data-player="'+esc(r.player_id)+'"><span class="n">'+r.rank+'</span>'+nm(r.player_id,r.player_name)+'<span class="nm">'+esc(r.player_name)+'</span>'+moveHtml(mv[r.player_id])+'<b>'+r.points+'</b></li>').join("")+'</ol>'+
-          '<p class="pf-note">Arrows compare with a week earlier.</p></section>'+
-      '</div>'+
-      '<section class="pf-card pf-wide"><h3>Match of the week</h3><div class="wk-matches">'+matchCard("Biggest win",bigWin)+matchCard("Highest scoring",thriller)+'</div>'+
-        (rival?'<div class="wk-rival link-player" data-player="'+esc(rival.a)+'"><small>Rivalry of the week</small><b>'+esc(rival.an)+' vs '+esc(rival.bn)+'</b><span>'+rival.n+' meetings · '+rival.aw+'W '+rival.d+'D '+rival.bw+'L for '+esc(rival.an)+'</span></div>':'')+'</section>'
-      :'<div class="h2h-empty"><b>No counted matches this week.</b><span>Use the arrows to browse other weeks.</span></div>');
-    loadWeekStories();
-    $("wkPrev").addEventListener("click",async()=>{weeklyStart=addDays(weeklyStart,-7);box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';renderWeekly(await fetchWeek(weeklyStart)||[]);});
-    const nx=$("wkNext");if(nx)nx.addEventListener("click",async()=>{weeklyStart=addDays(weeklyStart,7);box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';renderWeekly(await fetchWeek(weeklyStart)||[]);});
-  }
-
-
   // ================= Auto-written stories (EN + BN templates) =================
   var artLang=(function(){try{return localStorage.getItem("bpc_lang")==="bn"?"bn":"en";}catch(e){return "en";}})();
   var storyHome=[],adminArticles=[],adminArtTab="draft";
@@ -1821,11 +1738,15 @@ $("playersBody").innerHTML = shown.map(p =>
     if(ed){if(ed.headline)out.headline=ed.headline;if(ed.standfirst!=null)out.standfirst=ed.standfirst;if(Array.isArray(ed.body)&&ed.body.length)out.paras=ed.body;}
     return out;
   }
+  // The player a story is about: its subject, else the winner, else the first player.
+  function storyHero(art){
+    const f=art.facts;
+    if(f.subject&&f.subject.name)return f.subject;
+    return f.winner==="b"?f.b:f.a;
+  }
   function storyArt(art){
-    const f=art.facts,k=art.kind;
-    const one=(p,cls)=>avBig(p.name,p.id,cls||"st-av");
-    if(k==="milestone"&&f.subject)return '<div class="st-pair">'+avBig(f.subject.name,f.subject.id,"st-av st-av-lg")+'<span class="st-score">#'+f.n+'</span></div>';
-    return '<div class="st-pair">'+one(f.a)+'<span class="st-score">'+f.a.goals+' – '+f.b.goals+'</span>'+one(f.b)+'</div>';
+    const p=storyHero(art);
+    return '<div class="st-pair">'+avBig(p.name,p.id,"st-av st-av-lg")+'</div>';
   }
   function storyLangBar(){return '<span class="st-lang" role="group" aria-label="Language"><button type="button" data-artlang="en" class="'+(artLang==="en"?"on":"")+'">EN</button><button type="button" data-artlang="bn" class="'+(artLang==="bn"?"on":"")+'">বাংলা</button></span>';}
   function storyDate(art){return new Date(art.match_date+"T12:00:00").toLocaleDateString(artLang==="bn"?"bn-BD":"en-GB",{day:"numeric",month:"short",year:"numeric"});}
@@ -1845,28 +1766,33 @@ $("playersBody").innerHTML = shown.map(p =>
     }).join("")+'</div>';
     box.classList.remove("hidden");
   }
-  function renderStories(list,box){
-    if(!list.length){box.innerHTML="";return;}
-    box.innerHTML='<div class="st-sec-head"><h3>'+(artLang==="bn"?"এই সপ্তাহের গল্প":"Stories of the week")+'</h3>'+storyLangBar()+'</div>'+list.map(a=>{
-      const t=articleText(a,artLang);
-      return '<article class="st-full" id="art-'+esc(a.id)+'"><div class="st-hero">'+storyArt(a)+'<span class="st-tag">'+esc(t.tag)+'</span></div><div class="st-text"><h4>'+esc(t.headline)+'</h4>'+(t.standfirst?'<p class="st-stand">'+esc(t.standfirst)+'</p>':'')+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+'<footer>'+(artLang==="bn"?"ম্যাচের তথ্য থেকে স্বয়ংক্রিয়ভাবে লেখা":"Auto-written from match data")+' · '+esc(storyDate(a))+'</footer></div></article>';
-    }).join("");
-  }
-  async function loadWeekStories(){
-    const box=$("wkStories");if(!box)return;
-    const r=await client.rpc("get_articles",{p_week:ymd(weeklyStart),p_limit:10});
-    state.weekStories=r.data||[];renderStories(state.weekStories,box);
+  var storiesLimit=10;
+  async function loadStories(){
+    const box=$("storiesPage");if(!client||!box)return;
+    if(state.scrollArticle)storiesLimit=50;
+    box.innerHTML='<div class="h2h-empty"><span>Loading stories…</span></div>';
+    const [r]=await Promise.all([client.rpc("get_articles",{p_week:null,p_limit:storiesLimit}),ensureAvatars()]);
+    state.storyList=r.data||[];renderStoriesPage();
     if(state.scrollArticle){const el=$("art-"+state.scrollArticle);state.scrollArticle=null;if(el)setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),60);}
   }
-  function openArticle(id,weekStart){
-    weeklyStart=mondayOf(new Date(weekStart+"T12:00:00"));state.scrollArticle=id;showView("weekly");
+  function renderStoriesPage(){
+    const box=$("storiesPage");if(!box)return;
+    const list=state.storyList||[],bn=artLang==="bn";
+    const feed=list.length?list.map(a=>{
+      const t=articleText(a,artLang);
+      return '<article class="st-full" id="art-'+esc(a.id)+'"><div class="st-hero">'+storyArt(a)+'<span class="st-tag">'+esc(t.tag)+'</span></div><div class="st-text"><h4>'+esc(t.headline)+'</h4>'+(t.standfirst?'<p class="st-stand">'+esc(t.standfirst)+'</p>':'')+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+'<footer>'+(bn?"ম্যাচের তথ্য থেকে স্বয়ংক্রিয়ভাবে লেখা":"Auto-written from match data")+' · '+esc(storyDate(a))+'</footer></div></article>';
+    }).join(""):'<div class="h2h-empty"><b>'+(bn?"এখনও কোনো গল্প নেই।":"No stories yet.")+'</b><span>'+(bn?"বড় ফলাফলের গল্প এখানে প্রকাশিত হবে।":"Big results get written up here.")+'</span></div>';
+    const more=list.length>=storiesLimit&&storiesLimit<50?'<div class="st-more"><button type="button" class="secondary" id="storiesMore">'+(bn?"পুরোনো গল্প দেখুন":"Load older stories")+'</button></div>':'';
+    box.innerHTML='<div class="wk-mast"><div><h2>'+(bn?"গল্প":"Stories")+'</h2><p>'+(bn?"ক্লাবের সেরা মুহূর্তগুলোর ম্যাচ রিপোর্ট।":"Match reports from the club's biggest moments.")+'</p></div>'+storyLangBar()+'</div><div class="wk-stories st-feed">'+feed+'</div>'+more;
+    const mb=$("storiesMore");if(mb)mb.addEventListener("click",()=>{storiesLimit=Math.min(50,storiesLimit+10);loadStories();});
   }
+  function openArticle(id){state.scrollArticle=id;showView("stories");}
   document.addEventListener("click",e=>{
     const c=e.target.closest("[data-story]");
-    if(c){const a=storyHome.find(x=>x.id===c.dataset.story);if(a)openArticle(a.id,a.week_start);return;}
+    if(c){const a=storyHome.find(x=>x.id===c.dataset.story);if(a)openArticle(a.id);return;}
     const lb=e.target.closest("[data-artlang]");
     if(lb){artLang=lb.dataset.artlang;try{localStorage.setItem("bpc_lang",artLang);}catch(x){}
-      renderHomeStories();const wb=$("wkStories");if(wb&&state.weekStories)renderStories(state.weekStories,wb);
+      renderHomeStories();if(!$("view-stories").classList.contains("hidden")&&state.storyList)renderStoriesPage();
       if(!$("view-admin").classList.contains("hidden"))renderArticleAdmin();}
   });
 
@@ -2074,7 +2000,7 @@ $("playersBody").innerHTML = shown.map(p =>
       const g=top("goals_for"),c=top("clean_sheets");
       if(!g&&!c){box.classList.add("hidden");return;}
       const one=(x,k,label,unit)=>x?'<button type="button" class="hl-card" data-player="'+esc(x.player_id)+'">'+avBig(x.player_name,x.player_id,"hl-av")+'<span class="hl-txt"><small>'+label+'</small><b>'+esc(x.player_name)+'</b><em>'+x[k]+' '+unit+'</em></span></button>':'';
-      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><span class="hl-links"><button type="button" class="hl-link" data-view="weekly">BPC Weekly</button><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; BPC Stars</button></span></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
+      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><span class="hl-links"><button type="button" class="hl-link" data-view="stories">Stories</button><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; BPC Stars</button></span></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
