@@ -1,0 +1,6 @@
+-- Weekly newsletter data, rank movement (leaderboard as-of date) and the trash talk wall.
+-- See migration "weekly_trash_talk_rank_asof" applied to the project. Summary of objects:
+--   get_leaderboard_asof(p_month date, p_cutoff date)  - same ranking rules as get_leaderboard, matches up to a date
+--   get_week_matches(p_start date, p_end date)         - one row per counted match in a range (max 31 days)
+--   trash_talk table (RLS on, no direct access) + get_trash_talk / post_trash_talk (5 per hour, 200 chars) / hide_trash_talk
+-- Full SQL: run `select pg_get_functiondef(...)` or see the Supabase migration history.

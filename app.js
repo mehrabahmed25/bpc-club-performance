@@ -85,6 +85,7 @@
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
     if(name==="player")renderPlayerPage();
+    if(name==="weekly")loadWeekly();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
     if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();}
@@ -553,8 +554,10 @@ $("matchForm").addEventListener("submit", async e => {
     const month=$("monthPicker").value||monthNow;
     $("leaderboardMonthLabel").textContent=new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"})+" leaderboard";
     status("leaderboardStatus","Loading rankings…");
-    const [{data,error}]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),ensureAvatars()]);
+    const wantMoves=month===monthNow;
+    const [{data,error},prev]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),wantMoves?client.rpc("get_leaderboard_asof",{p_month:monthDate(month),p_cutoff:ymd(addDays(new Date(),-7))}):Promise.resolve({data:null}),ensureAvatars()]);
     if(error){status("leaderboardStatus",error.message,"error");return;}
+    const moves=rankMoves(data,prev&&prev.data);
     const {data:cobegTotals,error:cobegError}=await client.rpc("get_cobeg_match_totals",{p_month:monthDate(month)});
     if(cobegError){status("leaderboardStatus","Leaderboard loaded, but COBEG XI match totals could not be loaded: "+cobegError.message,"error");return;}
     const cobegByPlayer={};
@@ -565,7 +568,7 @@ $("matchForm").addEventListener("submit", async e => {
     body.innerHTML=data.map(r=>{
       const total=cobegByPlayer[r.player_id]||0;
       const eligible=!!r.award_eligible;
-      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'">'+r.rank+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
+      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'"><span class="rk">'+r.rank+'</span>'+moveHtml(moves[r.player_id])+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
     }).join("");
     renderPodium(data);
   }
@@ -1562,12 +1565,157 @@ $("playersBody").innerHTML = shown.map(p =>
         const r=m.a_goals>m.b_goals?"a":m.a_goals<m.b_goals?"b":"d";
         return '<div class="h2h-m r-'+r+'"><span class="d">'+prettyDate(m.match_date)+'</span><span class="n l'+(r==="a"?' win':'')+'">'+esc(A)+'</span><span class="sc">'+m.a_goals+' – '+m.b_goals+'</span><span class="n r'+(r==="b"?' win':'')+'">'+esc(B)+'</span></div>';
       }).join("")+'</div>':'');
+    box.insertAdjacentHTML("beforeend",'<section id="h2hTrash" class="tt-wrap"></section>');
+    renderTrash(a,b);
   }
   $("h2hA").addEventListener("change",renderH2h);
   $("h2hB").addEventListener("change",renderH2h);
   $("h2hSwap").addEventListener("click",()=>{const x=$("h2hA").value;$("h2hA").value=$("h2hB").value;$("h2hB").value=x;renderH2h();});
   $("legendsMonth").addEventListener("change",loadLegends);
 
+
+
+  // ---- date + rank-movement helpers ----
+  function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+  function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+  // rank now vs rank a week ago; null map when there is nothing to compare against
+  function rankMoves(now,prev){
+    const m={};
+    if(!now||!prev||!prev.some(r=>Number(r.matches_played)>0))return m;
+    const pm={};prev.forEach(r=>pm[r.player_id]=r);
+    now.forEach(r=>{
+      const p=pm[r.player_id];
+      if(!p||Number(p.matches_played)===0){m[r.player_id]=Number(r.matches_played)>0?{isNew:true}:null;return;}
+      m[r.player_id]={d:Number(p.rank)-Number(r.rank)};
+    });
+    return m;
+  }
+  function moveHtml(x){
+    if(!x)return "";
+    if(x.isNew)return '<i class="mv new" title="New in the table this week">NEW</i>';
+    if(x.d>0)return '<i class="mv up" title="Up '+x.d+' since last week">▲'+x.d+'</i>';
+    if(x.d<0)return '<i class="mv down" title="Down '+(-x.d)+' since last week">▼'+(-x.d)+'</i>';
+    return '<i class="mv same" title="No change since last week">–</i>';
+  }
+  function timeAgo(iso){
+    const s=Math.max(1,Math.round((Date.now()-new Date(iso).getTime())/1000));
+    if(s<60)return "just now";if(s<3600)return Math.floor(s/60)+"m ago";if(s<86400)return Math.floor(s/3600)+"h ago";
+    if(s<604800)return Math.floor(s/86400)+"d ago";return prettyDate(String(iso).slice(0,10));
+  }
+
+  // ================= Trash talk wall (inside Head to Head) =================
+  async function renderTrash(a,b){
+    const box=$("h2hTrash");if(!box)return;
+    const {data,error}=await client.rpc("get_trash_talk",{p_a:a,p_b:b});
+    if(error){box.innerHTML='<p class="tt-sub">Could not load the wall.</p>';return;}
+    const names={};(state.h2hPlayers||[]).forEach(p=>names[p.id]=p.display_name);
+    const canPost=!!state.session&&state.player&&state.player.active;
+    const compose=canPost?'<form class="tt-compose" id="ttForm"><textarea id="ttText" maxlength="200" rows="2" placeholder="Say something to '+esc(names[a]||"them")+' or '+esc(names[b]||"them")+'. Keep it playful."></textarea><div class="tt-bar"><span id="ttCount">0 / 200</span><button class="primary" type="submit" id="ttPost">Post</button></div><div id="ttMsg" class="status"></div></form>'
+      :'<p class="tt-signin">'+(state.session?'Only active registered players can post.':'Sign in to join the banter.')+'</p>';
+    const list=(data||[]).map(t=>{
+      const side=t.author_player_id===a?"l":t.author_player_id===b?"r":"f";
+      return '<div class="tt-msg '+side+'">'+avBig(t.author_name,t.author_player_id,"tt-av")+'<div class="tt-bub"><div class="tt-meta"><b class="link-player" data-player="'+esc(t.author_player_id)+'">'+esc(t.author_name)+'</b>'+(side==="f"?'<em>fan</em>':'')+'<span>'+timeAgo(t.created_at)+'</span>'+(t.can_hide?'<button type="button" class="tt-x" data-tt="'+esc(t.id)+'" title="Remove this post">Remove</button>':'')+'</div><p>'+esc(t.body)+'</p></div></div>';
+    }).join("")||'<p class="tt-empty">Quiet so far. Start the banter.</p>';
+    box.innerHTML='<h3 class="h2h-hist-title">Trash talk</h3><p class="tt-sub">Friendly banter only. Abuse gets removed.</p>'+compose+'<div class="tt-list">'+list+'</div>';
+    const f=$("ttForm");
+    if(f){
+      const ta=$("ttText");
+      ta.addEventListener("input",()=>{$("ttCount").textContent=ta.value.length+" / 200";});
+      f.addEventListener("submit",async e=>{
+        e.preventDefault();const body=ta.value.trim();if(!body)return;
+        $("ttPost").disabled=true;
+        const r=await client.rpc("post_trash_talk",{p_a:a,p_b:b,p_body:body});
+        if(r.error){status("ttMsg",r.error.message,"error");$("ttPost").disabled=false;return;}
+        renderTrash(a,b);
+      });
+    }
+    box.querySelectorAll("[data-tt]").forEach(btn=>btn.addEventListener("click",async()=>{
+      if(!confirm("Remove this post?"))return;
+      const r=await client.rpc("hide_trash_talk",{p_id:btn.dataset.tt});
+      if(r.error){toast(r.error.message);return;}
+      renderTrash(a,b);
+    }));
+  }
+
+  // ================= BPC Weekly newsletter =================
+  var weeklyStart=null;
+  function mondayOf(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());const k=(x.getDay()+6)%7;x.setDate(x.getDate()-k);return x;}
+  function fmtRange(a,b){
+    const o={day:"numeric",month:"short"};
+    return a.toLocaleDateString(undefined,o)+" – "+b.toLocaleDateString(undefined,{...o,year:"numeric"});
+  }
+  async function fetchWeek(start){
+    const end=addDays(start,6);
+    const r=await client.rpc("get_week_matches",{p_start:ymd(start),p_end:ymd(end)});
+    return r.error?null:(r.data||[]).map(m=>({...m,a_goals:Number(m.a_goals),b_goals:Number(m.b_goals)}));
+  }
+  async function loadWeekly(){
+    const box=$("weeklyPage");if(!client||!box)return;
+    box.innerHTML='<div class="h2h-empty"><span>Loading this week…</span></div>';
+    await ensureAvatars();
+    let rows=null;
+    if(!weeklyStart){
+      // open on the latest week that has results (looking back up to 8 weeks)
+      let s=mondayOf(new Date());
+      for(let i=0;i<8;i++){rows=await fetchWeek(s);if(rows&&rows.length){break;}if(i<7)s=addDays(s,-7);}
+      weeklyStart=s;
+    }else rows=await fetchWeek(weeklyStart);
+    renderWeekly(rows||[]);
+  }
+  async function renderWeekly(rows){
+    const box=$("weeklyPage"),start=weeklyStart,end=addDays(start,6);
+    const thisWeek=ymd(start)===ymd(mondayOf(new Date()));
+    // per-player perspectives (registered players only)
+    const P={};
+    const add=(id,name,gf,ga)=>{if(!id)return;const o=P[id]=P[id]||{id,name,n:0,w:0,d:0,l:0,gf:0,ga:0,cs:0,pts:0};o.n++;o.gf+=gf;o.ga+=ga;if(ga===0)o.cs++;if(gf>ga){o.w++;o.pts+=3;}else if(gf===ga){o.d++;o.pts+=1;}else o.l++;};
+    rows.forEach(m=>{add(m.a_id,m.a_name,m.a_goals,m.b_goals);add(m.b_id,m.b_name,m.b_goals,m.a_goals);});
+    const pl=Object.values(P);
+    const goals=rows.reduce((s,m)=>s+m.a_goals+m.b_goals,0);
+    const best=(arr,fn)=>arr.length?[...arr].sort(fn)[0]:null;
+    const potw=best(pl.filter(p=>p.n>=2),(x,y)=>y.pts-x.pts||(y.gf-y.ga)-(x.gf-x.ga)||y.gf-x.gf||x.name.localeCompare(y.name));
+    const scorer=best(pl.filter(p=>p.gf>0),(x,y)=>y.gf-x.gf||x.n-y.n||x.name.localeCompare(y.name));
+    const wall=best(pl.filter(p=>p.cs>0),(x,y)=>y.cs-x.cs||x.n-y.n||x.name.localeCompare(y.name));
+    const busy=best(pl,(x,y)=>y.n-x.n||y.pts-x.pts||x.name.localeCompare(y.name));
+    const bigWin=best(rows.filter(m=>m.a_goals!==m.b_goals),(x,y)=>Math.abs(y.a_goals-y.b_goals)-Math.abs(x.a_goals-x.b_goals)||(y.a_goals+y.b_goals)-(x.a_goals+x.b_goals));
+    const thriller=best(rows,(x,y)=>(y.a_goals+y.b_goals)-(x.a_goals+x.b_goals)||Math.abs(x.a_goals-x.b_goals)-Math.abs(y.a_goals-y.b_goals));
+    // rivalry of the week: registered pair that met most often
+    const pairs={};
+    rows.forEach(m=>{if(!m.a_id||!m.b_id)return;const k=[m.a_id,m.b_id].sort().join("|");const o=pairs[k]=pairs[k]||{a:m.a_id,an:m.a_name,b:m.b_id,bn:m.b_name,n:0,aw:0,bw:0,d:0};o.n++;
+      const ag=m.a_id===o.a?m.a_goals:m.b_goals,bg=m.a_id===o.a?m.b_goals:m.a_goals;if(ag>bg)o.aw++;else if(ag<bg)o.bw++;else o.d++;});
+    const rival=best(Object.values(pairs).filter(p=>p.n>=2),(x,y)=>y.n-x.n||x.an.localeCompare(y.an));
+    // standings at the end of the week, with movement vs the week before
+    const cutoff=end>new Date()?new Date():end;
+    const monthStr=ymd(cutoff).slice(0,7);
+    const prevCut=addDays(cutoff,-7);
+    const [nowR,prevR]=await Promise.all([
+      client.rpc("get_leaderboard_asof",{p_month:monthStr+"-01",p_cutoff:ymd(cutoff)}),
+      ymd(prevCut).slice(0,7)===monthStr?client.rpc("get_leaderboard_asof",{p_month:monthStr+"-01",p_cutoff:ymd(prevCut)}):Promise.resolve({data:null})
+    ]);
+    const table=(nowR.data||[]).filter(r=>Number(r.matches_played)>0).slice(0,5);
+    const mv=rankMoves(nowR.data,prevR.data);
+    const nm=(id,n)=>avBig(n,id,"wk-av");
+    const award=(label,p,val,unit)=>p?'<div class="wk-award link-player" data-player="'+esc(p.id)+'">'+nm(p.id,p.name)+'<div><small>'+label+'</small><b>'+esc(p.name)+'</b><span>'+val+' '+unit+'</span></div></div>':'';
+    const matchCard=(label,m)=>m?'<div class="wk-match"><small>'+label+'</small><div class="wk-score"><span class="'+(m.a_goals>m.b_goals?'win':'')+'">'+esc(m.a_name)+'</span><b>'+m.a_goals+' – '+m.b_goals+'</b><span class="'+(m.b_goals>m.a_goals?'win':'')+'">'+esc(m.b_name)+'</span></div><em>'+prettyDate(m.match_date)+'</em></div>':'';
+    const headline=!rows.length?"A quiet week on the pitch":
+      (potw?esc(potw.name)+" had the week: "+potw.w+" win"+(potw.w===1?"":"s")+" from "+potw.n+" played.":rows.length+" matches played this week.");
+    const awards=[award("Player of the week",potw,potw?potw.pts:0,"pts"),award("Top scorer",scorer,scorer?scorer.gf:0,"goals"),award("Clean sheet king",wall,wall?wall.cs:0,"clean sheets"),award("Busiest player",busy,busy?busy.n:0,"matches")].join("");
+    box.innerHTML=
+      '<div class="wk-mast"><div><h2>BPC Weekly</h2><p>'+fmtRange(start,end)+'</p></div><div class="wk-nav"><button type="button" id="wkPrev" aria-label="Previous week">←</button><button type="button" id="wkNext" aria-label="Next week"'+(thisWeek?' disabled':'')+'>→</button></div></div>'+
+      '<p class="wk-headline">'+headline+'</p>'+
+      (rows.length?
+      '<div class="wk-nums"><div><b>'+rows.length+'</b><span>Matches</span></div><div><b>'+goals+'</b><span>Goals</span></div><div><b>'+(goals/rows.length).toFixed(1)+'</b><span>Goals per match</span></div><div><b>'+pl.length+'</b><span>Players in action</span></div></div>'+
+      '<div class="wk-grid">'+
+        '<section class="pf-card"><h3>Awards of the week</h3><div class="wk-awards">'+awards+'</div></section>'+
+        '<section class="pf-card"><h3>Table after the week <small>'+new Date(monthStr+"-01T12:00:00").toLocaleDateString(undefined,{month:"long"})+'</small></h3>'+
+          '<ol class="wk-table">'+table.map(r=>'<li class="link-player" data-player="'+esc(r.player_id)+'"><span class="n">'+r.rank+'</span>'+nm(r.player_id,r.player_name)+'<span class="nm">'+esc(r.player_name)+'</span>'+moveHtml(mv[r.player_id])+'<b>'+r.points+'</b></li>').join("")+'</ol>'+
+          '<p class="pf-note">Arrows compare with a week earlier.</p></section>'+
+      '</div>'+
+      '<section class="pf-card pf-wide"><h3>Match of the week</h3><div class="wk-matches">'+matchCard("Biggest win",bigWin)+matchCard("Highest scoring",thriller)+'</div>'+
+        (rival?'<div class="wk-rival link-player" data-player="'+esc(rival.a)+'"><small>Rivalry of the week</small><b>'+esc(rival.an)+' vs '+esc(rival.bn)+'</b><span>'+rival.n+' meetings · '+rival.aw+'W '+rival.d+'D '+rival.bw+'L for '+esc(rival.an)+'</span></div>':'')+'</section>'
+      :'<div class="h2h-empty"><b>No counted matches this week.</b><span>Use the arrows to browse other weeks.</span></div>');
+    $("wkPrev").addEventListener("click",async()=>{weeklyStart=addDays(weeklyStart,-7);box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';renderWeekly(await fetchWeek(weeklyStart)||[]);});
+    const nx=$("wkNext");if(nx)nx.addEventListener("click",async()=>{weeklyStart=addDays(weeklyStart,7);box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';renderWeekly(await fetchWeek(weeklyStart)||[]);});
+  }
 
   // ================= Public player profile =================
   var pfScope={mode:"all",month:monthNow},pfCache={};
@@ -1705,7 +1853,7 @@ $("playersBody").innerHTML = shown.map(p =>
       const g=top("goals_for"),c=top("clean_sheets");
       if(!g&&!c){box.classList.add("hidden");return;}
       const one=(x,k,label,unit)=>x?'<button type="button" class="hl-card" data-player="'+esc(x.player_id)+'">'+avBig(x.player_name,x.player_id,"hl-av")+'<span class="hl-txt"><small>'+label+'</small><b>'+esc(x.player_name)+'</b><em>'+x[k]+' '+unit+'</em></span></button>':'';
-      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; BPC Stars</button></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
+      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><span class="hl-links"><button type="button" class="hl-link" data-view="weekly">BPC Weekly</button><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; BPC Stars</button></span></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
