@@ -1748,6 +1748,31 @@ $("playersBody").innerHTML = shown.map(p =>
     const p=storyHero(art);
     return '<div class="st-pair">'+avBig(p.name,p.id,"st-av st-av-lg")+'</div>';
   }
+  function storyChips(art,l){
+    const f=art.facts,p=storyHero(art),bn=l==="bn",o=[];
+    const k=art.kind;
+    if(k==="thrashing"&&f.margin)o.push((bn?"ব্যবধান ":"Margin ")+numL(f.margin,l));
+    else if(k==="thriller"&&f.total)o.push((bn?"মোট গোল ":"Goals ")+numL(f.total,l));
+    else if((k==="streak_end"||k==="nemesis")&&f.n)o.push((bn?"ধারা ":"Streak ")+numL(f.n,l));
+    else if(k==="upset"&&f.n)o.push((bn?"র‍্যাংকের ব্যবধান ":"Rank gap ")+numL(Math.abs((f.a.rank||0)-(f.b.rank||0)),l));
+    if(p&&p.mp)o.push((bn?"ম্যাচ ":"MP ")+numL(p.mp,l));
+    if(f.h2h&&f.h2h.played)o.push((bn?"মুখোমুখি ":"H2H ")+numL(f.h2h.played,l));
+    return o.slice(0,3);
+  }
+  function storyHeadline(h,name){
+    const e=esc(h);if(!name)return e;const n=esc(name);
+    return e.split(n).join('<mark>'+n+'</mark>');
+  }
+  // Photo card: blurred picture behind, sharp portrait, headline over the image.
+  function storyPhoto(art,t,hero){
+    const p=storyHero(art),u=avUrl({id:p.id,name:p.name}),l=artLang;
+    const chips=storyChips(art,l).map(c=>'<span>'+esc(c)+'</span>').join("");
+    const rank=p.rank?'<span class="st-rank">'+(l==="bn"?"র‍্যাংক ":"Rank ")+numL(p.rank,l)+'</span>':"";
+    return '<div class="st-ph-bg"'+(u?' style="background-image:url(\''+esc(u)+'\')"':'')+'></div><div class="st-ph-shade"></div>'+
+      (u?'<img class="st-ph-pic" alt="" src="'+esc(u)+'">':'<span class="st-ph-ini">'+esc(initials(p.name))+'</span>')+
+      '<span class="st-tag">'+esc(t.tag)+'</span>'+rank+
+      '<div class="st-ph-cap"><h3>'+storyHeadline(t.headline,p.name)+'</h3><div class="st-chips">'+chips+'</div></div>';
+  }
   function storyLangBar(){return '<span class="st-lang" role="group" aria-label="Language"><button type="button" data-artlang="en" class="'+(artLang==="en"?"on":"")+'">EN</button><button type="button" data-artlang="bn" class="'+(artLang==="bn"?"on":"")+'">বাংলা</button></span>';}
   function storyDate(art){return new Date(art.match_date+"T12:00:00").toLocaleDateString(artLang==="bn"?"bn-BD":"en-GB",{day:"numeric",month:"short",year:"numeric"});}
   async function loadHomeStories(){
@@ -1760,9 +1785,9 @@ $("playersBody").innerHTML = shown.map(p =>
   function renderHomeStories(){
     const box=$("homeStories");if(!box)return;
     if(!storyHome.length){box.classList.add("hidden");return;}
-    box.innerHTML='<div class="hl-head"><h2>'+(artLang==="bn"?"সাম্প্রতিক গল্প":"Latest stories")+'</h2>'+storyLangBar()+'</div><div class="st-grid">'+storyHome.map(a=>{
+    box.innerHTML='<div class="hl-head"><h2>'+(artLang==="bn"?"সাম্প্রতিক গল্প":"Latest stories")+'</h2>'+storyLangBar()+'</div><div class="st-row">'+storyHome.map(a=>{
       const t=articleText(a,artLang);
-      return '<button type="button" class="st-card" data-story="'+esc(a.id)+'"><div class="st-art">'+storyArt(a)+'<span class="st-tag">'+esc(t.tag)+'</span></div><div class="st-body"><b>'+esc(t.headline)+'</b><small>'+esc(storyDate(a))+'</small></div></button>';
+      return '<button type="button" class="st-ph st-card" data-story="'+esc(a.id)+'">'+storyPhoto(a,t)+'<small class="st-ph-date">'+esc(storyDate(a))+'</small></button>';
     }).join("")+'</div>';
     box.classList.remove("hidden");
   }
@@ -1780,7 +1805,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const list=state.storyList||[],bn=artLang==="bn";
     const feed=list.length?list.map(a=>{
       const t=articleText(a,artLang);
-      return '<article class="st-full" id="art-'+esc(a.id)+'"><div class="st-hero">'+storyArt(a)+'<span class="st-tag">'+esc(t.tag)+'</span></div><div class="st-text"><h4>'+esc(t.headline)+'</h4>'+(t.standfirst?'<p class="st-stand">'+esc(t.standfirst)+'</p>':'')+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+'<footer>'+(bn?"ম্যাচের তথ্য থেকে স্বয়ংক্রিয়ভাবে লেখা":"Auto-written from match data")+' · '+esc(storyDate(a))+'</footer></div></article>';
+      return '<article class="st-full" id="art-'+esc(a.id)+'"><div class="st-ph st-ph-hero">'+storyPhoto(a,t)+'</div><div class="st-text">'+(t.standfirst?'<p class="st-stand">'+esc(t.standfirst)+'</p>':'')+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+'<footer>'+(bn?"ম্যাচের তথ্য থেকে স্বয়ংক্রিয়ভাবে লেখা":"Auto-written from match data")+' · '+esc(storyDate(a))+'</footer></div></article>';
     }).join(""):'<div class="h2h-empty"><b>'+(bn?"এখনও কোনো গল্প নেই।":"No stories yet.")+'</b><span>'+(bn?"বড় ফলাফলের গল্প এখানে প্রকাশিত হবে।":"Big results get written up here.")+'</span></div>';
     const more=list.length>=storiesLimit&&storiesLimit<50?'<div class="st-more"><button type="button" class="secondary" id="storiesMore">'+(bn?"পুরোনো গল্প দেখুন":"Load older stories")+'</button></div>':'';
     box.innerHTML='<div class="wk-mast"><div><h2>'+(bn?"গল্প":"Stories")+'</h2><p>'+(bn?"ক্লাবের সেরা মুহূর্তগুলোর ম্যাচ রিপোর্ট।":"Match reports from the club's biggest moments.")+'</p></div>'+storyLangBar()+'</div><div class="wk-stories st-feed">'+feed+'</div>'+more;
