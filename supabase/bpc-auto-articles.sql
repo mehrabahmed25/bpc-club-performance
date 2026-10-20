@@ -1,0 +1,9 @@
+-- Auto-written stories (EN + BN rendered client-side from stored facts). Applied as migrations
+-- "auto_articles" and "articles_daily_cron". Objects:
+--   public.articles (RLS on, no direct access): kind, match_id (unique), facts jsonb, edited jsonb, status draft|published|hidden|rejected
+--   generate_articles(p_days)  - files DRAFT stories (max 3 per week). Thresholds: win margin >= 4, total goals >= 8,
+--                                upset (bottom-half beats top-3, both 5+ matches), nemesis broken (4+ meetings, no win),
+--                                winning run of 5+ ended, 50th/100th match milestone
+--   get_articles(p_week, p_limit)             - public, published only, hides stories with removed players
+--   admin_list_articles / admin_set_article_status / admin_edit_article - admin review
+--   pg_cron job 'bpc-generate-articles' runs generate_articles(14) daily at 17:30 UTC (23:30 Dhaka)

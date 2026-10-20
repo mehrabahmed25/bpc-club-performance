@@ -80,7 +80,7 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeLegends();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeLegends();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -802,6 +802,7 @@ async function loadHistory(){
     $("adminDenied").classList.toggle("hidden",state.isAdmin);
     $("adminContent").classList.toggle("hidden",!state.isAdmin);
     if(!state.isAdmin)return;
+    loadArticleAdmin();
     await loadPosterAdmin();
     await loadFundsAccessAdmin();
     status("adminStatus","Loading pending submissions…");
@@ -1702,6 +1703,7 @@ $("playersBody").innerHTML = shown.map(p =>
     box.innerHTML=
       '<div class="wk-mast"><div><h2>BPC Weekly</h2><p>'+fmtRange(start,end)+'</p></div><div class="wk-nav"><button type="button" id="wkPrev" aria-label="Previous week">←</button><button type="button" id="wkNext" aria-label="Next week"'+(thisWeek?' disabled':'')+'>→</button></div></div>'+
       '<p class="wk-headline">'+headline+'</p>'+
+      '<section id="wkStories" class="wk-stories"></section>'+
       (rows.length?
       '<div class="wk-nums"><div><b>'+rows.length+'</b><span>Matches</span></div><div><b>'+goals+'</b><span>Goals</span></div><div><b>'+(goals/rows.length).toFixed(1)+'</b><span>Goals per match</span></div><div><b>'+pl.length+'</b><span>Players in action</span></div></div>'+
       '<div class="wk-grid">'+
@@ -1713,9 +1715,227 @@ $("playersBody").innerHTML = shown.map(p =>
       '<section class="pf-card pf-wide"><h3>Match of the week</h3><div class="wk-matches">'+matchCard("Biggest win",bigWin)+matchCard("Highest scoring",thriller)+'</div>'+
         (rival?'<div class="wk-rival link-player" data-player="'+esc(rival.a)+'"><small>Rivalry of the week</small><b>'+esc(rival.an)+' vs '+esc(rival.bn)+'</b><span>'+rival.n+' meetings · '+rival.aw+'W '+rival.d+'D '+rival.bw+'L for '+esc(rival.an)+'</span></div>':'')+'</section>'
       :'<div class="h2h-empty"><b>No counted matches this week.</b><span>Use the arrows to browse other weeks.</span></div>');
+    loadWeekStories();
     $("wkPrev").addEventListener("click",async()=>{weeklyStart=addDays(weeklyStart,-7);box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';renderWeekly(await fetchWeek(weeklyStart)||[]);});
     const nx=$("wkNext");if(nx)nx.addEventListener("click",async()=>{weeklyStart=addDays(weeklyStart,7);box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';renderWeekly(await fetchWeek(weeklyStart)||[]);});
   }
+
+
+  // ================= Auto-written stories (EN + BN templates) =================
+  var artLang=(function(){try{return localStorage.getItem("bpc_lang")==="bn"?"bn":"en";}catch(e){return "en";}})();
+  var storyHome=[],adminArticles=[],adminArtTab="draft";
+  const BN_ORD={1:"১ম",2:"২য়",3:"৩য়",4:"৪র্থ",5:"৫ম",6:"৬ষ্ঠ",7:"৭ম",8:"৮ম",9:"৯ম",10:"১০ম"};
+  const ordEn=n=>{const v=n%100;if(v>=11&&v<=13)return n+"th";return n+({1:"st",2:"nd",3:"rd"}[n%10]||"th");};
+  const ordL=(n,l)=>l==="bn"?(BN_ORD[n]||(Number(n).toLocaleString("bn-BD")+"তম")):ordEn(n);
+  const numL=(n,l)=>l==="bn"?Number(n).toLocaleString("bn-BD"):String(n);
+  const hashSeed=s=>{let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))|0;return Math.abs(h);};
+  const STORY_TAGS={en:{thrashing:"Big win",thriller:"Goal fest",upset:"Upset",nemesis:"Hoodoo broken",streak_end:"Run ended",milestone:"Milestone"},
+                    bn:{thrashing:"বড় জয়",thriller:"গোলের উৎসব",upset:"চমক",nemesis:"অভিশাপ কাটল",streak_end:"ধারা থামল",milestone:"মাইলফলক"}};
+  function articleText(art,l){
+    const f=art.facts||{},h=f.h2h||{},seed=hashSeed(art.id);
+    const pick=(arr,k)=>arr[(seed+(k||0))%arr.length];
+    const n=x=>numL(x,l),bn=l==="bn";
+    const A=f.a.name,B=f.b.name;
+    const win=f.winner==="a"?f.a:f.winner==="b"?f.b:null,los=f.winner==="a"?f.b:f.winner==="b"?f.a:null;
+    const W=win?win.name:A,L=los?los.name:B;
+    const wg=win?win.goals:f.a.goals,lg=los?los.goals:f.b.goals;
+    const dt=new Date(f.date+"T12:00:00").toLocaleDateString(bn?"bn-BD":"en-GB",{day:"numeric",month:"long"});
+    const sc=n(wg)+"–"+n(lg),margin=f.margin,total=f.total;
+    const avg=f.avg_total!=null?Number(f.avg_total).toLocaleString(bn?"bn-BD":"en",{minimumFractionDigits:1,maximumFractionDigits:1}):null;
+    // head-to-head sentence, from the point of view of (x, y)
+    const h2hLine=(x,y,xw,yw)=>{
+      const pl=Number(h.played||0);
+      if(!f.b.id)return "";
+      if(!pl)return bn?"এটি ছিল তাদের প্রথম গণনাকৃত মুখোমুখি।":"It was their first counted meeting.";
+      const dr=Number(h.draws||0);
+      return bn?"আগের "+n(pl)+"টি গণনাকৃত ম্যাচে "+x+" জিতেছে "+n(xw)+"টি, "+y+" "+n(yw)+"টি"+(dr?", আর ড্র "+n(dr)+"টি।":"।")
+               :"In their "+pl+" earlier counted meeting"+(pl===1?"":"s")+", "+x+" has won "+xw+" and "+y+" "+yw+(dr?", with "+dr+" drawn.":".");
+    };
+    const winnerSideWins=win?(f.winner==="a"?h.a_wins:h.b_wins):h.a_wins,loserSideWins=win?(f.winner==="a"?h.b_wins:h.a_wins):h.b_wins;
+    const rankLine=()=>{
+      if(win&&los&&win.rank&&los.rank&&Number(win.mp)>0&&Number(los.mp)>0)
+        return bn?"ম্যাচের আগে টেবিলে "+W+" ছিল "+ordL(win.rank,l)+" স্থানে, আর "+L+" ছিল "+ordL(los.rank,l)+" স্থানে।"
+                 :"Before the match, "+W+" sat "+ordL(win.rank,l)+" in the table and "+L+" "+ordL(los.rank,l)+".";
+      return "";
+    };
+    const subj=f.subject||null,S=subj?subj.name:"";
+    const sIsA=subj&&subj.id===f.a.id;
+    const sg=subj?(sIsA?f.a.goals:f.b.goals):0,og=subj?(sIsA?f.b.goals:f.a.goals):0,O=subj?(sIsA?B:A):"";
+    let H,ST,P=[];
+    switch(art.kind){
+      case "thrashing":
+        H=bn?pick([L+"-কে "+sc+" গোলে উড়িয়ে দিল "+W,W+"-এর গোলবন্যা: "+L+" "+n(margin)+" গোলে পিছিয়ে",L+"-কে "+n(margin)+" গোলের শিক্ষা দিল "+W]):pick([W+" routs "+L+" "+sc,sc+": "+W+" runs riot against "+L,W+" hands "+L+" a "+margin+"-goal lesson"]);
+        ST=bn?dt+"-এর ম্যাচে "+n(margin)+" গোলের ব্যবধান: বন্ধুত্বপূর্ণ ম্যাচ হয়ে উঠল দাপুটে জয়ের গল্প।":"A "+margin+"-goal gap on "+dt+" turned a friendly into a statement.";
+        P=[bn?dt+" তারিখে "+W+" কোনো সন্দেহ রাখেনি। "+L+"-কে "+sc+" ব্যবধানে হারিয়েছে তারা। BPC-র বন্ধুত্বপূর্ণ ম্যাচে "+n(margin)+" গোলের ব্যবধান তুলনামূলক বিরল।"
+              :W+" left no doubt on "+dt+", beating "+L+" "+sc+". A margin of "+margin+" goals is uncommon in BPC friendlies and this one was never in question.",
+           h2hLine(W,L,winnerSideWins,loserSideWins),rankLine(),
+           bn?pick([L+" নিশ্চয়ই প্রতিশোধ চাইবে, আর "+W+" প্রস্তুত থাকবে।","খুব শিগগিরই "+L+"-এর পক্ষ থেকে রিভেঞ্জ ম্যাচের দাবি আসতে পারে।"],1)
+             :pick(["Expect "+L+" to ask for a rematch. "+W+" will be ready.","Do not be surprised if "+L+" asks for a return fixture very soon."],1)];
+        break;
+      case "thriller":
+        H=win?(bn?pick([n(total)+" গোলের থ্রিলারে জিতল "+W,W+" "+sc+" "+L+": গোলের উৎসব"]):pick([total+" goals! "+W+" edges a thriller with "+L,W+" "+sc+" "+L+": a goal feast"]))
+             :(bn?n(total)+" গোল, তবু বিজয়ী নেই: "+A+" আর "+B+"-র ড্র":total+" goals and no winner: "+A+" and "+B+" share the spoils");
+        ST=avg?(bn?"এক ম্যাচে "+n(total)+" গোল, যেখানে ক্লাবের গড় ম্যাচপ্রতি "+avg+"।":total+" goals in one match, against a club average of "+avg+" per game."):(bn?dt+"-এর ম্যাচে গোলের ছড়াছড়ি।":"A match full of goals on "+dt+".");
+        P=[win?(bn?dt+" তারিখে "+W+" "+L+"-কে "+sc+" গোলে হারিয়েছে, ম্যাচজুড়ে গোলের ছড়াছড়ি ছিল। মোট গোল "+n(total)+"টি।":W+" beat "+L+" "+sc+" on "+dt+" in a match where the goals never stopped. "+total+" goals were scored in total.")
+              :(bn?dt+" তারিখে "+A+" ও "+B+" "+n(f.a.goals)+"–"+n(f.b.goals)+" গোলে ড্র করেছে; ম্যাচজুড়ে গোলের ছড়াছড়ি ছিল।":A+" and "+B+" drew "+f.a.goals+"–"+f.b.goals+" on "+dt+" in a match where the goals never stopped."),
+           avg?(bn?"ক্লাবের গড় ম্যাচপ্রতি "+avg+" গোল, তাই এই ম্যাচ স্বাভাবিকের চেয়ে অনেক বেশি গোলের ছিল।":"The club average is "+avg+" goals per match, so this one ran well above the usual pace."):"",
+           h2hLine(W,L,winnerSideWins,loserSideWins),
+           bn?"পরের দেখায় ডিফেন্ডারদের একটু বাড়তি মনোযোগ দিতে হবে।":"Defences will want a word with themselves before the next meeting."];
+        break;
+      case "upset":
+        H=bn?pick(["চমক! "+L+"-কে হারিয়ে দিল "+W,"শীর্ষ তিনের "+L+"-কে হারাল "+W,"অঘটন: "+W+"-র কাছে হার "+L+"-এর"]):pick(["Upset! "+W+" stuns "+L,W+" topples top-three "+L,"Shock result: "+W+" beats "+L]);
+        ST=bn?"টেবিলে "+n(f.np)+" জনের মধ্যে "+ordL(win.rank,l)+" স্থানে থেকেও "+ordL(los.rank,l)+" স্থানের "+L+"-কে হারাল "+W+"।":ordL(win.rank,l)+" of "+f.np+" in the table, "+W+" took down "+ordL(los.rank,l)+"-placed "+L+".";
+        P=[bn?dt+" তারিখে "+W+" মাসের অন্যতম চমকপ্রদ ফল করেছে, "+L+"-কে "+sc+" গোলে হারিয়ে। ম্যাচের আগে টেবিলে "+W+" ছিল "+ordL(win.rank,l)+" আর "+L+" "+ordL(los.rank,l)+"।"
+              :W+" pulled off one of the results of the month on "+dt+", beating "+L+" "+sc+". Before the match "+W+" was "+ordL(win.rank,l)+" in the table and "+L+" was "+ordL(los.rank,l)+".",
+           h2hLine(W,L,winnerSideWins,loserSideWins),
+           bn?"এমন ফলই টেবিলকে জীবন্ত রাখে: র‍্যাংকিং যা-ই হোক, কেউ নিরাপদ নয়।":"Results like this keep the table honest: nobody is safe, whatever their ranking."];
+        break;
+      case "nemesis":
+        H=bn?pick(["অবশেষে "+L+"-কে হারাল "+W,"অভিশাপ কাটল: "+L+"-র বিপক্ষে প্রথম জয় "+W+"-র",L+"-র বিপক্ষে অপেক্ষার অবসান "+W+"-র"]):pick([W+" finally beats "+L,"Hoodoo broken: "+W+" beats "+L+" at last",W+" ends the wait against "+L]);
+        ST=bn?n(f.n)+"টি ম্যাচ জয়হীন থাকার পর "+dt+" তারিখে জয়ের দেখা পেল "+W+"।":"After "+f.n+" meetings without a win, "+W+" got there on "+dt+".";
+        P=[bn?dt+" তারিখে "+W+" "+L+"-কে "+sc+" গোলে হারিয়েছে। আগের "+n(f.n)+"টি মুখোমুখিতে জয় ছিল না তাদের।":W+" beat "+L+" "+sc+" on "+dt+", their first win in the fixture after "+f.n+" previous meetings without one.",
+           bn?"এতদিন ম্যাচআপে "+L+"-এরই নিয়ন্ত্রণ ছিল; এখন তারা আগের অবস্থা ফেরাতে চাইবে।":L+" had been in control of this matchup and will want the old order back.",
+           bn?"প্রতিটি প্রতিদ্বন্দ্বিতার একটি মোড় দরকার। এটি হয়তো সেই মোড়।":"Every rivalry needs a turning point. This might be it."];
+        break;
+      case "streak_end": {
+        const lost=sg<og;
+        H=lost?(bn?pick([S+"-এর "+n(f.n)+" ম্যাচের জয়ের ধারা থামাল "+O,"ধারা শেষ: টানা "+n(f.n)+" জয়ের পর থামল "+S]):pick([O+" ends "+S+"'s "+f.n+"-match winning run","The run is over: "+S+" stopped after "+f.n+" wins"]))
+            :(bn?S+"-কে রুখে দিয়ে "+n(f.n)+" ম্যাচের জয়ের ধারা থামাল "+O:O+" holds "+S+" and ends a "+f.n+"-match winning run");
+        ST=bn?dt+"-এর আগে টানা "+n(f.n)+"টি ম্যাচ জিতেছিল "+S+"।":S+" had won "+f.n+" in a row before "+dt+".";
+        P=[lost?(bn?"টানা "+n(f.n)+"টি ম্যাচ জেতার পর "+dt+" তারিখে "+O+"-এর কাছে "+n(og)+"–"+n(sg)+" গোলে হারল "+S+"। ধারা শেষ।":S+" had won "+f.n+" matches in a row, but on "+dt+" "+O+" won "+og+"–"+sg+". The run is over.")
+                :(bn?"টানা "+n(f.n)+"টি ম্যাচ জেতার পর "+dt+" তারিখে "+O+"-র সাথে "+n(sg)+"–"+n(og)+" গোলে ড্র করল "+S+"।":S+" had won "+f.n+" matches in a row, but on "+dt+" drew "+sg+"–"+og+" with "+O+"."),
+           h2hLine(S,O,sIsA?h.a_wins:h.b_wins,sIsA?h.b_wins:h.a_wins),
+           bn?"এমন ধারা সহজে আসে না; এখন নতুন করে শুরু করতে হবে "+S+"-কে।":"Runs like that do not come easily, and now "+S+" has to start another."];
+        break;}
+      case "milestone": {
+        const res=sg>og?(bn?O+"-কে "+n(sg)+"–"+n(og)+" গোলে হারিয়ে":"beating "+O+" "+sg+"–"+og):sg===og?(bn?O+"-র সাথে "+n(sg)+"–"+n(og)+" গোলে ড্র করে":"drawing "+sg+"–"+og+" with "+O):(bn?O+"-র কাছে "+n(sg)+"–"+n(og)+" গোলে হেরে":"losing "+sg+"–"+og+" to "+O);
+        H=bn?pick([n(f.n)+"তম ম্যাচে "+S,S+"-এর মাইলফলক: "+n(f.n)+"টি গণনাকৃত ম্যাচ"]):pick([S+" reaches "+f.n+" counted matches","Milestone for "+S+": match number "+f.n]);
+        ST=bn?n(f.n)+"টি গণনাকৃত BPC ম্যাচ, আর এখনও চলছে।":f.n+" counted BPC matches and still going.";
+        P=[bn?dt+" তারিখে "+S+" BPC লিগে "+n(f.n)+"তম ম্যাচ খেলেছে — "+res+"।":"On "+dt+", "+S+" played match number "+f.n+" in the BPC league, "+res+".",
+           bn?"এমন নিয়মিত অংশগ্রহণই ক্লাবের টেবিলকে সচল রাখে।":"That kind of regular showing is what keeps the club table moving."];
+        break;}
+      default: H=A+" "+f.a.goals+"–"+f.b.goals+" "+B;ST="";P=[];
+    }
+    const out={headline:H,standfirst:ST,paras:P.filter(Boolean),tag:(STORY_TAGS[l]||STORY_TAGS.en)[art.kind]||""};
+    const ed=art.edited&&art.edited[l];
+    if(ed){if(ed.headline)out.headline=ed.headline;if(ed.standfirst!=null)out.standfirst=ed.standfirst;if(Array.isArray(ed.body)&&ed.body.length)out.paras=ed.body;}
+    return out;
+  }
+  function storyArt(art){
+    const f=art.facts,k=art.kind;
+    const one=(p,cls)=>avBig(p.name,p.id,cls||"st-av");
+    if(k==="milestone"&&f.subject)return '<div class="st-pair">'+avBig(f.subject.name,f.subject.id,"st-av st-av-lg")+'<span class="st-score">#'+f.n+'</span></div>';
+    return '<div class="st-pair">'+one(f.a)+'<span class="st-score">'+f.a.goals+' – '+f.b.goals+'</span>'+one(f.b)+'</div>';
+  }
+  function storyLangBar(){return '<span class="st-lang" role="group" aria-label="Language"><button type="button" data-artlang="en" class="'+(artLang==="en"?"on":"")+'">EN</button><button type="button" data-artlang="bn" class="'+(artLang==="bn"?"on":"")+'">বাংলা</button></span>';}
+  function storyDate(art){return new Date(art.match_date+"T12:00:00").toLocaleDateString(artLang==="bn"?"bn-BD":"en-GB",{day:"numeric",month:"short",year:"numeric"});}
+  async function loadHomeStories(){
+    const box=$("homeStories");if(!box||!client)return;
+    try{
+      const [r]=await Promise.all([client.rpc("get_articles",{p_week:null,p_limit:3}),ensureAvatars()]);
+      storyHome=r.data||[];renderHomeStories();
+    }catch(e){console.warn(e);}
+  }
+  function renderHomeStories(){
+    const box=$("homeStories");if(!box)return;
+    if(!storyHome.length){box.classList.add("hidden");return;}
+    box.innerHTML='<div class="hl-head"><h2>'+(artLang==="bn"?"সাম্প্রতিক গল্প":"Latest stories")+'</h2>'+storyLangBar()+'</div><div class="st-grid">'+storyHome.map(a=>{
+      const t=articleText(a,artLang);
+      return '<button type="button" class="st-card" data-story="'+esc(a.id)+'"><div class="st-art">'+storyArt(a)+'<span class="st-tag">'+esc(t.tag)+'</span></div><div class="st-body"><b>'+esc(t.headline)+'</b><small>'+esc(storyDate(a))+'</small></div></button>';
+    }).join("")+'</div>';
+    box.classList.remove("hidden");
+  }
+  function renderStories(list,box){
+    if(!list.length){box.innerHTML="";return;}
+    box.innerHTML='<div class="st-sec-head"><h3>'+(artLang==="bn"?"এই সপ্তাহের গল্প":"Stories of the week")+'</h3>'+storyLangBar()+'</div>'+list.map(a=>{
+      const t=articleText(a,artLang);
+      return '<article class="st-full" id="art-'+esc(a.id)+'"><div class="st-hero">'+storyArt(a)+'<span class="st-tag">'+esc(t.tag)+'</span></div><div class="st-text"><h4>'+esc(t.headline)+'</h4>'+(t.standfirst?'<p class="st-stand">'+esc(t.standfirst)+'</p>':'')+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+'<footer>'+(artLang==="bn"?"ম্যাচের তথ্য থেকে স্বয়ংক্রিয়ভাবে লেখা":"Auto-written from match data")+' · '+esc(storyDate(a))+'</footer></div></article>';
+    }).join("");
+  }
+  async function loadWeekStories(){
+    const box=$("wkStories");if(!box)return;
+    const r=await client.rpc("get_articles",{p_week:ymd(weeklyStart),p_limit:10});
+    state.weekStories=r.data||[];renderStories(state.weekStories,box);
+    if(state.scrollArticle){const el=$("art-"+state.scrollArticle);state.scrollArticle=null;if(el)setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),60);}
+  }
+  function openArticle(id,weekStart){
+    weeklyStart=mondayOf(new Date(weekStart+"T12:00:00"));state.scrollArticle=id;showView("weekly");
+  }
+  document.addEventListener("click",e=>{
+    const c=e.target.closest("[data-story]");
+    if(c){const a=storyHome.find(x=>x.id===c.dataset.story);if(a)openArticle(a.id,a.week_start);return;}
+    const lb=e.target.closest("[data-artlang]");
+    if(lb){artLang=lb.dataset.artlang;try{localStorage.setItem("bpc_lang",artLang);}catch(x){}
+      renderHomeStories();const wb=$("wkStories");if(wb&&state.weekStories)renderStories(state.weekStories,wb);
+      if(!$("view-admin").classList.contains("hidden"))renderArticleAdmin();}
+  });
+
+  // ---- admin review ----
+  async function loadArticleAdmin(){
+    if(!state.isAdmin)return;
+    const r=await client.rpc("admin_list_articles",{p_status:null});
+    if(r.error){status("articleAdminStatus",r.error.message,"error");return;}
+    adminArticles=r.data||[];renderArticleAdmin();
+  }
+  function renderArticleAdmin(){
+    const box=$("articleAdminList");if(!box)return;
+    const labels={draft:"Drafts",published:"Published",hidden:"Hidden",rejected:"Rejected"};
+    const counts={};adminArticles.forEach(a=>counts[a.status]=(counts[a.status]||0)+1);
+    $("articleTabs").innerHTML=Object.keys(labels).map(k=>'<button type="button" class="'+(adminArtTab===k?"on":"")+'" data-arttab="'+k+'">'+labels[k]+' <span>'+(counts[k]||0)+'</span></button>').join("")+storyLangBar();
+    const list=adminArticles.filter(a=>a.status===adminArtTab);
+    const btns=a=>({draft:[["published","Publish","primary"],["edit","Edit","secondary"],["rejected","Reject","secondary"]],
+      published:[["hidden","Hide","secondary"],["edit","Edit","secondary"]],
+      hidden:[["published","Publish","primary"],["edit","Edit","secondary"]],
+      rejected:[["draft","Move to drafts","secondary"]]}[a.status]||[]);
+    box.innerHTML=list.length?list.map(a=>{
+      const t=articleText(a,artLang);
+      return '<article class="st-admin"><div class="st-admin-art">'+storyArt(a)+'</div><div class="st-admin-body"><small>'+esc(t.tag)+' · '+esc(storyDate(a))+(a.edited?' · edited':'')+'</small><h4>'+esc(t.headline)+'</h4><p>'+esc(t.standfirst)+'</p><details><summary>Read full article</summary>'+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+'</details><div class="st-admin-btns">'+btns(a).map(b=>'<button type="button" class="'+b[2]+'" data-artact="'+b[0]+'" data-artid="'+esc(a.id)+'">'+b[1]+'</button>').join("")+'</div></div></article>';
+    }).join(""):'<div class="panel soft">Nothing here. Drafts appear automatically after newsworthy matches, or press "Generate now".</div>';
+    $("articleTabs").querySelectorAll("[data-arttab]").forEach(b=>b.onclick=()=>{adminArtTab=b.dataset.arttab;renderArticleAdmin();});
+    box.querySelectorAll("[data-artact]").forEach(b=>b.onclick=()=>articleAction(b.dataset.artid,b.dataset.artact));
+  }
+  async function articleAction(id,act){
+    const a=adminArticles.find(x=>x.id===id);if(!a)return;
+    if(act==="edit")return editArticle(a);
+    if(act==="rejected"&&!confirm("Reject this draft? It stays in the Rejected tab and will not be regenerated."))return;
+    const r=await client.rpc("admin_set_article_status",{p_id:id,p_status:act});
+    if(r.error){status("articleAdminStatus",r.error.message,"error");return;}
+    toast(act==="published"?"Published.":act==="hidden"?"Hidden.":act==="rejected"?"Rejected.":"Moved to drafts.");
+    await loadArticleAdmin();loadHomeStories();
+  }
+  function editArticle(a){
+    const ov=document.createElement("div");ov.className="modal-overlay";
+    const fields=l=>{const t=articleText({...a,edited:null},l),e=(a.edited&&a.edited[l])||{};
+      return '<fieldset class="st-edit"><legend>'+(l==="en"?"English":"বাংলা")+'</legend><label>Headline<input data-l="'+l+'" data-f="headline" maxlength="200" value="'+esc(e.headline||t.headline)+'"></label><label>Standfirst<input data-l="'+l+'" data-f="standfirst" maxlength="300" value="'+esc(e.standfirst!=null?e.standfirst:t.standfirst)+'"></label><label>Article (blank line between paragraphs)<textarea data-l="'+l+'" data-f="body" rows="7">'+esc((e.body&&e.body.length?e.body:t.paras).join("\n\n"))+'</textarea></label></fieldset>';};
+    ov.innerHTML='<div class="modal-box st-edit-box" role="dialog" aria-modal="true"><h3>Edit article</h3><p class="small">Edits replace the auto-written text for that language. Facts and players stay the same.</p>'+fields("en")+fields("bn")+'<div class="modal-actions"><button type="button" class="secondary" id="stReset">Reset to auto-written</button><span style="flex:1"></span><button type="button" class="secondary" id="stCancel">Cancel</button><button type="button" class="primary" id="stSave">Save</button></div><div id="stErr" class="status"></div></div>';
+    document.body.appendChild(ov);
+    const close=()=>ov.remove();
+    ov.querySelector("#stCancel").onclick=close;
+    ov.addEventListener("click",e=>{if(e.target===ov)close();});
+    const save=async(edited)=>{
+      const r=await client.rpc("admin_edit_article",{p_id:a.id,p_edited:edited});
+      if(r.error){ov.querySelector("#stErr").textContent=r.error.message;return;}
+      close();toast("Saved.");await loadArticleAdmin();loadHomeStories();
+    };
+    ov.querySelector("#stReset").onclick=()=>save(null);
+    ov.querySelector("#stSave").onclick=()=>{
+      const ed={};
+      ["en","bn"].forEach(l=>{
+        const g=f=>ov.querySelector('[data-l="'+l+'"][data-f="'+f+'"]').value.trim();
+        ed[l]={headline:g("headline"),standfirst:g("standfirst"),body:g("body").split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean)};
+      });
+      if(!ed.en.headline||!ed.bn.headline){ov.querySelector("#stErr").textContent="Both headlines are required.";return;}
+      save(ed);
+    };
+  }
+  $("generateArticles").addEventListener("click",async()=>{
+    const b=$("generateArticles");b.disabled=true;
+    const r=await client.rpc("generate_articles",{p_days:14});
+    b.disabled=false;
+    if(r.error){status("articleAdminStatus",r.error.message,"error");return;}
+    status("articleAdminStatus",r.data?r.data+" new draft"+(r.data===1?"":"s")+" created.":"No new newsworthy matches found.","success");
+    loadArticleAdmin();
+  });
 
   // ================= Public player profile =================
   var pfScope={mode:"all",month:monthNow},pfCache={};
@@ -1820,6 +2040,7 @@ $("playersBody").innerHTML = shown.map(p =>
     });
   }
   setTimeout(loadHomeLegends,0);
+  setTimeout(loadHomeStories,0);
   function legendCard(kind,scope,rows,monthLabel){
     const isG=kind==="goals";
     const key=isG?"goals_for":"clean_sheets";

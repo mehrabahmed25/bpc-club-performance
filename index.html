@@ -36,6 +36,7 @@
         <div class="home-cta"><button class="primary" data-view="leaderboard">See the leaderboard</button><button class="ghost" data-view="tournaments">Join a tournament</button></div></div>
     </div>
     <section id="homeLegends" class="home-legends hidden" aria-label="This month's stars"></section>
+    <section id="homeStories" class="home-stories hidden" aria-label="Latest stories"></section>
   <section id="uclPosterSection" class="poster-section hidden" aria-label="UCL finalists poster">
     <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">UCL Finalists</h2></div><span class="poster-badge">Featured</span></div>
     <img id="posterImage" class="poster-image" alt="Club announcement">
@@ -150,7 +151,12 @@
         <div id="allMatchHistoryStatus" class="status"></div>
         <div id="allMatchHistoryGroups"><div class="panel soft">Click “Show all match history” to load records.</div></div>
       </div>
-            <div class="section-head compact"><h2>Website branding</h2><p>Upload your official BPC logo and set the name shown in the website header.</p></div>
+            <div class="section-head compact"><h2>Article drafts</h2><p>Newsworthy matches are turned into articles automatically (English and Bangla). Review each draft, edit it if needed, then publish.</p></div>
+      <div class="toolbar"><button type="button" class="secondary" id="generateArticles">Generate now</button></div>
+      <div id="articleAdminStatus" class="status"></div>
+      <div id="articleTabs" class="st-tabs"></div>
+      <div id="articleAdminList" class="st-admin-list"></div>
+      <div class="section-head compact"><h2>Website branding</h2><p>Upload your official BPC logo and set the name shown in the website header.</p></div>
       <form id="brandingForm" class="panel poster-admin-form">
         <label>Club name<input id="brandNameInput" maxlength="80" value="Brahmanbaria Pes Club" required></label>
         <label>Subtitle<input id="brandSubtitleInput" maxlength="100" value="Official Website" required></label>
