@@ -80,15 +80,16 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeLegends();loadHomeStories();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeSeries();loadHomeLegends();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
     if(name==="player")renderPlayerPage();
     if(name==="stories")loadStories();
+    if(name==="series")loadSeriesPage();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
-    if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();}
+    if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();loadSeriesStrip();}
     if(name==="funds")loadFundsPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
@@ -1790,6 +1791,166 @@ $("playersBody").innerHTML = shown.map(p =>
     }).join("")+'</div>';
     box.classList.remove("hidden");
   }
+  // ================= Team series (e.g. Married v Unmarried) =================
+  var seriesList=[],seriesBundle=null,seriesId=null,seriesFrom="home";
+  function sideName(s,side){return side==="a"?s.team_a:s.team_b;}
+  function seriesTally(list){const w={a:0,b:0};(list||[]).forEach(r=>{if(r.winner==="a")w.a++;else if(r.winner==="b")w.b++;});return w;}
+  function seriesLeader(s,w){const need=Math.floor(s.rounds/2)+1;return w.a>=need?"a":w.b>=need?"b":null;}
+  async function loadSeriesStrip(){
+    const el=$("seriesStrip");if(!el||!client)return;
+    try{const {data}=await client.rpc("get_series_list");seriesList=data||[];}catch(e){seriesList=[];}
+    const adm=state.tnAdmin;
+    if(!seriesList.length&&!adm){el.classList.add("hidden");return;}
+    el.innerHTML='<div><b>Team series</b><span class="small">'+(seriesList.length?'Team v team contests played as 1v1 games.':'No series yet.')+'</span></div><div class="sr-strip-links">'+seriesList.map(s=>'<button type="button" class="ghost" data-series="'+esc(s.id)+'">'+esc(s.name)+'</button>').join("")+(adm?'<button type="button" class="primary" data-series="new">New series</button>':'')+'</div>';
+    el.classList.remove("hidden");
+  }
+  async function loadHomeSeries(){
+    const box=$("homeSeries");if(!box||!client)return;
+    try{
+      const [r]=await Promise.all([client.rpc("get_series_list"),ensureAvatars()]);
+      seriesList=r.data||[];
+    }catch(e){return;}
+    const list=seriesList.filter(s=>s.status!=="archived").slice(0,2);
+    if(!list.length){box.classList.add("hidden");return;}
+    box.innerHTML=list.map(s=>{
+      const w=s.rounds_won||{a:0,b:0},lead=seriesLeader(s,w);
+      const chip=s.status==="finished"||lead?'<span class="sr-chip done">'+(lead?esc(sideName(s,lead))+' win':'Finished')+'</span>':s.status==="live"?'<span class="sr-chip live">Live</span>':(s.reg_open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Starting soon</span>');
+      return '<button type="button" class="sr-banner" data-series="'+esc(s.id)+'"><span class="sr-b-top">'+chip+'<small>Best of '+s.rounds+' rounds</small></span><b class="sr-b-name">'+esc(s.name)+'</b><span class="sr-b-vs"><span><em>'+esc(s.team_a)+'</em><small>'+s.a_count+'/'+s.per_side+' players</small></span><strong>'+w.a+' – '+w.b+'</strong><span><em>'+esc(s.team_b)+'</em><small>'+s.b_count+'/'+s.per_side+' players</small></span></span><span class="sr-b-cta">'+(s.status==="open"&&s.reg_open?'Pick your side':'Open the series')+'</span></button>';
+    }).join("");
+    box.classList.remove("hidden");
+  }
+  function openSeries(id,from){
+    seriesId=id;
+    const cur=document.querySelector(".view:not(.hidden)");seriesFrom=from||(cur&&cur.id!=="view-series"?cur.id.replace("view-",""):seriesFrom)||"home";
+    showView("series");
+  }
+  async function loadSeriesPage(){
+    const box=$("seriesPage");if(!box||!client)return;
+    box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';
+    await ensureAvatars();
+    if(seriesId&&seriesId!=="new"){
+      const {data,error}=await client.rpc("get_series_bundle",{p_id:seriesId});
+      if(error||!data){box.innerHTML='<div class="h2h-empty"><b>Series not found.</b><span>It may have been archived.</span></div>';return;}
+      seriesBundle=data;renderSeriesDetail();
+    }else{
+      const {data}=await client.rpc("get_series_list");seriesList=data||[];renderSeriesIndex();
+    }
+  }
+  function seriesBack(){return '<button type="button" class="ghost sr-back" id="srBack">← '+(seriesFrom==="tournaments"?"Tournaments":"Back")+'</button>';}
+  function renderSeriesIndex(){
+    const box=$("seriesPage"),adm=state.tnAdmin;
+    const cards=seriesList.map(s=>'<button type="button" class="sr-row" data-series="'+esc(s.id)+'"><b>'+esc(s.name)+'</b><span>'+esc(s.team_a)+' '+(s.rounds_won?s.rounds_won.a:0)+' – '+(s.rounds_won?s.rounds_won.b:0)+' '+esc(s.team_b)+'</span><small>'+esc(s.status)+(s.pending?' · '+s.pending+' waiting for approval':'')+'</small></button>').join("");
+    const form=adm?'<form id="srCreate" class="panel sr-create"><h3>New series</h3><div class="sr-grid"><label>Series name<input name="name" required maxlength="100" value="Married v Unmarried"></label><label>Team one<input name="a" required maxlength="40" value="Married"></label><label>Team two<input name="b" required maxlength="40" value="Unmarried"></label><label>Players per team<input name="per" type="number" min="1" max="30" value="8"></label><label>Best of rounds<input name="rounds" type="number" min="1" max="9" value="3"></label><label>Sign-up deadline (optional)<input name="deadline" type="datetime-local"></label></div><button class="primary" type="submit">Create and open sign-ups</button><div id="srCreateStatus" class="status"></div></form>':'';
+    box.innerHTML=seriesBack()+'<div class="wk-mast"><div><h2>Team series</h2><p>Two teams, 1v1 games, best of rounds wins.</p></div></div><div class="sr-list">'+(cards||'<div class="h2h-empty"><b>No series yet.</b><span>Series appear here once an admin creates one.</span></div>')+'</div>'+form;
+    $("srBack").onclick=()=>showView(seriesFrom==="series"?"home":seriesFrom);
+    $("srCreate")?.addEventListener("submit",async e=>{
+      e.preventDefault();const f=e.target,d=new FormData(f);
+      const {data,error}=await client.rpc("series_create",{p_name:d.get("name"),p_team_a:d.get("a"),p_team_b:d.get("b"),p_per_side:Number(d.get("per"))||8,p_rounds:Number(d.get("rounds"))||3,p_deadline:d.get("deadline")?new Date(d.get("deadline")).toISOString():null});
+      if(error){status("srCreateStatus",error.message,"error");return;}
+      toast("Series created. Sign-ups are open.");seriesId=data;loadSeriesPage();
+    });
+  }
+  function seriesPlayer(m,cls){return '<span class="sr-pl link-player" data-player="'+esc(m.player_id)+'">'+avBig(m.name,m.player_id,cls||"sr-av")+'<b>'+esc(m.name)+'</b></span>';}
+  function renderSeriesDetail(){
+    const B=seriesBundle,s=B.series,adm=B.is_admin,me=B.me,box=$("seriesPage");
+    const mem={};B.members.forEach(m=>mem[m.id]=m);
+    const tally=seriesTally(B.rounds),lead=seriesLeader(s,tally);
+    const conf=side=>B.members.filter(m=>m.side===side&&m.status==="confirmed");
+    const pend=B.members.filter(m=>m.status==="pending");
+    const open=s.status==="open"&&s.reg_open&&(!s.reg_deadline||new Date(s.reg_deadline)>new Date());
+    const chip=lead?'<span class="sr-chip done">'+esc(sideName(s,lead))+' win the series</span>':s.status==="finished"?'<span class="sr-chip done">Finished</span>':s.status==="live"?'<span class="sr-chip live">Live</span>':open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Sign-ups closed</span>';
+    // header
+    let html=seriesBack()+'<div class="sr-hero"><div class="sr-h-top"><h2>'+esc(s.name)+'</h2>'+chip+'</div><div class="sr-score"><div class="sr-team '+(lead==="a"?"win":"")+'"><b>'+esc(s.team_a)+'</b><small>'+conf("a").length+'/'+s.per_side+' players</small></div><div class="sr-tally"><span>'+tally.a+'</span><i>–</i><span>'+tally.b+'</span><small>rounds · best of '+s.rounds+'</small></div><div class="sr-team '+(lead==="b"?"win":"")+'"><b>'+esc(s.team_b)+'</b><small>'+conf("b").length+'/'+s.per_side+' players</small></div></div>'+(s.reg_deadline&&open?'<p class="sr-note">Sign-ups close '+esc(new Date(s.reg_deadline).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</p>':'')+'</div>';
+    // join panel
+    let join="";
+    if(!state.session)join=open?'<div class="sr-join"><b>Want to play?</b><span class="small">Sign in to pick a side.</span><button type="button" class="primary" data-view="account">Sign in</button></div>':'';
+    else if(me&&me.status==="pending")join='<div class="sr-join"><b>You asked to join '+esc(sideName(s,me.side))+'.</b><span class="small">An admin will confirm your spot.</span><button type="button" class="ghost" id="srLeave">Withdraw</button></div>';
+    else if(me&&me.status==="confirmed")join='<div class="sr-join ok"><b>You are in '+esc(sideName(s,me.side))+'.</b><span class="small">Your games and score box show below once pairings are set.</span>'+(!B.games.some(g=>g.mine)?'<button type="button" class="ghost" id="srLeave">Leave team</button>':'')+'</div>';
+    else if(open)join='<div class="sr-join"><b>Pick your side</b><span class="small">Admin confirms every entry. Each team takes up to '+s.per_side+' players.</span><div class="sr-pick"><button type="button" class="primary" data-srjoin="a">Join '+esc(s.team_a)+'</button><button type="button" class="primary alt" data-srjoin="b">Join '+esc(s.team_b)+'</button></div></div>';
+    html+=join+'<div id="srStatus" class="status"></div>';
+    // squads
+    const squad=side=>{
+      const list=B.members.filter(m=>m.side===side&&(m.status==="confirmed"||adm||(me&&m.id===me.member_id)));
+      return '<section class="sr-squad"><h3>'+esc(sideName(s,side))+' <small>'+conf(side).length+'/'+s.per_side+'</small></h3>'+(list.length?list.map(m=>'<div class="sr-mem '+(m.status==="pending"?"pending":"")+'">'+seriesPlayer(m)+(m.status==="pending"?'<span class="sr-chip">Waiting</span>':'')+(adm?'<span class="sr-mact">'+(m.status==="pending"?'<button type="button" class="primary" data-srmem="approve" data-id="'+esc(m.id)+'">Approve</button>':'')+'<button type="button" class="ghost" data-srmem="switch" data-id="'+esc(m.id)+'">Move</button><button type="button" class="ghost" data-srmem="remove" data-id="'+esc(m.id)+'">Remove</button></span>':'')+'</div>').join(""):'<p class="small">No players yet.</p>')+'</section>';
+    };
+    html+='<div class="sr-squads">'+squad("a")+squad("b")+'</div>';
+    // rounds
+    for(let r=1;r<=s.rounds;r++){
+      const games=B.games.filter(g=>g.round===r),ro=B.rounds.find(x=>x.round===r);
+      if(!games.length&&!adm)continue;
+      const head=ro?'<span class="sr-rtally">'+ro.a_wins+' – '+ro.b_wins+(ro.complete?(ro.winner==="draw"?' · drawn':' · '+esc(sideName(s,ro.winner))+' take the round'):'')+'</span>':'<span class="sr-rtally">Not scheduled</span>';
+      html+='<section class="sr-round"><div class="sr-r-head"><h3>Round '+r+'</h3>'+head+'</div>'+(games.length?games.map(g=>gameRow(g,mem,s,adm)).join(""):'<p class="small sr-empty">No games yet.</p>')+(adm?pairTools(r,games,B,mem):'')+'</section>';
+    }
+    // admin controls
+    if(adm){
+      html+='<section class="panel sr-admin"><h3>Series controls</h3><div class="sr-ctl">'+
+        '<button type="button" class="ghost" data-srset="reg">'+(s.reg_open?'Close sign-ups':'Open sign-ups')+'</button>'+
+        (s.status==="open"?'<button type="button" class="primary" data-srset="live">Start the series</button>':'')+
+        (s.status==="live"?'<button type="button" class="primary" data-srset="finished">Mark finished</button>':'')+
+        (s.status!=="open"?'<button type="button" class="ghost" data-srset="open">Back to sign-up stage</button>':'')+
+        '<button type="button" class="ghost" data-srset="archived">Archive</button></div>'+
+        '<form id="srDeadline" class="inline-form"><label class="small">Sign-up deadline<input type="datetime-local" name="d"></label><button class="ghost" type="submit">Save</button><button class="ghost" type="button" id="srDeadlineClear">Clear</button></form>'+
+        (pend.length?'<p class="small">'+pend.length+' entr'+(pend.length>1?'ies':'y')+' waiting for approval.</p>':'')+'</section>';
+    }
+    box.innerHTML=html;
+    wireSeries();
+  }
+  function gameRow(g,mem,s,adm){
+    const a=mem[g.a_member],b=mem[g.b_member];if(!a||!b)return"";
+    const has=g.a_goals!=null&&g.b_goals!=null;
+    const win=g.status==="approved"&&has?(g.a_goals>g.b_goals?"a":g.a_goals<g.b_goals?"b":""):"";
+    const st=g.status==="approved"?'<span class="sr-chip done">Final</span>':g.status==="submitted"?'<span class="sr-chip live">Waiting for approval</span>':'<span class="sr-chip">Waiting for score</span>';
+    const canSend=state.session&&(adm||g.mine)&&(g.status!=="approved"||adm);
+    const form=canSend?'<form class="sr-send" data-game="'+esc(g.id)+'"><input type="number" min="0" max="99" inputmode="numeric" name="a" aria-label="'+esc(a.name)+' goals" value="'+(has?g.a_goals:"")+'" required><span>–</span><input type="number" min="0" max="99" inputmode="numeric" name="b" aria-label="'+esc(b.name)+' goals" value="'+(has?g.b_goals:"")+'" required><button class="primary" type="submit">'+(adm?'Save score':'Send score')+'</button>'+(adm&&g.status==="submitted"?'<button type="button" class="ghost" data-srrev="reject" data-id="'+esc(g.id)+'">Reject</button>':'')+(adm&&g.status==="submitted"?'<button type="button" class="primary" data-srrev="approve" data-id="'+esc(g.id)+'">Approve</button>':'')+'</form>':'';
+    return '<div class="sr-game '+(g.mine?"mine":"")+'"><div class="sr-g-row"><div class="sr-g-p '+(win==="a"?"w":"")+'">'+seriesPlayer(a)+'</div><div class="sr-g-mid">'+(has&&(g.status==="approved"||adm||g.mine)?'<strong>'+g.a_goals+' – '+g.b_goals+'</strong>':'<strong class="vs">v</strong>')+st+'</div><div class="sr-g-p r '+(win==="b"?"w":"")+'">'+seriesPlayer(b)+'</div></div>'+form+'</div>';
+  }
+  function pairTools(r,games,B,mem){
+    const locked=games.some(g=>g.status==="submitted"||g.status==="approved");
+    const A=B.members.filter(m=>m.side==="a"&&m.status==="confirmed"),Bs=B.members.filter(m=>m.side==="b"&&m.status==="confirmed");
+    if(locked||!A.length||!Bs.length)return locked?'<p class="small sr-lock">Pairings are locked once scores come in.</p>':'';
+    const cur={};games.forEach(g=>cur[g.a_member]=g.b_member);
+    return '<details class="sr-pair"><summary>Set pairings for round '+r+'</summary><div class="sr-pair-body"><button type="button" class="ghost" data-srauto="'+r+'">Auto-pair by sign-up order</button><div class="sr-pair-rows" data-round="'+r+'">'+A.map(a=>'<div class="sr-pair-row"><span>'+esc(a.name)+'</span><select data-a="'+esc(a.id)+'"><option value="">No game</option>'+Bs.map(b=>'<option value="'+esc(b.id)+'"'+(cur[a.id]===b.id?' selected':'')+'>'+esc(b.name)+'</option>').join("")+'</select></div>').join("")+'</div><button type="button" class="primary" data-srsave="'+r+'">Save pairings</button></div></details>';
+  }
+  async function seriesCall(fn,args,okMsg){
+    const {error,data}=await client.rpc(fn,args);
+    if(error){status("srStatus",error.message,"error");toast(error.message);return null;}
+    if(okMsg)toast(okMsg);await loadSeriesPage();return data===undefined?true:(data===null?true:data);
+  }
+  function wireSeries(){
+    const B=seriesBundle,s=B.series,box=$("seriesPage");
+    $("srBack").onclick=()=>{if(seriesFrom==="series"||seriesFrom==="home")showView("home");else showView(seriesFrom);};
+    box.querySelectorAll("[data-srjoin]").forEach(b=>b.onclick=()=>seriesCall("series_register",{p_id:s.id,p_side:b.dataset.srjoin},"Sign-up sent. An admin will confirm it."));
+    box.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>showView(b.dataset.view));
+    const lv=$("srLeave");if(lv)lv.onclick=()=>seriesCall("series_leave",{p_id:s.id},"You have left the series.");
+    box.querySelectorAll("[data-srmem]").forEach(b=>b.onclick=()=>seriesCall("series_member_action",{p_member:b.dataset.id,p_action:b.dataset.srmem},b.dataset.srmem==="approve"?"Player confirmed.":b.dataset.srmem==="remove"?"Player removed.":"Player moved."));
+    box.querySelectorAll("form.sr-send").forEach(f=>f.addEventListener("submit",async e=>{
+      e.preventDefault();const d=new FormData(f);
+      const r=await seriesCall("series_submit_score",{p_game:f.dataset.game,p_a:Number(d.get("a")),p_b:Number(d.get("b"))});
+      if(r)toast(r==="approved"?"Score saved.":"Score sent for approval.");
+    }));
+    box.querySelectorAll("[data-srrev]").forEach(b=>b.onclick=()=>seriesCall("series_review_score",{p_game:b.dataset.id,p_approve:b.dataset.srrev==="approve"},b.dataset.srrev==="approve"?"Score approved.":"Score sent back."));
+    box.querySelectorAll("[data-srset]").forEach(b=>b.onclick=()=>{
+      const k=b.dataset.srset;
+      seriesCall("series_set",k==="reg"?{p_id:s.id,p_reg_open:!s.reg_open}:{p_id:s.id,p_status:k},"Saved.").then(r=>{if(r&&k==="archived")showView("home");});
+    });
+    $("srDeadline")?.addEventListener("submit",e=>{e.preventDefault();const v=new FormData(e.target).get("d");if(!v){toast("Pick a date first.");return;}seriesCall("series_set",{p_id:s.id,p_deadline:new Date(v).toISOString()},"Deadline saved.");});
+    $("srDeadlineClear")?.addEventListener("click",()=>seriesCall("series_set",{p_id:s.id,p_clear_deadline:true},"Deadline cleared."));
+    box.querySelectorAll("[data-srauto]").forEach(b=>b.onclick=()=>{
+      const rows=box.querySelector('.sr-pair-rows[data-round="'+b.dataset.srauto+'"]');
+      const bs=[...rows.querySelector("select").options].map(o=>o.value).filter(Boolean);
+      [...rows.querySelectorAll("select")].forEach((sel,i)=>{sel.value=bs[i]||"";});
+    });
+    box.querySelectorAll("[data-srsave]").forEach(b=>b.onclick=()=>{
+      const rows=box.querySelector('.sr-pair-rows[data-round="'+b.dataset.srsave+'"]');
+      const pairs=[...rows.querySelectorAll("select")].filter(x=>x.value).map(x=>({a:x.dataset.a,b:x.value}));
+      if(new Set(pairs.map(p=>p.b)).size!==pairs.length){status("srStatus","Each player can only play one game per round.","error");return;}
+      seriesCall("series_pair_round",{p_id:s.id,p_round:Number(b.dataset.srsave),p_pairs:pairs},"Pairings saved.");
+    });
+  }
+  document.addEventListener("click",e=>{
+    const t=e.target.closest("[data-series]");if(!t)return;
+    openSeries(t.dataset.series);
+  });
   var storiesLimit=10;
   async function loadStories(){
     const box=$("storiesPage");if(!client||!box)return;
@@ -1991,6 +2152,7 @@ $("playersBody").innerHTML = shown.map(p =>
   }
   setTimeout(loadHomeLegends,0);
   setTimeout(loadHomeStories,0);
+  setTimeout(loadHomeSeries,0);
   function legendCard(kind,scope,rows,monthLabel){
     const isG=kind==="goals";
     const key=isG?"goals_for":"clean_sheets";
