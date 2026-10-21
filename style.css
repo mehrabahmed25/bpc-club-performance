@@ -1333,3 +1333,25 @@ tr.is-me td:first-child{box-shadow:inset 4px 0 0 var(--flood)}
 @media(max-width:700px){.pf-hero2{flex-wrap:wrap;padding:20px 18px;gap:16px}.pf-ring{margin-left:auto}.pf-hero2 .pf-id{flex:1 1 55%}.pf-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.pf-ring,.pf-badge.is-on:after{animation:none}}
 .pf-tl{justify-content:center}.pf-tlc{flex:1 1 0;min-width:14px;max-width:56px}
+
+/* ======== Home redesign: matchday ======== */
+.home-hero{padding:30px 34px 32px;margin:0 0 16px;grid-template-columns:1fr}
+.home-hero h1{font-size:clamp(28px,4.4vw,48px);letter-spacing:-1.4px}
+.home-hero p{margin-top:10px;font-size:16px}
+.home-hero .home-cta{margin-top:18px}
+.home-hero:before{animation:hero-draw 1.6s cubic-bezier(.3,.7,.2,1) both}
+@keyframes hero-draw{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.home-ticker{display:flex;align-items:stretch;overflow:hidden;margin:0 0 18px;border-radius:16px;background:#060d1d;color:#fff;box-shadow:0 10px 24px #0a183a26}
+.tk-tag{flex:0 0 auto;display:grid;place-items:center;padding:0 16px;background:var(--flood);color:var(--night);font:800 12px var(--display,inherit);letter-spacing:.04em;text-transform:uppercase}
+.tk-track{flex:1;overflow:hidden;padding:12px 0;-webkit-mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent)}
+.tk-move{display:flex;gap:36px;width:max-content;animation:tk-run 50s linear infinite}
+.home-ticker:hover .tk-move{animation-play-state:paused}
+.tk-i{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;font-size:14px}
+.tk-i b{font-weight:600;color:#aebbd6}
+.tk-i b.w{color:#fff;font-weight:800}
+.tk-i em{font:800 14px var(--display,inherit);font-style:normal;padding:2px 10px;border-radius:8px;background:#ffffff1c;color:var(--flood)}
+@keyframes tk-run{to{transform:translateX(-50%)}}
+.home-podium{margin:0 0 26px}
+.home-podium .lb-podium{margin-top:10px}
+@media(prefers-reduced-motion:reduce){.tk-move{animation:none}.tk-track{overflow-x:auto}.home-hero:before{animation:none}}
+@media(max-width:680px){.home-hero{padding:24px 20px 26px}.tk-tag{padding:0 12px}}

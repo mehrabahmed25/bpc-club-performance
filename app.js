@@ -80,7 +80,7 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeSeries();loadHomeLegends();loadHomeStories();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomePodium();loadHomeLegends();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -588,8 +588,8 @@ $("matchForm").addEventListener("submit", async e => {
     }
     renderPodium(data);
   }
-  function renderPodium(rows){
-    const el=$("lbPodium");if(!el)return;
+  function renderPodium(rows,target){
+    const el=target||$("lbPodium");if(!el)return;
     const top=(rows||[]).filter(r=>Number(r.matches_played)>0).slice(0,3);
     if(top.length<3){el.classList.add("hidden");el.innerHTML="";return;}
     const slot=(r,i)=>'<div class="pod pod-'+(i+1)+' link-player" data-player="'+esc(r.player_id)+'" style="--d:'+([.25,.1,.4][i])+'s"><span class="pod-num" aria-hidden="true">'+(i+1)+'</span>'+(i===0?'<svg class="pod-crown" viewBox="0 0 48 32" aria-hidden="true"><path d="M3 28 L7 8 L17 18 L24 3 L31 18 L41 8 L45 28 Z" fill="currentColor"/></svg>':'<span class="pod-rank">'+(i+1)+'</span>')+'<span class="pod-avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
@@ -2292,6 +2292,8 @@ $("playersBody").innerHTML = shown.map(p =>
   setTimeout(loadHomeLegends,0);
   setTimeout(loadHomeStories,0);
   setTimeout(loadHomeSeries,0);
+  setTimeout(loadHomeTicker,0);
+  setTimeout(loadHomePodium,0);
   function legendCard(kind,scope,rows,monthLabel){
     const isG=kind==="goals";
     const key=isG?"goals_for":"clean_sheets";
@@ -2315,6 +2317,32 @@ $("playersBody").innerHTML = shown.map(p =>
     const [all,mon]=await Promise.all([client.rpc("get_top_performers",{p_month:null}),client.rpc("get_top_performers",{p_month:monthDate(mv)}),ensureAvatars()]);
     if(all.error||mon.error){grid.innerHTML='<div class="lg-empty">Could not load the stats.</div>';return;}
     grid.innerHTML=legendCard("goals","all",all.data,label)+legendCard("goals","month",mon.data,label)+legendCard("cs","all",all.data,label)+legendCard("cs","month",mon.data,label);
+  }
+  // ---- Home: scoreboard ticker + table podium ----
+  async function loadHomeTicker(){
+    const box=$("homeTicker");if(!box||!client)return;
+    try{
+      const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(),-14)),p_end:ymd(new Date())});
+      const rows=(data||[]).filter(m=>m.a_name&&m.b_name).slice(0,14);
+      if(!rows.length){box.classList.add("hidden");return;}
+      const item=m=>{const aw=m.a_goals>m.b_goals,bw=m.b_goals>m.a_goals;return '<span class="tk-i"><b class="'+(aw?'w':'')+'">'+esc(m.a_name)+'</b><em>'+m.a_goals+' – '+m.b_goals+'</em><b class="'+(bw?'w':'')+'">'+esc(m.b_name)+'</b></span>';};
+      const html=rows.map(item).join("");
+      box.innerHTML='<span class="tk-tag">Results</span><div class="tk-track"><div class="tk-move">'+html+html+'</div></div>';
+      box.classList.remove("hidden");
+    }catch(e){console.warn(e);}
+  }
+  async function loadHomePodium(){
+    const box=$("homePodium");if(!box||!client)return;
+    try{
+      const [r]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
+      const rows=r.data||[];
+      const top=rows.filter(x=>Number(x.matches_played)>0);
+      if(top.length<3){box.classList.add("hidden");return;}
+      box.innerHTML='<div class="hl-head"><h2>The table right now</h2><span class="hl-links"><button type="button" class="hl-link" data-view="leaderboard">Full leaderboard</button></span></div><div class="lb-podium" id="homePodiumGrid"></div>';
+      renderPodium(rows,$("homePodiumGrid"));
+      box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+      box.classList.remove("hidden");
+    }catch(e){console.warn(e);}
   }
   async function loadHomeLegends(){
     const box=$("homeLegends");if(!box||!client)return;
