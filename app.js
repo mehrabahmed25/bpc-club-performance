@@ -2222,7 +2222,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const form=all.slice(0,10),f0=form.map(pfRes);
     let streak=0,kind=f0[0];for(const x of f0){if(x===kind)streak++;else break;}
     let unb=0;for(const x of f0){if(x!=="l")unb++;else break;}
-    const streakTxt=!all.length?"":kind==="w"&&streak>=2?"On a "+streak+"-match winning run":unb>=3?"Unbeaten in "+unb:kind==="l"&&streak>=2?"Lost the last "+streak:"";
+    const streakTxt=!all.length?"":kind==="w"&&streak>=2?"On a "+streak+"-match winning run":unb>=3?"Unbeaten in "+unb+" matches":kind==="l"&&streak>=2?"Lost the last "+streak:"";
     // rivalries within scope
     const opp={};
     rows.forEach(r=>{const k=r.opponent_id||("n:"+r.opponent_name);(opp[k]=opp[k]||{id:r.opponent_id,name:r.opponent_name,rows:[]}).rows.push(r);});
@@ -2244,14 +2244,23 @@ $("playersBody").innerHTML = shown.map(p =>
     const bestM=[...pts].sort((a,b)=>b.p-a.p)[0];
     const chart='<div class="pf-bars" role="img" aria-label="Points per month">'+pts.map(x=>'<div class="pf-bar'+(x.k===(bestM&&bestM.p?bestM.k:"")?' is-best':'')+'" title="'+monthLabel(x.k)+': '+x.p+' pts"><i style="height:'+Math.max(x.p?6:2,Math.round(x.p/maxP*100))+'%"></i><span>'+monthLabel(x.k).slice(0,3)+'</span></div>').join("")+'</div>';
     const bd=pfBadges(all);
-    const badges=bd.defs.map(d=>{const ok=d[3]>=d[4];return '<div class="pf-badge'+(ok?' is-on':'')+'" title="'+esc(d[2])+'"><span class="g">'+d[0]+'</span><b>'+d[1]+'</b><small>'+(ok?"Earned":Math.min(d[3],d[4])+" / "+d[4])+'</small></div>';}).join("");
+    const badges=bd.defs.map(d=>{const ok=d[3]>=d[4];return '<div class="pf-badge'+(ok?' is-on':'')+'" title="'+esc(d[2])+'"><span class="g">'+d[0]+'</span><b>'+d[1]+'</b><small>'+(ok?"Earned":Math.min(d[3],d[4])+" / "+d[4])+'</small>'+(ok?'':'<span class="pf-bp"><i style="width:'+Math.round(Math.min(d[3],d[4])/d[4]*100)+'%"></i></span>')+'</div>';}).join("");
     const earned=bd.defs.filter(d=>d[3]>=d[4]).length;
     const recent=all.slice(0,8).map(r=>'<div class="pf-m r-'+pfRes(r)+'"><span class="d">'+prettyDate(r.match_date)+'</span><span class="o'+(r.opponent_id?' link-player':'')+'"'+(r.opponent_id?' data-player="'+esc(r.opponent_id)+'"':'')+'>'+esc(r.opponent_name)+'</span><span class="s">'+r.gf+' – '+r.ga+'</span></div>').join("")||'<div class="pf-none">No counted matches yet.</div>';
     const signed=!!state.session&&state.player&&state.player.id!==id;
+    const storyBits=[];
+    if(lbRow)storyBits.push("Ranked #"+lbRow.rank+" this month with "+lbRow.points+" points");
+    if(streakTxt)storyBits.push(streakTxt);
+    if(most&&most.s.n>1)storyBits.push("Plays "+most.name+" most");
+    const storyLine=storyBits.length?storyBits.join(". ")+".":(all.length?"Not ranked this month.":"No counted matches yet.");
+    const ringW=st.n?Math.round(st.w/st.n*100):0,ringD=st.n?Math.round((st.w+st.d)/st.n*100):0;
     box.innerHTML=
-      '<div class="pf-head">'+avBig(me.display_name,me.id,"pf-av")+
-        '<div class="pf-id"><h2>'+esc(me.display_name)+'</h2><p>'+(lbRow?'Rank #'+lbRow.rank+' this month · '+lbRow.points+' pts':'Not ranked this month')+(streakTxt?' · '+esc(streakTxt):'')+'</p></div>'+
+      '<div class="pf-head pf-hero2"><div class="pf-fx" aria-hidden="true"><i class="a"></i><i class="b"></i><span class="pf-ghost">'+esc(String(me.display_name).split(/\s+/).slice(-1)[0])+'</span></div>'+
+        '<div class="pf-portrait">'+avBig(me.display_name,me.id,"pf-av")+(lbRow?'<span class="pf-rankchip">#'+lbRow.rank+'</span>':'')+'</div>'+
+        '<div class="pf-id"><h2>'+esc(me.display_name)+'</h2><p class="pf-story">'+esc(storyLine)+'</p>'+
+        '<div class="pf-formrow">'+(form.slice(0,6).map(r=>'<i class="fm '+pfRes(r)+'">'+pfRes(r).toUpperCase()+'</i>').join("")||'<em>No matches yet</em>')+'</div>'+
         '<div class="pf-actions"><button type="button" class="pf-btn" id="pfCompare">Compare'+(signed?' with me':'')+'</button></div></div>'+
+        '<div class="pf-ring" style="--w:'+ringW+';--d:'+ringD+'" role="img" aria-label="Win rate '+st.rate+' percent"><b>'+st.rate+'<small>%</small></b><span>win rate</span></div></div>'+
       '<div class="pf-scope"><button type="button" class="'+(pfScope.mode==="all"?'on':'')+'" data-pfs="all">All time</button><button type="button" class="'+(pfScope.mode==="month"?'on':'')+'" data-pfs="month">Month</button>'+(pfScope.mode==="month"?'<input type="month" id="pfMonth" value="'+esc(pfScope.month)+'">':'')+'</div>'+
       '<div class="pf-tiles">'+
         [["Matches",st.n],["Win rate",st.rate+"%"],["W · D · L",st.w+" · "+st.d+" · "+st.l],["Goals",st.gf+" – "+st.ga],["Clean sheets",st.cs],["Points",st.pts]].map(t=>'<div class="pf-tile"><b>'+t[1]+'</b><span>'+t[0]+'</span></div>').join("")+'</div>'+
@@ -2261,14 +2270,15 @@ $("playersBody").innerHTML = shown.map(p =>
         '<section class="pf-card"><h3>Rivalries</h3><div class="pf-rivs">'+rivalCard("Most played",most,"No matches yet")+rivalCard("Nemesis",nemesis,"Needs 3+ meetings")+rivalCard("Favourite opponent",victim,"Needs 3+ meetings")+'</div>'+
           '<h3>Highlights</h3><div class="pf-hls">'+hl("Biggest win",bigWin,bigWin?bigWin.gf+" – "+bigWin.ga:"")+hl("Highest scoring",topScore,topScore?topScore.gf+" – "+topScore.ga:"")+'</div></section>'+
       '</div>'+
+      (all.length>1?'<section class="pf-card pf-wide"><h3>Goals timeline <small>last '+Math.min(all.length,16)+' matches, oldest to newest</small></h3><div class="pf-tl">'+[...all.slice(0,16)].reverse().map(r=>'<div class="pf-tlc" title="'+esc(prettyDate(r.match_date))+' vs '+esc(r.opponent_name)+': '+r.gf+'–'+r.ga+'"><i class="up" style="height:'+Math.min(r.gf,10)*8+'px"></i><i class="dn" style="height:'+Math.min(r.ga,10)*8+'px"></i></div>').join("")+'</div><p class="pf-note">Green above the line is goals scored, red below is goals conceded.</p></section>':'')+
       '<section class="pf-card pf-wide"><h3>Badges <small>'+earned+' of '+bd.defs.length+' earned</small></h3><div class="pf-badges">'+badges+'</div></section>'+
       '<section class="pf-card pf-wide"><h3>Latest matches</h3><div class="pf-ms">'+recent+'</div></section>'+
       '<div id="pfSeries"></div>';
     serP.then(sd=>{
       const el=$("pfSeries");if(!el||!sd||!sd.summary||!sd.summary.played)return;
       const m=sd.summary;
-      el.innerHTML='<section class="pf-card pf-wide pf-series"><h3>Team series <small>kept separate from friendly matches</small></h3><div class="pf-tiles pf-tiles-sm">'+[["Games",m.played],["W · D · L",m.w+" · "+m.d+" · "+m.l],["Goals",m.gf+" – "+m.ga]].map(t=>'<div class="pf-tile"><b>'+t[1]+'</b><span>'+t[0]+'</span></div>').join("")+'</div>'+
-        sd.series.map(x=>'<div class="pf-ser"><div class="pf-ser-h"><b>'+esc(x.name)+'</b><span>Played for '+esc(x.team)+'</span></div>'+x.games.map(g=>'<div class="pf-m r-'+(g.gf>g.ga?"w":g.gf<g.ga?"l":"d")+'"><span class="d">Round '+g.round+'</span><span class="o'+(g.opp_id?' link-player':'')+'"'+(g.opp_id?' data-player="'+esc(g.opp_id)+'"':'')+'>'+esc(g.opp)+'</span><span class="s">'+g.gf+' – '+g.ga+'</span></div>').join("")+'</div>').join("")+'</section>';
+      el.innerHTML='<section class="pf-card pf-wide pf-series"><div class="pf-ser-band"><b>Team series</b><small>kept separate from friendly matches</small></div><div class="pf-tiles pf-tiles-sm">'+[["Games",m.played],["W · D · L",m.w+" · "+m.d+" · "+m.l],["Goals",m.gf+" – "+m.ga]].map(t=>'<div class="pf-tile"><b>'+t[1]+'</b><span>'+t[0]+'</span></div>').join("")+'</div>'+
+        sd.series.map(x=>'<div class="pf-ser"><div class="pf-ser-h"><b>'+esc(x.name)+'</b><span class="pf-ser-team">Played for <em>'+esc(x.team)+'</em></span></div>'+x.games.map(g=>'<div class="pf-m r-'+(g.gf>g.ga?"w":g.gf<g.ga?"l":"d")+'"><span class="d">Round '+g.round+'</span><span class="o'+(g.opp_id?' link-player':'')+'"'+(g.opp_id?' data-player="'+esc(g.opp_id)+'"':'')+'>'+esc(g.opp)+'</span><span class="s">'+g.gf+' – '+g.ga+'</span></div>').join("")+'</div>').join("")+'</section>';
     });
     box.querySelectorAll("[data-pfs]").forEach(b=>b.addEventListener("click",()=>{pfScope.mode=b.dataset.pfs;renderPlayerPage();}));
     const pm=$("pfMonth");if(pm)pm.addEventListener("change",()=>{pfScope.month=pm.value||monthNow;renderPlayerPage();});
