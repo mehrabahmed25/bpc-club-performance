@@ -1878,7 +1878,8 @@ $("playersBody").innerHTML = shown.map(p =>
     for(let r=1;r<=s.rounds;r++){
       const games=B.games.filter(g=>g.round===r),ro=B.rounds.find(x=>x.round===r);
       const head=ro?'<span class="sr-rtally">'+ro.a_wins+' – '+ro.b_wins+(ro.complete?(ro.winner==="draw"?' · drawn':' · '+esc(sideName(s,ro.winner))+' take the round'):'')+'</span>':'<span class="sr-rtally">Not scheduled</span>';
-      html+='<section class="sr-round"><div class="sr-r-head"><h3>Round '+r+'</h3>'+head+'</div>'+squadsBlock(r,B,mem,s,adm)+(games.length?games.map(g=>gameRow(g,mem,s,adm)).join(""):'<p class="small sr-empty">Fixtures appear once both captains submit their squads.</p>')+(adm?pairTools(r,games,B,mem):'')+'</section>';
+      const started=(B.started||[]).includes(r)||games.some(g=>g.status==="submitted"||g.status==="approved");
+      html+='<section class="sr-round"><div class="sr-r-head"><h3>Round '+r+(started?' <span class="sr-chip live">Started</span>':'')+'</h3>'+head+(adm?(started&&(B.started||[]).includes(r)?'<button type="button" class="ghost" data-srstart="'+r+'" data-v="0">Unlock round</button>':(!started?'<button type="button" class="primary" data-srstart="'+r+'" data-v="1">Start round</button>':'')):'')+'</div>'+squadsBlock(r,B,mem,s,adm)+(games.length?games.map(g=>gameRow(g,mem,s,adm)).join(""):'<p class="small sr-empty">Fixtures appear once both captains submit their squads.</p>')+(adm?pairTools(r,games,B,mem):'')+'</section>';
     }
     // admin controls
     if(adm){
@@ -1913,7 +1914,7 @@ $("playersBody").innerHTML = shown.map(p =>
   function squadIds(B,r,side){const q=B.squads.find(x=>x.round===r&&x.side===side);return q?q.members.slice():[];}
   function squadsBlock(r,B,mem,s,adm){
     const me=B.me,cap=side=>adm||(me&&me.captain&&me.side===side&&me.status==="confirmed");
-    const played=B.games.some(g=>g.round===r&&(g.status==="submitted"||g.status==="approved"));
+    const played=(B.started||[]).includes(r)||B.games.some(g=>g.round===r&&(g.status==="submitted"||g.status==="approved"));
     const col=side=>{
       const ids=squadIds(B,r,side),name=sideName(s,side);
       const editable=cap(side)&&(adm||!played);
@@ -1973,6 +1974,7 @@ $("playersBody").innerHTML = shown.map(p =>
     $("srDeadline")?.addEventListener("submit",e=>{e.preventDefault();const v=new FormData(e.target).get("d");if(!v){toast("Pick a date first.");return;}seriesCall("series_set",{p_id:s.id,p_deadline:new Date(v).toISOString()},"Deadline saved.");});
     $("srDeadlineClear")?.addEventListener("click",()=>seriesCall("series_set",{p_id:s.id,p_clear_deadline:true},"Deadline cleared."));
     box.querySelectorAll(".sr-sq[data-round] .sr-sq-edit").forEach(el=>paintDraft(el,B));
+    box.querySelectorAll("[data-srstart]").forEach(b=>b.onclick=()=>seriesCall("series_start_round",{p_id:s.id,p_round:Number(b.dataset.srstart),p_started:b.dataset.v==="1"},b.dataset.v==="1"?"Round started. Captains can no longer change its squads.":"Round unlocked."));
     box.querySelectorAll("[data-srcap]").forEach(b=>b.onclick=()=>seriesCall("series_set_captain",{p_id:s.id,p_side:b.dataset.side,p_member:b.dataset.srcap||null},b.dataset.srcap?"Captain set.":"Captain removed."));
     box.querySelectorAll("[data-srauto-unused]").forEach(b=>b.onclick=()=>{
       const rows=box.querySelector('.sr-pair-rows[data-round="'+b.dataset.srauto+'"]');
@@ -2127,6 +2129,7 @@ $("playersBody").innerHTML = shown.map(p =>
     if(!client||!id){box.innerHTML="";return;}
     box.innerHTML='<div class="h2h-empty"><span>Loading profile…</span></div>';
     const lbMonth=monthDate(pfScope.mode==="month"?pfScope.month:monthNow);
+    const serP=client.rpc("get_player_series",{p_player:id}).then(r=>r.data||null,()=>null);
     const [mres,dir,lb]=await Promise.all([client.rpc("get_player_matches",{p_player:id}),client.from("active_player_directory").select("id,display_name").eq("id",id).maybeSingle(),client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
     const me=dir.data;
     if(!me||mres.error){box.innerHTML='<div class="h2h-empty"><b>Player not found.</b><span>This profile is not available.</span></div>';return;}
@@ -2179,7 +2182,14 @@ $("playersBody").innerHTML = shown.map(p =>
           '<h3>Highlights</h3><div class="pf-hls">'+hl("Biggest win",bigWin,bigWin?bigWin.gf+" – "+bigWin.ga:"")+hl("Highest scoring",topScore,topScore?topScore.gf+" – "+topScore.ga:"")+'</div></section>'+
       '</div>'+
       '<section class="pf-card pf-wide"><h3>Badges <small>'+earned+' of '+bd.defs.length+' earned</small></h3><div class="pf-badges">'+badges+'</div></section>'+
-      '<section class="pf-card pf-wide"><h3>Latest matches</h3><div class="pf-ms">'+recent+'</div></section>';
+      '<section class="pf-card pf-wide"><h3>Latest matches</h3><div class="pf-ms">'+recent+'</div></section>'+
+      '<div id="pfSeries"></div>';
+    serP.then(sd=>{
+      const el=$("pfSeries");if(!el||!sd||!sd.summary||!sd.summary.played)return;
+      const m=sd.summary;
+      el.innerHTML='<section class="pf-card pf-wide pf-series"><h3>Team series <small>kept separate from friendly matches</small></h3><div class="pf-tiles pf-tiles-sm">'+[["Games",m.played],["W · D · L",m.w+" · "+m.d+" · "+m.l],["Goals",m.gf+" – "+m.ga]].map(t=>'<div class="pf-tile"><b>'+t[1]+'</b><span>'+t[0]+'</span></div>').join("")+'</div>'+
+        sd.series.map(x=>'<div class="pf-ser"><div class="pf-ser-h"><b>'+esc(x.name)+'</b><span>Played for '+esc(x.team)+'</span></div>'+x.games.map(g=>'<div class="pf-m r-'+(g.gf>g.ga?"w":g.gf<g.ga?"l":"d")+'"><span class="d">Round '+g.round+'</span><span class="o'+(g.opp_id?' link-player':'')+'"'+(g.opp_id?' data-player="'+esc(g.opp_id)+'"':'')+'>'+esc(g.opp)+'</span><span class="s">'+g.gf+' – '+g.ga+'</span></div>').join("")+'</div>').join("")+'</section>';
+    });
     box.querySelectorAll("[data-pfs]").forEach(b=>b.addEventListener("click",()=>{pfScope.mode=b.dataset.pfs;renderPlayerPage();}));
     const pm=$("pfMonth");if(pm)pm.addEventListener("change",()=>{pfScope.month=pm.value||monthNow;renderPlayerPage();});
     $("pfCompare").addEventListener("click",async()=>{

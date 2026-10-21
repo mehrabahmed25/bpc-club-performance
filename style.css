@@ -1083,3 +1083,11 @@ button.st-ph:focus-visible{outline:3px solid var(--flood);outline-offset:2px}
 .sr-save-sq{margin-top:4px}
 .sr-bench{margin:0 0 6px}
 @media(max-width:700px){.sr-squads-r{grid-template-columns:1fr}}
+.pf-series{margin-top:14px}
+.pf-series h3 small{font-weight:600;color:var(--muted);margin-left:6px}
+.pf-tiles-sm{grid-template-columns:repeat(3,1fr);margin:10px 0 6px}
+.pf-ser{margin-top:12px;display:grid;gap:6px}
+.pf-ser-h{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.pf-ser-h span{color:var(--muted);font-size:13px}
+.sr-r-head .ghost{background:#fff;color:var(--ink);border:1px solid #c9d3e6;box-shadow:none;padding:6px 12px}
+.sr-r-head h3 .sr-chip{margin-left:8px;vertical-align:middle}
