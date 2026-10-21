@@ -1815,7 +1815,7 @@ $("playersBody").innerHTML = shown.map(p =>
     box.innerHTML=list.map(s=>{
       const w=s.rounds_won||{a:0,b:0},lead=seriesLeader(s,w);
       const chip=s.status==="finished"||lead?'<span class="sr-chip done">'+(lead?esc(sideName(s,lead))+' win':'Finished')+'</span>':s.status==="live"?'<span class="sr-chip live">Live</span>':(s.reg_open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Starting soon</span>');
-      return '<button type="button" class="sr-banner" data-series="'+esc(s.id)+'"><span class="sr-b-top">'+chip+'<small>Best of '+s.rounds+' rounds</small></span><b class="sr-b-name">'+esc(s.name)+'</b><span class="sr-b-vs"><span><em>'+esc(s.team_a)+'</em><small>'+s.a_count+'/'+s.per_side+' players</small></span><strong>'+w.a+' – '+w.b+'</strong><span><em>'+esc(s.team_b)+'</em><small>'+s.b_count+'/'+s.per_side+' players</small></span></span><span class="sr-b-cta">'+(s.status==="open"&&s.reg_open?'Pick your side':'Open the series')+'</span></button>';
+      return '<button type="button" class="sr-banner" data-series="'+esc(s.id)+'"><span class="sr-b-top">'+chip+'<small>Best of '+s.rounds+' rounds</small></span><b class="sr-b-name">'+esc(s.name)+'</b><span class="sr-b-vs"><span><em>'+esc(s.team_a)+'</em><small>'+s.a_count+' players</small></span><strong>'+w.a+' – '+w.b+'</strong><span><em>'+esc(s.team_b)+'</em><small>'+s.b_count+' players</small></span></span><span class="sr-b-cta">'+(s.status==="open"&&s.reg_open?'Pick your side':'Open the series')+'</span></button>';
     }).join("");
     box.classList.remove("hidden");
   }
@@ -1840,12 +1840,12 @@ $("playersBody").innerHTML = shown.map(p =>
   function renderSeriesIndex(){
     const box=$("seriesPage"),adm=state.tnAdmin;
     const cards=seriesList.map(s=>'<button type="button" class="sr-row" data-series="'+esc(s.id)+'"><b>'+esc(s.name)+'</b><span>'+esc(s.team_a)+' '+(s.rounds_won?s.rounds_won.a:0)+' – '+(s.rounds_won?s.rounds_won.b:0)+' '+esc(s.team_b)+'</span><small>'+esc(s.status)+(s.pending?' · '+s.pending+' waiting for approval':'')+'</small></button>').join("");
-    const form=adm?'<form id="srCreate" class="panel sr-create"><h3>New series</h3><div class="sr-grid"><label>Series name<input name="name" required maxlength="100" value="Married v Unmarried"></label><label>Team one<input name="a" required maxlength="40" value="Married"></label><label>Team two<input name="b" required maxlength="40" value="Unmarried"></label><label>Players per team<input name="per" type="number" min="1" max="30" value="8"></label><label>Best of rounds<input name="rounds" type="number" min="1" max="9" value="3"></label><label>Sign-up deadline (optional)<input name="deadline" type="datetime-local"></label></div><button class="primary" type="submit">Create and open sign-ups</button><div id="srCreateStatus" class="status"></div></form>':'';
+    const form=adm?'<form id="srCreate" class="panel sr-create"><h3>New series</h3><div class="sr-grid"><label>Series name<input name="name" required maxlength="100" value="Married v Unmarried"></label><label>Team one<input name="a" required maxlength="40" value="Married"></label><label>Team two<input name="b" required maxlength="40" value="Unmarried"></label><label>Best of rounds<input name="rounds" type="number" min="1" max="9" value="3"></label><label>Sign-up deadline (optional)<input name="deadline" type="datetime-local"></label></div><button class="primary" type="submit">Create and open sign-ups</button><div id="srCreateStatus" class="status"></div></form>':'';
     box.innerHTML=seriesBack()+'<div class="wk-mast"><div><h2>Team series</h2><p>Two teams, 1v1 games, best of rounds wins.</p></div></div><div class="sr-list">'+(cards||'<div class="h2h-empty"><b>No series yet.</b><span>Series appear here once an admin creates one.</span></div>')+'</div>'+form;
     $("srBack").onclick=()=>showView(seriesFrom==="series"?"home":seriesFrom);
     $("srCreate")?.addEventListener("submit",async e=>{
       e.preventDefault();const f=e.target,d=new FormData(f);
-      const {data,error}=await client.rpc("series_create",{p_name:d.get("name"),p_team_a:d.get("a"),p_team_b:d.get("b"),p_per_side:Number(d.get("per"))||8,p_rounds:Number(d.get("rounds"))||3,p_deadline:d.get("deadline")?new Date(d.get("deadline")).toISOString():null});
+      const {data,error}=await client.rpc("series_create",{p_name:d.get("name"),p_team_a:d.get("a"),p_team_b:d.get("b"),p_per_side:8,p_rounds:Number(d.get("rounds"))||3,p_deadline:d.get("deadline")?new Date(d.get("deadline")).toISOString():null});
       if(error){status("srCreateStatus",error.message,"error");return;}
       toast("Series created. Sign-ups are open.");seriesId=data;loadSeriesPage();
     });
@@ -1860,26 +1860,25 @@ $("playersBody").innerHTML = shown.map(p =>
     const open=s.status==="open"&&s.reg_open&&(!s.reg_deadline||new Date(s.reg_deadline)>new Date());
     const chip=lead?'<span class="sr-chip done">'+esc(sideName(s,lead))+' win the series</span>':s.status==="finished"?'<span class="sr-chip done">Finished</span>':s.status==="live"?'<span class="sr-chip live">Live</span>':open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Sign-ups closed</span>';
     // header
-    let html=seriesBack()+'<div class="sr-hero"><div class="sr-h-top"><h2>'+esc(s.name)+'</h2>'+chip+'</div><div class="sr-score"><div class="sr-team '+(lead==="a"?"win":"")+'"><b>'+esc(s.team_a)+'</b><small>'+conf("a").length+'/'+s.per_side+' players</small></div><div class="sr-tally"><span>'+tally.a+'</span><i>–</i><span>'+tally.b+'</span><small>rounds · best of '+s.rounds+'</small></div><div class="sr-team '+(lead==="b"?"win":"")+'"><b>'+esc(s.team_b)+'</b><small>'+conf("b").length+'/'+s.per_side+' players</small></div></div>'+(s.reg_deadline&&open?'<p class="sr-note">Sign-ups close '+esc(new Date(s.reg_deadline).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</p>':'')+'</div>';
+    let html=seriesBack()+'<div class="sr-hero"><div class="sr-h-top"><h2>'+esc(s.name)+'</h2>'+chip+'</div><div class="sr-score"><div class="sr-team '+(lead==="a"?"win":"")+'"><b>'+esc(s.team_a)+'</b><small>'+conf("a").length+' players</small></div><div class="sr-tally"><span>'+tally.a+'</span><i>–</i><span>'+tally.b+'</span><small>rounds · best of '+s.rounds+'</small></div><div class="sr-team '+(lead==="b"?"win":"")+'"><b>'+esc(s.team_b)+'</b><small>'+conf("b").length+' players</small></div></div>'+(s.reg_deadline&&open?'<p class="sr-note">Sign-ups close '+esc(new Date(s.reg_deadline).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</p>':'')+'</div>';
     // join panel
     let join="";
     if(!state.session)join=open?'<div class="sr-join"><b>Want to play?</b><span class="small">Sign in to pick a side.</span><button type="button" class="primary" data-view="account">Sign in</button></div>':'';
     else if(me&&me.status==="pending")join='<div class="sr-join"><b>You asked to join '+esc(sideName(s,me.side))+'.</b><span class="small">An admin will confirm your spot.</span><button type="button" class="ghost" id="srLeave">Withdraw</button></div>';
     else if(me&&me.status==="confirmed")join='<div class="sr-join ok"><b>You are in '+esc(sideName(s,me.side))+'.</b><span class="small">Your games and score box show below once pairings are set.</span>'+(!B.games.some(g=>g.mine)?'<button type="button" class="ghost" id="srLeave">Leave team</button>':'')+'</div>';
-    else if(open)join='<div class="sr-join"><b>Pick your side</b><span class="small">Admin confirms every entry. Each team takes up to '+s.per_side+' players.</span><div class="sr-pick"><button type="button" class="primary" data-srjoin="a">Join '+esc(s.team_a)+'</button><button type="button" class="primary alt" data-srjoin="b">Join '+esc(s.team_b)+'</button></div></div>';
+    else if(open)join='<div class="sr-join"><b>Pick your side</b><span class="small">Admin confirms every entry. Any number of players can join each team.</span><div class="sr-pick"><button type="button" class="primary" data-srjoin="a">Join '+esc(s.team_a)+'</button><button type="button" class="primary alt" data-srjoin="b">Join '+esc(s.team_b)+'</button></div></div>';
     html+=join+'<div id="srStatus" class="status"></div>';
     // squads
     const squad=side=>{
       const list=B.members.filter(m=>m.side===side&&(m.status==="confirmed"||adm||(me&&m.id===me.member_id)));
-      return '<section class="sr-squad"><h3>'+esc(sideName(s,side))+' <small>'+conf(side).length+'/'+s.per_side+'</small></h3>'+(list.length?list.map(m=>'<div class="sr-mem '+(m.status==="pending"?"pending":"")+'">'+seriesPlayer(m)+(m.status==="pending"?'<span class="sr-chip">Waiting</span>':'')+(adm?'<span class="sr-mact">'+(m.status==="pending"?'<button type="button" class="primary" data-srmem="approve" data-id="'+esc(m.id)+'">Approve</button>':'')+'<button type="button" class="ghost" data-srmem="switch" data-id="'+esc(m.id)+'">Move</button><button type="button" class="ghost" data-srmem="remove" data-id="'+esc(m.id)+'">Remove</button></span>':'')+'</div>').join(""):'<p class="small">No players yet.</p>')+'</section>';
+      return '<section class="sr-squad"><h3>'+esc(sideName(s,side))+' <small>'+conf(side).length+' players</small></h3>'+(list.length?list.map(m=>'<div class="sr-mem '+(m.status==="pending"?"pending":"")+'">'+seriesPlayer(m)+(m.status==="pending"?'<span class="sr-chip">Waiting</span>':'')+(m.id===(side==="a"?s.captain_a:s.captain_b)?'<span class="sr-chip open">Captain</span>':'')+(adm?'<span class="sr-mact">'+(m.status==="confirmed"?(m.id===(side==="a"?s.captain_a:s.captain_b)?'<button type="button" class="ghost" data-srcap="" data-side="'+side+'">Remove captain</button>':'<button type="button" class="ghost" data-srcap="'+esc(m.id)+'" data-side="'+side+'">Make captain</button>'):'')+(m.status==="pending"?'<button type="button" class="primary" data-srmem="approve" data-id="'+esc(m.id)+'">Approve</button>':'')+'<button type="button" class="ghost" data-srmem="switch" data-id="'+esc(m.id)+'">Move</button><button type="button" class="ghost" data-srmem="remove" data-id="'+esc(m.id)+'">Remove</button></span>':'')+'</div>').join(""):'<p class="small">No players yet.</p>')+'</section>';
     };
     html+='<div class="sr-squads">'+squad("a")+squad("b")+'</div>';
     // rounds
     for(let r=1;r<=s.rounds;r++){
       const games=B.games.filter(g=>g.round===r),ro=B.rounds.find(x=>x.round===r);
-      if(!games.length&&!adm)continue;
       const head=ro?'<span class="sr-rtally">'+ro.a_wins+' – '+ro.b_wins+(ro.complete?(ro.winner==="draw"?' · drawn':' · '+esc(sideName(s,ro.winner))+' take the round'):'')+'</span>':'<span class="sr-rtally">Not scheduled</span>';
-      html+='<section class="sr-round"><div class="sr-r-head"><h3>Round '+r+'</h3>'+head+'</div>'+(games.length?games.map(g=>gameRow(g,mem,s,adm)).join(""):'<p class="small sr-empty">No games yet.</p>')+(adm?pairTools(r,games,B,mem):'')+'</section>';
+      html+='<section class="sr-round"><div class="sr-r-head"><h3>Round '+r+'</h3>'+head+'</div>'+squadsBlock(r,B,mem,s,adm)+(games.length?games.map(g=>gameRow(g,mem,s,adm)).join(""):'<p class="small sr-empty">Fixtures appear once both captains submit their squads.</p>')+(adm?pairTools(r,games,B,mem):'')+'</section>';
     }
     // admin controls
     if(adm){
@@ -1905,11 +1904,49 @@ $("playersBody").innerHTML = shown.map(p =>
     return '<div class="sr-game '+(g.mine?"mine":"")+'"><div class="sr-g-row"><div class="sr-g-p '+(win==="a"?"w":"")+'">'+seriesPlayer(a)+'</div><div class="sr-g-mid">'+(has&&(g.status==="approved"||adm||g.mine)?'<strong>'+g.a_goals+' – '+g.b_goals+'</strong>':'<strong class="vs">v</strong>')+st+'</div><div class="sr-g-p r '+(win==="b"?"w":"")+'">'+seriesPlayer(b)+'</div></div>'+form+'</div>';
   }
   function pairTools(r,games,B,mem){
-    const locked=games.some(g=>g.status==="submitted"||g.status==="approved");
     const A=B.members.filter(m=>m.side==="a"&&m.status==="confirmed"),Bs=B.members.filter(m=>m.side==="b"&&m.status==="confirmed");
-    if(locked||!A.length||!Bs.length)return locked?'<p class="small sr-lock">Pairings are locked once scores come in.</p>':'';
+    if(!A.length||!Bs.length)return"";
     const cur={};games.forEach(g=>cur[g.a_member]=g.b_member);
-    return '<details class="sr-pair"><summary>Set pairings for round '+r+'</summary><div class="sr-pair-body"><button type="button" class="ghost" data-srauto="'+r+'">Auto-pair by sign-up order</button><div class="sr-pair-rows" data-round="'+r+'">'+A.map(a=>'<div class="sr-pair-row"><span>'+esc(a.name)+'</span><select data-a="'+esc(a.id)+'"><option value="">No game</option>'+Bs.map(b=>'<option value="'+esc(b.id)+'"'+(cur[a.id]===b.id?' selected':'')+'>'+esc(b.name)+'</option>').join("")+'</select></div>').join("")+'</div><button type="button" class="primary" data-srsave="'+r+'">Save pairings</button></div></details>';
+    return '<details class="sr-pair"><summary>Admin: set pairings by hand for round '+r+'</summary><div class="sr-pair-body"><p class="small">Changing a pairing clears that game\'s score. Unchanged games keep theirs.</p><div class="sr-pair-rows" data-round="'+r+'">'+A.map(a=>'<div class="sr-pair-row"><span>'+esc(a.name)+'</span><select data-a="'+esc(a.id)+'"><option value="">No game</option>'+Bs.map(b=>'<option value="'+esc(b.id)+'"'+(cur[a.id]===b.id?' selected':'')+'>'+esc(b.name)+'</option>').join("")+'</select></div>').join("")+'</div><button type="button" class="primary" data-srsave="'+r+'">Save pairings</button></div></details>';
+  }
+  var srDraft={};
+  function squadIds(B,r,side){const q=B.squads.find(x=>x.round===r&&x.side===side);return q?q.members.slice():[];}
+  function squadsBlock(r,B,mem,s,adm){
+    const me=B.me,cap=side=>adm||(me&&me.captain&&me.side===side&&me.status==="confirmed");
+    const played=B.games.some(g=>g.round===r&&(g.status==="submitted"||g.status==="approved"));
+    const col=side=>{
+      const ids=squadIds(B,r,side),name=sideName(s,side);
+      const editable=cap(side)&&(adm||!played);
+      if(editable){
+        const k=r+side;if(!srDraft[k])srDraft[k]=ids.slice();
+        return '<div class="sr-sq" data-round="'+r+'" data-side="'+side+'"><h4>'+esc(name)+' squad</h4><div class="sr-sq-edit"></div></div>';
+      }
+      return '<div class="sr-sq"><h4>'+esc(name)+' squad</h4>'+(ids.length?'<ol>'+ids.map(id=>'<li>'+(mem[id]?seriesPlayer(mem[id],"sr-av sm"):"")+'</li>').join("")+'</ol>':'<p class="small">Not submitted yet.</p>')+'</div>';
+    };
+    const na=squadIds(B,r,"a").length,nb=squadIds(B,r,"b").length;
+    return '<div class="sr-squads-r">'+col("a")+col("b")+'</div>'+((na||nb)?'<p class="small sr-bench">'+(na&&nb?Math.min(na,nb)+' game'+(Math.min(na,nb)===1?'':'s')+' · '+(na!==nb?(na>nb?(na-nb)+' extra on '+esc(s.team_a)+' bench':(nb-na)+' extra on '+esc(s.team_b)+' bench'):'squads are level'):'Waiting for the other captain.')+'</p>':'');
+  }
+  function paintDraft(el,B){
+    const host=el.parentElement,r=Number(host.dataset.round),side=host.dataset.side,k=r+side,draft=srDraft[k]||[];
+    const mem={};B.members.forEach(m=>mem[m.id]=m);
+    const pool=B.members.filter(m=>m.side===side&&m.status==="confirmed"&&!draft.includes(m.id));
+    el.innerHTML=(draft.length?'<ol>'+draft.map((id,i)=>'<li>'+(mem[id]?seriesPlayer(mem[id],"sr-av sm"):"")+'<span class="sr-ord"><button type="button" data-o="up" data-i="'+i+'" aria-label="Move up"'+(i===0?" disabled":"")+'>↑</button><button type="button" data-o="down" data-i="'+i+'" aria-label="Move down"'+(i===draft.length-1?" disabled":"")+'>↓</button><button type="button" data-o="x" data-i="'+i+'" aria-label="Remove">✕</button></span></li>').join("")+'</ol>':'<p class="small">Add players in playing order. Number 1 plays the other team\'s number 1.</p>')+
+      (pool.length?'<div class="sr-add"><select aria-label="Add a player"><option value="">Add a player…</option>'+pool.map(m=>'<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>').join("")+'</select><button type="button" class="ghost" data-o="add">Add</button></div>':'')+
+      '<button type="button" class="primary sr-save-sq">Submit squad</button>';
+    el.onclick=async e=>{
+      const b=e.target.closest("button");if(!b)return;
+      const i=Number(b.dataset.i),d=srDraft[k];
+      if(b.dataset.o==="up"&&i>0){[d[i-1],d[i]]=[d[i],d[i-1]];}
+      else if(b.dataset.o==="down"&&i<d.length-1){[d[i+1],d[i]]=[d[i],d[i+1]];}
+      else if(b.dataset.o==="x"){d.splice(i,1);}
+      else if(b.dataset.o==="add"){const v=el.querySelector(".sr-add select").value;if(v)d.push(v);}
+      else if(b.classList.contains("sr-save-sq")){
+        const {error}=await client.rpc("series_submit_squad",{p_id:B.series.id,p_round:r,p_side:side,p_members:d});
+        if(error){status("srStatus",error.message,"error");toast(error.message);return;}
+        toast("Squad submitted.");srDraft={};await loadSeriesPage();return;
+      }
+      paintDraft(el,B);
+    };
   }
   async function seriesCall(fn,args,okMsg){
     const {error,data}=await client.rpc(fn,args);
@@ -1935,7 +1972,9 @@ $("playersBody").innerHTML = shown.map(p =>
     });
     $("srDeadline")?.addEventListener("submit",e=>{e.preventDefault();const v=new FormData(e.target).get("d");if(!v){toast("Pick a date first.");return;}seriesCall("series_set",{p_id:s.id,p_deadline:new Date(v).toISOString()},"Deadline saved.");});
     $("srDeadlineClear")?.addEventListener("click",()=>seriesCall("series_set",{p_id:s.id,p_clear_deadline:true},"Deadline cleared."));
-    box.querySelectorAll("[data-srauto]").forEach(b=>b.onclick=()=>{
+    box.querySelectorAll(".sr-sq[data-round] .sr-sq-edit").forEach(el=>paintDraft(el,B));
+    box.querySelectorAll("[data-srcap]").forEach(b=>b.onclick=()=>seriesCall("series_set_captain",{p_id:s.id,p_side:b.dataset.side,p_member:b.dataset.srcap||null},b.dataset.srcap?"Captain set.":"Captain removed."));
+    box.querySelectorAll("[data-srauto-unused]").forEach(b=>b.onclick=()=>{
       const rows=box.querySelector('.sr-pair-rows[data-round="'+b.dataset.srauto+'"]');
       const bs=[...rows.querySelector("select").options].map(o=>o.value).filter(Boolean);
       [...rows.querySelectorAll("select")].forEach((sel,i)=>{sel.value=bs[i]||"";});
