@@ -556,6 +556,7 @@ $("matchForm").addEventListener("submit", async e => {
     $("leaderboardMonthLabel").textContent=new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"})+" leaderboard";
     status("leaderboardStatus","Loading rankings…");
     const wantMoves=month===monthNow;
+    const formP=client.rpc("get_recent_form",{p_limit:5}).then(r=>r.data||[],()=>[]);
     const [{data,error},prev]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),wantMoves?client.rpc("get_leaderboard_asof",{p_month:monthDate(month),p_cutoff:ymd(addDays(new Date(),-7))}):Promise.resolve({data:null}),ensureAvatars()]);
     if(error){status("leaderboardStatus",error.message,"error");return;}
     const moves=rankMoves(data,prev&&prev.data);
@@ -564,20 +565,34 @@ $("matchForm").addEventListener("submit", async e => {
     const cobegByPlayer={};
     (cobegTotals||[]).forEach(row=>{cobegByPlayer[row.player_id]=Number(row.total_mp_vs_cobeg_xi)||0;});
     status("leaderboardStatus",data.length+" active players · Approved and counted results only.");
+    const formRows=await formP,formBy={};formRows.forEach(f=>formBy[f.player_id]=f.form);
     const body=$("leaderboardBody");
+    const oldTop={};body.querySelectorAll("tr[data-pid]").forEach(tr=>{oldTop[tr.dataset.pid]=tr.getBoundingClientRect().top;});
+    const maxPts=Math.max(1,...data.map(r=>Number(r.points)||0)),myId=state.player&&state.player.id;
     if(!data.length){body.innerHTML='<tr><td colspan="13" class="empty">No active players yet. Members can register to appear here.</td></tr>';return;}
     body.innerHTML=data.map(r=>{
       const total=cobegByPlayer[r.player_id]||0;
       const eligible=!!r.award_eligible;
-      return '<tr><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'"><span class="rk">'+r.rank+'</span>'+moveHtml(moves[r.player_id])+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc((r.player_name||"?").split(/\\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase())+'</span>'+esc(r.player_name)+'</div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points">'+r.points+'</td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td><span class="pill '+(eligible?'good':'')+'">'+(eligible?'Eligible':'In progress')+'</span></td></tr>';
+      const fm=(formBy[r.player_id]||"").split("").map(c=>'<i class="fd '+c.toLowerCase()+'" title="'+({W:"Win",D:"Draw",L:"Loss"})[c]+'"></i>').join("");
+      const pct=Math.round((Math.min(Number(r.matches_played)||0,40)/40+Math.min(total,25)/25+Math.min(Number(r.cobeg_opponents)||0,5)/5)/3*100);
+      const ring='<span class="aw-ring'+(eligible?' ok':'')+'" style="--p:'+(eligible?100:pct)+'" title="'+(eligible?"Award eligible":"Award progress "+pct+"%")+'"><b>'+(eligible?"✓":pct+"%")+'</b></span>';
+      return '<tr data-pid="'+esc(r.player_id)+'"'+(myId&&r.player_id===myId?' class="is-me"':'')+'><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'"><span class="rk">'+r.rank+'</span>'+moveHtml(moves[r.player_id])+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><span class="pc-name"><b>'+esc(r.player_name)+'</b>'+(myId&&r.player_id===myId?'<em class="you">You</em>':'')+(fm?'<span class="lb-form" aria-label="Recent form">'+fm+'</span>':'')+'</span></div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points"><div class="pts-cell"><b>'+r.points+'</b><span class="pts-bar"><i style="width:'+Math.round((Number(r.points)||0)/maxPts*100)+'%"></i></span></div></td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td>'+ring+'</td></tr>';
     }).join("");
+    // re-shuffle: rows slide from their old position when the table reloads
+    if(Object.keys(oldTop).length&&!matchMedia("(prefers-reduced-motion: reduce)").matches){
+      body.querySelectorAll("tr[data-pid]").forEach(tr=>{
+        const o=oldTop[tr.dataset.pid];if(o==null)return;
+        const dy=o-tr.getBoundingClientRect().top;
+        if(Math.abs(dy)>2&&tr.animate)tr.animate([{transform:"translateY("+dy+"px)"},{transform:"none"}],{duration:520,easing:"cubic-bezier(.2,.9,.3,1)"});
+      });
+    }
     renderPodium(data);
   }
   function renderPodium(rows){
     const el=$("lbPodium");if(!el)return;
     const top=(rows||[]).filter(r=>Number(r.matches_played)>0).slice(0,3);
     if(top.length<3){el.classList.add("hidden");el.innerHTML="";return;}
-    const slot=(r,i)=>'<div class="pod pod-'+(i+1)+' link-player" data-player="'+esc(r.player_id)+'"><span class="pod-rank">'+(i+1)+'</span><span class="pod-avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
+    const slot=(r,i)=>'<div class="pod pod-'+(i+1)+' link-player" data-player="'+esc(r.player_id)+'" style="--d:'+([.25,.1,.4][i])+'s"><span class="pod-num" aria-hidden="true">'+(i+1)+'</span>'+(i===0?'<svg class="pod-crown" viewBox="0 0 48 32" aria-hidden="true"><path d="M3 28 L7 8 L17 18 L24 3 L31 18 L41 8 L45 28 Z" fill="currentColor"/></svg>':'<span class="pod-rank">'+(i+1)+'</span>')+'<span class="pod-avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><b class="pod-name">'+esc(r.player_name)+'</b><span class="pod-pts">'+esc(r.points)+'<small> pts</small></span><span class="pod-rec">'+esc(r.wins)+'W '+esc(r.draws)+'D '+esc(r.losses)+'L · GD '+signed(Number(r.goal_difference)||0)+'</span></div>';
     el.innerHTML=[1,0,2].map(i=>slot(top[i],i)).join("");
     el.classList.remove("hidden");
   }
