@@ -1801,6 +1801,57 @@ $("playersBody").innerHTML = shown.map(p =>
   function sideName(s,side){return side==="a"?s.team_a:s.team_b;}
   function seriesTally(list){const w={a:0,b:0};(list||[]).forEach(r=>{if(r.winner==="a")w.a++;else if(r.winner==="b")w.b++;});return w;}
   function seriesLeader(s,w){const need=Math.floor(s.rounds/2)+1;return w.a>=need?"a":w.b>=need?"b":null;}
+  // ---- matchday poster (Home banner + series page header) ----
+  var srTimer=null;
+  function srCdText(ms){
+    if(ms<=0)return"Sign-ups closed";
+    const t=Math.floor(ms/1000),d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60),sec=t%60,p=n=>String(n).padStart(2,"0");
+    return "Closes in "+(d?d+"d ":"")+p(h)+"h "+p(m)+"m "+p(sec)+"s";
+  }
+  function srTick(){
+    const els=document.querySelectorAll(".sr-cd[data-until]");
+    if(!els.length){clearInterval(srTimer);srTimer=null;return;}
+    els.forEach(e=>{e.textContent=srCdText(new Date(e.dataset.until)-Date.now());});
+  }
+  function srStartTimer(){if(!srTimer)srTimer=setInterval(srTick,1000);srTick();}
+  function srStack(list,count,max){
+    const l=(list||[]).slice(0,max||6),more=Math.max(0,count-l.length);
+    return '<span class="srp-stack">'+l.map(p=>avBig(p.name,p.id,"srp-pa")).join("")+(more?'<span class="srp-more">+'+more+'</span>':'')+(!l.length?'<span class="srp-none">Be the first</span>':'')+'</span>';
+  }
+  function srTug(a,b,s){
+    const t=a+b,p=t?Math.min(92,Math.max(8,Math.round(a/t*100))):50;
+    return '<div class="srp-tug" role="img" aria-label="Games won: '+esc(s.team_a)+' '+a+', '+esc(s.team_b)+' '+b+'"><i class="srp-tug-a" style="width:'+p+'%"></i><i class="srp-tug-b" style="width:'+(100-p)+'%"></i><span class="srp-knot" style="left:'+p+'%"></span><small class="l">'+a+' game'+(a===1?'':'s')+'</small><small class="m">Games won</small><small class="r">'+b+' game'+(b===1?'':'s')+'</small></div>';
+  }
+  function srPips(s,rounds,started){
+    const need=Math.floor(s.rounds/2)+1,out=[];
+    for(let r=1;r<=s.rounds;r++){
+      const ro=(rounds||[]).find(x=>x.round===r);
+      const w=ro&&ro.complete?ro.winner:null;
+      const live=!w&&(ro&&ro.total>0&&(started||[]).includes(r)||ro&&ro.approved>0);
+      out.push('<span class="srp-pip '+(w==="a"?"pa":w==="b"?"pb":w==="draw"?"pd":live?"live":"")+'"><b>'+r+'</b><em>'+(w==="a"?esc(s.team_a):w==="b"?esc(s.team_b):w==="draw"?"Drawn":live?"Live":"Round")+'</em></span>');
+    }
+    return '<div class="srp-pips">'+out.join('<i class="srp-link"></i>')+'</div><p class="srp-need">First to '+need+' round'+(need===1?'':'s')+' takes the series</p>';
+  }
+  function srConfetti(){
+    const c=["#f6b73c","#3b73ff","#ffffff","#13a46b"];let h="";
+    for(let i=0;i<34;i++)h+='<i style="left:'+(Math.random()*100).toFixed(1)+'%;background:'+c[i%4]+';animation-delay:'+(Math.random()*.8).toFixed(2)+'s;--dx:'+((Math.random()-.5)*160).toFixed(0)+'px;--r:'+Math.round(Math.random()*720)+'deg"></i>';
+    return '<div class="srp-confetti" aria-hidden="true">'+h+'</div>';
+  }
+  // opts: {s, a:{count,players}, b:{...}, tally:{a,b}, lead, games:{a,b}, rounds, started, big, tag}
+  function srPoster(o){
+    const s=o.s,lead=o.lead,open=s.status==="open"&&s.reg_open&&(!s.reg_deadline||new Date(s.reg_deadline)>new Date());
+    const chip=lead?'<span class="sr-chip done">'+esc(sideName(s,lead))+' win the series</span>':s.status==="finished"?'<span class="sr-chip done">Finished</span>':s.status==="live"?'<span class="sr-chip live"><i class="srp-dot"></i>Live</span>':open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Sign-ups closed</span>';
+    const cd=open&&s.reg_deadline?'<span class="sr-cd" data-until="'+esc(s.reg_deadline)+'">'+srCdText(new Date(s.reg_deadline)-Date.now())+'</span>':'<span class="srp-best">Best of '+s.rounds+' rounds</span>';
+    const team=side=>{
+      const t=o[side],won=lead===side;
+      return '<div class="srp-team s'+side+(won?' won':'')+(lead&&!won?' lost':'')+'">'+(won?'<span class="srp-ribbon">Champions</span>':'')+'<span class="sr-crest">'+esc(initials(sideName(s,side)))+'</span><b>'+esc(sideName(s,side))+'</b><small>'+t.count+' player'+(t.count===1?'':'s')+'</small>'+srStack(t.players,t.count,o.big?8:6)+'</div>';
+    };
+    return '<div class="srp-bg" aria-hidden="true"><i class="srp-half a"></i><i class="srp-half b"></i><i class="srp-slash"></i><span class="srp-ghost a">'+esc(s.team_a)+'</span><span class="srp-ghost b">'+esc(s.team_b)+'</span></div>'+
+      (lead?srConfetti():'')+
+      '<div class="srp-top"><div class="srp-title">'+chip+'<h2>'+esc(s.name)+'</h2></div>'+cd+'</div>'+
+      '<div class="srp-main">'+team("a")+'<div class="srp-vs"><span class="srp-score"><b>'+o.tally.a+'</b><i>–</i><b>'+o.tally.b+'</b></span><small>rounds</small></div>'+team("b")+'</div>'+
+      srTug(o.games.a,o.games.b,s)+(o.big?srPips(s,o.rounds,o.started):'')+(o.tag||'');
+  }
   async function loadSeriesStrip(){
     const el=$("seriesStrip");if(!el||!client)return;
     try{const {data}=await client.rpc("get_series_list");seriesList=data||[];}catch(e){seriesList=[];}
@@ -1818,10 +1869,11 @@ $("playersBody").innerHTML = shown.map(p =>
     const list=seriesList.filter(s=>s.status!=="archived").slice(0,2);
     if(!list.length){box.classList.add("hidden");return;}
     box.innerHTML=list.map(s=>{
-      const w=s.rounds_won||{a:0,b:0},lead=seriesLeader(s,w);
-      const chip=s.status==="finished"||lead?'<span class="sr-chip done">'+(lead?esc(sideName(s,lead))+' win':'Finished')+'</span>':s.status==="live"?'<span class="sr-chip live">Live</span>':(s.reg_open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Starting soon</span>');
-      return '<button type="button" class="sr-banner" data-series="'+esc(s.id)+'"><span class="sr-b-top">'+chip+'<small>Best of '+s.rounds+' rounds</small></span><b class="sr-b-name">'+esc(s.name)+'</b><span class="sr-b-vs"><span><em>'+esc(s.team_a)+'</em><small>'+s.a_count+' players</small></span><strong>'+w.a+' – '+w.b+'</strong><span><em>'+esc(s.team_b)+'</em><small>'+s.b_count+' players</small></span></span><span class="sr-b-cta">'+(s.status==="open"&&s.reg_open?'Pick your side':'Open the series')+'</span></button>';
+      const w=s.rounds_won||{a:0,b:0},lead=seriesLeader(s,w),g=s.games||{a:0,b:0};
+      const open=s.status==="open"&&s.reg_open;
+      return '<div class="sr-banner sr-poster" role="button" tabindex="0" data-series="'+esc(s.id)+'">'+srPoster({s,a:{count:s.a_count,players:s.a_players},b:{count:s.b_count,players:s.b_players},tally:w,lead,games:g,tag:'<span class="srp-cta">'+(open?'Pick your side':lead?'See the result':'Open the series')+'<i></i></span>'})+'</div>';
     }).join("");
+    srStartTimer();
     box.classList.remove("hidden");
   }
   function openSeries(id,from){
@@ -1865,7 +1917,9 @@ $("playersBody").innerHTML = shown.map(p =>
     const open=s.status==="open"&&s.reg_open&&(!s.reg_deadline||new Date(s.reg_deadline)>new Date());
     const chip=lead?'<span class="sr-chip done">'+esc(sideName(s,lead))+' win the series</span>':s.status==="finished"?'<span class="sr-chip done">Finished</span>':s.status==="live"?'<span class="sr-chip live">Live</span>':open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Sign-ups closed</span>';
     // header
-    let html=seriesBack()+'<div class="sr-hero"><div class="sr-h-top"><h2>'+esc(s.name)+'</h2>'+chip+'</div><div class="sr-score"><div class="sr-team sa '+(lead==="a"?"win":"")+'"><span class="sr-crest">'+esc(initials(s.team_a))+'</span><b>'+esc(s.team_a)+'</b><small>'+conf("a").length+' players</small></div><div class="sr-tally"><span>'+tally.a+'</span><i>–</i><span>'+tally.b+'</span><small>rounds · best of '+s.rounds+'</small></div><div class="sr-team sb '+(lead==="b"?"win":"")+'"><span class="sr-crest">'+esc(initials(s.team_b))+'</span><b>'+esc(s.team_b)+'</b><small>'+conf("b").length+' players</small></div></div>'+(s.reg_deadline&&open?'<p class="sr-note">Sign-ups close '+esc(new Date(s.reg_deadline).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))+'</p>':'')+'</div>';
+    const gw={a:0,b:0};B.games.forEach(g=>{if(g.status==="approved"&&g.a_goals!=null){if(g.a_goals>g.b_goals)gw.a++;else if(g.a_goals<g.b_goals)gw.b++;}});
+    const pl=side=>conf(side).slice(0,8).map(m=>({id:m.player_id,name:m.name}));
+    let html=seriesBack()+'<div class="sr-poster sr-hero-big">'+srPoster({s,a:{count:conf("a").length,players:pl("a")},b:{count:conf("b").length,players:pl("b")},tally,lead,games:gw,rounds:B.rounds,started:B.started,big:true})+'</div>';
     // join panel
     let join="";
     if(!state.session)join=open?'<div class="sr-join"><b>Want to play?</b><span class="small">Sign in to pick a side.</span><button type="button" class="primary" data-view="account">Sign in</button></div>':'';
@@ -1898,6 +1952,7 @@ $("playersBody").innerHTML = shown.map(p =>
         (pend.length?'<p class="small">'+pend.length+' entr'+(pend.length>1?'ies':'y')+' waiting for approval.</p>':'')+'</section>';
     }
     box.innerHTML=html;
+    srStartTimer();
     wireSeries();
   }
   function gameRow(g,mem,s,adm){
@@ -1996,6 +2051,11 @@ $("playersBody").innerHTML = shown.map(p =>
   document.addEventListener("click",e=>{
     const t=e.target.closest("[data-series]");if(!t)return;
     openSeries(t.dataset.series);
+  });
+  document.addEventListener("keydown",e=>{
+    if(e.key!=="Enter"&&e.key!==" ")return;
+    const t=e.target.closest&&e.target.closest(".sr-banner[data-series]");if(!t||e.target!==t)return;
+    e.preventDefault();openSeries(t.dataset.series);
   });
   var storiesLimit=10;
   async function loadStories(){
