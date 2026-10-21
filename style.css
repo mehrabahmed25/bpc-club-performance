@@ -1091,3 +1091,7 @@ button.st-ph:focus-visible{outline:3px solid var(--flood);outline-offset:2px}
 .pf-ser-h span{color:var(--muted);font-size:13px}
 .sr-r-head .ghost{background:#fff;color:var(--ink);border:1px solid #c9d3e6;box-shadow:none;padding:6px 12px}
 .sr-r-head h3 .sr-chip{margin-left:8px;vertical-align:middle}
+.h2h-series{margin-top:18px}
+.h2h-series h3 small{font-weight:600;color:var(--muted);margin-left:6px;font-size:12px}
+.h2h-ser-sum{margin:4px 0 10px;color:var(--muted)}
+.h2h-series .h2h-m .d{white-space:normal;line-height:1.25}

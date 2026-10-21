@@ -1567,7 +1567,12 @@ $("playersBody").innerHTML = shown.map(p =>
         const r=m.a_goals>m.b_goals?"a":m.a_goals<m.b_goals?"b":"d";
         return '<div class="h2h-m r-'+r+'"><span class="d">'+prettyDate(m.match_date)+'</span><span class="n l'+(r==="a"?' win':'')+'">'+esc(A)+'</span><span class="sc">'+m.a_goals+' – '+m.b_goals+'</span><span class="n r'+(r==="b"?' win':'')+'">'+esc(B)+'</span></div>';
       }).join("")+'</div>':'');
-    box.insertAdjacentHTML("beforeend",'<section id="h2hTrash" class="tt-wrap"></section>');
+    box.insertAdjacentHTML("beforeend",'<section id="h2hSeries"></section><section id="h2hTrash" class="tt-wrap"></section>');
+    client.rpc("get_series_h2h",{p_a:a,p_b:b}).then(r=>{
+      const el=$("h2hSeries"),sg=r.data||[];if(!el||!sg.length||$("h2hA").value!==a||$("h2hB").value!==b)return;
+      const w=[0,0],d=sg.reduce((n,g)=>{if(g.a_goals>g.b_goals)w[0]++;else if(g.a_goals<g.b_goals)w[1]++;else n++;return n;},0);
+      el.innerHTML='<div class="h2h-series"><h3 class="h2h-hist-title">Team series meetings <small>separate from the figures above</small></h3><p class="h2h-ser-sum"><b>'+esc(A)+' '+w[0]+'</b> · '+d+' draw'+(d===1?'':'s')+' · <b>'+esc(B)+' '+w[1]+'</b> in '+sg.length+' series game'+(sg.length===1?'':'s')+'</p><div class="h2h-hist">'+sg.map(g=>{const rr=g.a_goals>g.b_goals?"a":g.a_goals<g.b_goals?"b":"d";return '<div class="h2h-m r-'+rr+'"><span class="d">'+esc(g.series)+' · R'+g.round+'</span><span class="n l'+(rr==="a"?' win':'')+'">'+esc(A)+'</span><span class="sc">'+g.a_goals+' – '+g.b_goals+'</span><span class="n r'+(rr==="b"?' win':'')+'">'+esc(B)+'</span></div>';}).join("")+'</div></div>';
+    });
     renderTrash(a,b);
   }
   $("h2hA").addEventListener("change",renderH2h);
