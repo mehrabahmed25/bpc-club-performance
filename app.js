@@ -578,6 +578,7 @@ $("matchForm").addEventListener("submit", async e => {
       const ring='<span class="aw-ring'+(eligible?' ok':'')+'" style="--p:'+(eligible?100:pct)+'" title="'+(eligible?"Award eligible":"Award progress "+pct+"%")+'"><b>'+(eligible?"✓":pct+"%")+'</b></span>';
       return '<tr data-pid="'+esc(r.player_id)+'"'+(myId&&r.player_id===myId?' class="is-me"':'')+'><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'"><span class="rk">'+r.rank+'</span>'+moveHtml(moves[r.player_id])+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><span class="pc-name"><b>'+esc(r.player_name)+'</b>'+(myId&&r.player_id===myId?'<em class="you">You</em>':'')+(fm?'<span class="lb-form" aria-label="Recent form">'+fm+'</span>':'')+'</span></div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points"><div class="pts-cell"><b>'+r.points+'</b><span class="pts-bar"><i style="width:'+Math.round((Number(r.points)||0)/maxPts*100)+'%"></i></span></div></td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td>'+ring+'</td></tr>';
     }).join("");
+    body.querySelectorAll("tr[data-pid]").forEach(tr=>{const x=moves[tr.dataset.pid];if(x&&x.d)tr.classList.add(x.d>0?"flash-up":"flash-down");});
     // re-shuffle: rows slide from their old position when the table reloads
     if(Object.keys(oldTop).length&&!matchMedia("(prefers-reduced-motion: reduce)").matches){
       body.querySelectorAll("tr[data-pid]").forEach(tr=>{
@@ -1790,7 +1791,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const rank=p.rank?'<span class="st-rank">'+(l==="bn"?"র‍্যাংক ":"Rank ")+numL(p.rank,l)+'</span>':"";
     return '<div class="st-ph-bg"'+(u?' style="background-image:url(\''+esc(u)+'\')"':'')+'></div><div class="st-ph-shade"></div>'+
       (u?'<img class="st-ph-pic" alt="" src="'+esc(u)+'">':'<span class="st-ph-ini">'+esc(initials(p.name))+'</span>')+
-      '<span class="st-tag">'+esc(t.tag)+'</span>'+rank+
+      '<span class="st-tag k-'+esc(art.kind)+'">'+esc(t.tag)+'</span>'+rank+
       '<div class="st-ph-cap"><h3>'+storyHeadline(t.headline,p.name)+'</h3></div>';
   }
   function storyLangBar(){return '<span class="st-lang" role="group" aria-label="Language"><button type="button" data-artlang="en" class="'+(artLang==="en"?"on":"")+'">EN</button><button type="button" data-artlang="bn" class="'+(artLang==="bn"?"on":"")+'">বাংলা</button></span>';}
