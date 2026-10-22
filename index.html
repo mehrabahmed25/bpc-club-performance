@@ -159,6 +159,12 @@
       <div id="articleAdminStatus" class="status"></div>
       <div id="articleTabs" class="st-tabs"></div>
       <div id="articleAdminList" class="st-admin-list"></div>
+      <div class="section-head compact"><h2>Weekly roundup</h2><p>One post for the club group: results, top scorer, biggest win, the table and stories. Edit it if you like, then copy.</p></div>
+      <div class="panel ru-panel">
+        <div class="ru-bar"><label class="small">Week ending<input type="date" id="ruEnd"></label><span class="st-lang ru-lang" role="group" aria-label="Language"><button type="button" data-rulang="en" class="on">EN</button><button type="button" data-rulang="bn">বাংলা</button></span><button type="button" class="secondary" id="ruBuild">Write roundup</button></div>
+        <textarea id="ruText" rows="14" placeholder="Press “Write roundup” to draft this week’s post." aria-label="Roundup text"></textarea>
+        <div class="ru-bar"><button type="button" class="primary" id="ruCopy">Copy text</button><span id="ruStatus" class="status"></span></div>
+      </div>
       <div class="section-head compact"><h2>Website branding</h2><p>Upload your official BPC logo and set the name shown in the website header.</p></div>
       <form id="brandingForm" class="panel poster-admin-form">
         <label>Club name<input id="brandNameInput" maxlength="80" value="Brahmanbaria Pes Club" required></label>

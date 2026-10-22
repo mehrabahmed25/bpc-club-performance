@@ -1811,6 +1811,60 @@ $("playersBody").innerHTML = shown.map(p =>
     }).join("")+'</div>';
     box.classList.remove("hidden");
   }
+  // ================= Weekly roundup (admin) =================
+  var ruLang="en";
+  async function buildRoundup(){
+    if(!client)return;
+    const end=$("ruEnd").value||ymd(new Date()),start=ymd(addDays(new Date(end+"T12:00:00"),-6)),l=ruLang,bn=l==="bn",n=x=>numL(x,l);
+    status("ruStatus","Writing…");
+    const [mres,lb,ar]=await Promise.all([
+      client.rpc("get_week_matches",{p_start:start,p_end:end}),
+      client.rpc("get_leaderboard",{p_month:monthDate(end.slice(0,7))}),
+      client.rpc("get_articles",{p_week:null,p_limit:30})]);
+    if(mres.error){status("ruStatus",mres.error.message,"error");return;}
+    const ms=(mres.data||[]).filter(m=>m.a_name&&m.b_name).sort((a,b)=>a.match_date<b.match_date?-1:a.match_date>b.match_date?1:0);
+    const D=d=>new Date(d+"T12:00:00").toLocaleDateString(bn?"bn-BD":"en-GB",{day:"numeric",month:"short"});
+    const site=location.origin+location.pathname;
+    const L=[];
+    L.push("🏆 "+(bn?"BPC সাপ্তাহিক রাউন্ডআপ":"BPC Weekly Roundup")+" · "+D(start)+" – "+D(end));
+    if(!ms.length){L.push("",bn?"এই সপ্তাহে কোনো গণনাযোগ্য ম্যাচ হয়নি।":"No counted matches this week.");}
+    else{
+      L.push("","⚽ "+(bn?"ফলাফল":"Results")+" ("+n(ms.length)+(bn?" ম্যাচ)":" matches)"));
+      ms.slice(0,12).forEach(m=>L.push("• "+m.a_name+" "+n(m.a_goals)+"–"+n(m.b_goals)+" "+m.b_name));
+      if(ms.length>12)L.push("• +"+n(ms.length-12)+(bn?" আরও":" more"));
+      const g={};
+      ms.forEach(m=>{[[m.a_id,m.a_name,m.a_goals],[m.b_id,m.b_name,m.b_goals]].forEach(p=>{if(!p[0])return;const o=g[p[0]]=g[p[0]]||{name:p[1],goals:0,mp:0};o.goals+=Number(p[2]);o.mp++;});});
+      const top=Object.values(g).sort((a,b)=>b.goals-a.goals||a.mp-b.mp||a.name.localeCompare(b.name))[0];
+      if(top&&top.goals>0)L.push("","⭐ "+(bn?"সপ্তাহের সেরা স্কোরার":"Top scorer")+": "+top.name+" — "+n(top.goals)+(bn?" গোল (":" goal"+(top.goals===1?"":"s")+" in ")+n(top.mp)+(bn?" ম্যাচ)":" match"+(top.mp===1?"":"es")));
+      const big=[...ms].sort((a,b)=>Math.abs(b.a_goals-b.b_goals)-Math.abs(a.a_goals-a.b_goals))[0];
+      if(big&&big.a_goals!==big.b_goals)L.push("💥 "+(bn?"সবচেয়ে বড় জয়":"Biggest win")+": "+big.a_name+" "+n(big.a_goals)+"–"+n(big.b_goals)+" "+big.b_name+" ("+D(big.match_date)+")");
+      const hi=[...ms].sort((a,b)=>(b.a_goals+b.b_goals)-(a.a_goals+a.b_goals))[0];
+      if(hi&&hi.a_goals+hi.b_goals>=7&&hi!==big)L.push("🔥 "+(bn?"সবচেয়ে গোলের ম্যাচ":"Goal fest")+": "+hi.a_name+" "+n(hi.a_goals)+"–"+n(hi.b_goals)+" "+hi.b_name);
+    }
+    const rows=(lb.data||[]).filter(r=>Number(r.matches_played)>0).sort((a,b)=>a.rank-b.rank).slice(0,3);
+    if(rows.length){
+      const mo=new Date(end.slice(0,7)+"-01T12:00:00").toLocaleDateString(bn?"bn-BD":"en-GB",{month:"long",year:"numeric"});
+      L.push("","📊 "+(bn?"টেবিল":"Table")+" · "+mo);
+      rows.forEach((r,i)=>L.push(n(i+1)+". "+r.player_name+" — "+n(r.points)+(bn?" পয়েন্ট":" pts")));
+    }
+    const sts=(ar.data||[]).filter(a=>a.match_date>=start&&a.match_date<=end).slice(0,4);
+    if(sts.length){L.push("","📰 "+(bn?"গল্প":"Stories"));sts.forEach(a=>L.push("• "+articleText(a,l).headline));}
+    L.push("",(bn?"খেলুন, ফলাফল জমা দিন, টেবিলে উঠুন: ":"Play, submit your result and climb the table: ")+site);
+    $("ruText").value=L.join("\n");
+    status("ruStatus","Draft ready. Edit it, then copy.","ok");
+  }
+  $("ruEnd").value=ymd(new Date());
+  $("ruBuild").addEventListener("click",buildRoundup);
+  document.querySelectorAll("[data-rulang]").forEach(b=>b.addEventListener("click",()=>{
+    ruLang=b.dataset.rulang;document.querySelectorAll("[data-rulang]").forEach(x=>x.classList.toggle("on",x===b));
+    if($("ruText").value)buildRoundup();
+  }));
+  $("ruCopy").addEventListener("click",async()=>{
+    const t=$("ruText").value;if(!t){status("ruStatus","Write the roundup first.","error");return;}
+    try{await navigator.clipboard.writeText(t);}catch(e){$("ruText").select();document.execCommand("copy");}
+    status("ruStatus","Copied. Paste it into the club group.","ok");toast("Roundup copied.");
+  });
+
   // ================= Team series (e.g. Married v Unmarried) =================
   var seriesList=[],seriesBundle=null,seriesId=null,seriesFrom="home";
   function sideName(s,side){return side==="a"?s.team_a:s.team_b;}
@@ -2072,13 +2126,35 @@ $("playersBody").innerHTML = shown.map(p =>
     const t=e.target.closest&&e.target.closest(".sr-banner[data-series]");if(!t||e.target!==t)return;
     e.preventDefault();openSeries(t.dataset.series);
   });
+  var REACT=[["fire","🔥","Fire"],["clap","👏","Great"],["laugh","😂","Funny"],["wow","😮","Wow"]];
+  function reactRow(id){
+    const m=(state.reacts||{})[id]||{};
+    return '<div class="st-react" data-art="'+esc(id)+'" role="group" aria-label="Reactions">'+REACT.map(r=>{const x=m[r[0]]||{n:0,mine:false};return '<button type="button" class="rx'+(x.mine?' on':'')+'" data-react="'+r[0]+'" data-art="'+esc(id)+'" aria-pressed="'+(x.mine?"true":"false")+'" title="'+r[2]+'"><span>'+r[1]+'</span><b>'+(x.n||"")+'</b></button>';}).join("")+'</div>';
+  }
+  document.addEventListener("click",async e=>{
+    const b=e.target.closest("[data-react]");if(!b)return;
+    if(!state.session){toast("Sign in to react.");return;}
+    const id=b.dataset.art,k=b.dataset.react;
+    const {data,error}=await client.rpc("toggle_article_reaction",{p_article:id,p_kind:k});
+    if(error){toast(error.message);return;}
+    state.reacts=state.reacts||{};
+    const m=(state.reacts[id]=state.reacts[id]||{}),x=(m[k]=m[k]||{n:0,mine:false});
+    x.mine=!!data;x.n=Math.max(0,x.n+(data?1:-1));
+    const row=document.querySelector('.st-react[data-art="'+id+'"]');if(row)row.outerHTML=reactRow(id);
+  });
   var storiesLimit=10;
   async function loadStories(){
     const box=$("storiesPage");if(!client||!box)return;
     if(state.scrollArticle)storiesLimit=50;
     box.innerHTML='<div class="h2h-empty"><span>Loading stories…</span></div>';
     const [r]=await Promise.all([client.rpc("get_articles",{p_week:null,p_limit:storiesLimit}),ensureAvatars()]);
-    state.storyList=r.data||[];renderStoriesPage();
+    state.storyList=r.data||[];
+    state.reacts={};
+    try{
+      const ids=state.storyList.map(a=>a.id);
+      if(ids.length){const rr=await client.rpc("get_article_reactions",{p_ids:ids});(rr.data||[]).forEach(x=>{(state.reacts[x.article_id]=state.reacts[x.article_id]||{})[x.kind]={n:Number(x.n),mine:!!x.mine};});}
+    }catch(e){console.warn(e);}
+    renderStoriesPage();
     if(state.scrollArticle){const el=$("art-"+state.scrollArticle);state.scrollArticle=null;if(el)setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),60);}
   }
   function renderStoriesPage(){
@@ -2086,7 +2162,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const list=state.storyList||[],bn=artLang==="bn";
     const feed=list.length?list.map(a=>{
       const t=articleText(a,artLang);
-      return '<article class="st-full" id="art-'+esc(a.id)+'"><div class="st-ph st-ph-hero">'+storyPhoto(a,t)+'</div><div class="st-text">'+(t.standfirst?'<p class="st-stand">'+esc(t.standfirst)+'</p>':'')+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+'<footer>'+(bn?"ম্যাচের তথ্য থেকে স্বয়ংক্রিয়ভাবে লেখা":"Auto-written from match data")+' · '+esc(storyDate(a))+'</footer></div></article>';
+      return '<article class="st-full" id="art-'+esc(a.id)+'"><div class="st-ph st-ph-hero">'+storyPhoto(a,t)+'</div><div class="st-text">'+(t.standfirst?'<p class="st-stand">'+esc(t.standfirst)+'</p>':'')+t.paras.map(p=>'<p>'+esc(p)+'</p>').join("")+reactRow(a.id)+'<footer>'+(bn?"ম্যাচের তথ্য থেকে স্বয়ংক্রিয়ভাবে লেখা":"Auto-written from match data")+' · '+esc(storyDate(a))+'</footer></div></article>';
     }).join(""):'<div class="h2h-empty"><b>'+(bn?"এখনও কোনো গল্প নেই।":"No stories yet.")+'</b><span>'+(bn?"বড় ফলাফলের গল্প এখানে প্রকাশিত হবে।":"Big results get written up here.")+'</span></div>';
     const more=list.length>=storiesLimit&&storiesLimit<50?'<div class="st-more"><button type="button" class="secondary" id="storiesMore">'+(bn?"পুরোনো গল্প দেখুন":"Load older stories")+'</button></div>':'';
     box.innerHTML='<div class="wk-mast"><div><h2>'+(bn?"গল্প":"Stories")+'</h2><p>'+(bn?"ক্লাবের সেরা মুহূর্তগুলোর ম্যাচ রিপোর্ট।":"Match reports from the club's biggest moments.")+'</p></div>'+storyLangBar()+'</div><div class="wk-stories st-feed">'+feed+'</div>'+more;
@@ -2204,6 +2280,66 @@ $("playersBody").innerHTML = shown.map(p =>
     ];
     return {defs,bestW,bestU};
   }
+  // ---- Share card (profile) ----
+  function rrect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+  function loadImg(u){return new Promise(res=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>res(i);i.onerror=()=>res(null);setTimeout(()=>res(null),6000);i.src=u;});}
+  function drawShareCard(P,img){
+    const W=1080,H=1350,cv=document.createElement("canvas");cv.width=W;cv.height=H;const c=cv.getContext("2d");
+    const disp="'Bricolage Grotesque',Inter,system-ui,sans-serif",body="Inter,system-ui,sans-serif";
+    c.fillStyle="#060d1d";c.fillRect(0,0,W,H);
+    let g=c.createLinearGradient(0,0,W*.6,H*.5);g.addColorStop(0,"#4a82ff");g.addColorStop(.55,"#1636a6");g.addColorStop(1,"#0a1c63");
+    c.fillStyle=g;c.beginPath();c.moveTo(0,0);c.lineTo(W*.62,0);c.lineTo(W*.36,H*.62);c.lineTo(0,H*.62);c.closePath();c.fill();
+    g=c.createLinearGradient(W,0,W*.5,H*.6);g.addColorStop(0,"#ffd983");g.addColorStop(.55,"#e29a14");g.addColorStop(1,"#7d5206");
+    c.globalAlpha=.9;c.fillStyle=g;c.beginPath();c.moveTo(W*.68,0);c.lineTo(W,0);c.lineTo(W,H*.62);c.lineTo(W*.42,H*.62);c.closePath();c.fill();c.globalAlpha=1;
+    c.save();c.shadowColor="#ffd27a";c.shadowBlur=30;c.fillStyle="#fff";c.beginPath();c.moveTo(W*.645,0);c.lineTo(W*.67,0);c.lineTo(W*.405,H*.62);c.lineTo(W*.38,H*.62);c.closePath();c.fill();c.restore();
+    g=c.createLinearGradient(0,H*.5,0,H);g.addColorStop(0,"rgba(6,13,29,0)");g.addColorStop(.35,"#060d1d");c.fillStyle=g;c.fillRect(0,H*.4,W,H*.6);
+    const sur=String(P.name).split(/\s+/).slice(-1)[0].toUpperCase();
+    c.font="800 300px "+disp;c.textAlign="center";c.lineWidth=3;c.strokeStyle="rgba(255,255,255,.14)";c.strokeText(sur,W/2,520);
+    // portrait
+    const ax=W/2-190,ay=150,as=380;
+    c.save();c.shadowColor="rgba(0,0,0,.6)";c.shadowBlur=50;c.shadowOffsetY=20;rrect(c,ax,ay,as,as,90);c.fillStyle="#10244a";c.fill();c.restore();
+    c.save();rrect(c,ax,ay,as,as,90);c.clip();
+    if(img){const r=Math.max(as/img.width,as/img.height),w=img.width*r,h=img.height*r;c.drawImage(img,ax+(as-w)/2,ay+(as-h)/2,w,h);}
+    else{c.fillStyle="#1d3a78";c.fillRect(ax,ay,as,as);c.fillStyle="#fff";c.font="800 170px "+disp;c.textBaseline="middle";c.fillText(initials(P.name),W/2,ay+as/2+8);c.textBaseline="alphabetic";}
+    c.restore();
+    c.lineWidth=8;c.strokeStyle="rgba(255,255,255,.85)";rrect(c,ax,ay,as,as,90);c.stroke();
+    if(P.rank){const tx=ax+as-30,ty=ay+as-10;c.fillStyle="#f6b73c";rrect(c,tx-70,ty-34,150,68,34);c.fill();c.lineWidth=7;c.strokeStyle="#060d1d";c.stroke();c.fillStyle="#091226";c.font="800 38px "+disp;c.textBaseline="middle";c.fillText("#"+P.rank,tx+5,ty+3);c.textBaseline="alphabetic";}
+    // name
+    let fs=96;c.font="800 "+fs+"px "+disp;while(c.measureText(P.name).width>W-120&&fs>46){fs-=4;c.font="800 "+fs+"px "+disp;}
+    c.fillStyle="#fff";c.shadowColor="rgba(0,0,0,.6)";c.shadowBlur=24;c.fillText(P.name,W/2,640);c.shadowBlur=0;
+    c.fillStyle="#c4cfe6";c.font="600 34px "+body;c.fillText(P.line,W/2,694);
+    // form
+    const fm=P.form.slice(0,6),fx=W/2-(fm.length*62)/2+31;
+    fm.forEach((r,i)=>{c.fillStyle=r==="w"?"#13a46b":r==="l"?"#d6475a":"#b7861b";rrect(c,fx+i*62-26,730,52,52,14);c.fill();c.fillStyle="#fff";c.font="800 26px "+disp;c.textBaseline="middle";c.fillText(r.toUpperCase(),fx+i*62,757);c.textBaseline="alphabetic";});
+    // ring
+    const cx=W/2,cy=1000,R=130,lw=34;
+    const arc=(a,b,col)=>{c.beginPath();c.arc(cx,cy,R,-Math.PI/2+a*2*Math.PI,-Math.PI/2+b*2*Math.PI);c.strokeStyle=col;c.lineWidth=lw;c.lineCap="butt";c.stroke();};
+    const tot=P.n||1,w=P.w/tot,d=(P.w+P.d)/tot;
+    c.beginPath();c.arc(cx,cy,R,0,7);c.strokeStyle="rgba(255,255,255,.12)";c.lineWidth=lw;c.stroke();
+    if(P.n){arc(0,w,"#13a46b");arc(w,d,"#9aa6bb");arc(d,1,"#d6475a");}
+    c.fillStyle="#fff";c.font="800 84px "+disp;c.textBaseline="middle";c.fillText(P.rate+"%",cx,cy-6);c.font="600 26px "+body;c.fillStyle="#9fb0d4";c.fillText("win rate",cx,cy+58);c.textBaseline="alphabetic";
+    const stat=(x,y,val,lab)=>{c.fillStyle="#fff";c.font="800 62px "+disp;c.fillText(val,x,y);c.fillStyle="#9fb0d4";c.font="600 26px "+body;c.fillText(lab,x,y+38);};
+    stat(190,970,String(P.n),"Matches");stat(190,1100,P.w+" · "+P.d+" · "+P.l,"W · D · L");
+    stat(890,970,P.gf+" – "+P.ga,"Goals");stat(890,1100,String(P.cs),"Clean sheets");
+    // footer
+    c.fillStyle="#f6b73c";c.font="800 34px "+disp;c.fillText("Brahmanbaria Pes Club",W/2,1250);
+    c.fillStyle="#7f90b4";c.font="500 24px "+body;c.fillText(location.host+location.pathname.replace(/index\.html$/,""),W/2,1290);
+    return cv;
+  }
+  async function shareProfileCard(P){
+    try{if(document.fonts&&document.fonts.load){await document.fonts.load("800 40px 'Bricolage Grotesque'");await document.fonts.load("600 20px Inter");}}catch(e){}
+    let img=null;
+    if(P.avatar)img=await loadImg(P.avatar+(P.avatar.includes("?")?"&":"?")+"cors=1");
+    let cv=drawShareCard(P,img),blob=await new Promise(r=>{try{cv.toBlob(r,"image/png");}catch(e){r(null);}});
+    if(!blob&&img){cv=drawShareCard(P,null);blob=await new Promise(r=>cv.toBlob(r,"image/png"));}
+    if(!blob){toast("Could not make the card.");return;}
+    const file=new File([blob],"bpc-"+String(P.name).toLowerCase().replace(/[^a-z0-9]+/g,"-")+".png",{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({files:[file],title:P.name+" · BPC"});return;}catch(e){if(e&&e.name==="AbortError")return;}
+    }
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast("Card saved. Share it from your gallery.");
+  }
   async function renderPlayerPage(){
     const box=$("playerPage"),id=state.viewPlayerId;
     if(!client||!id){box.innerHTML="";return;}
@@ -2259,7 +2395,7 @@ $("playersBody").innerHTML = shown.map(p =>
         '<div class="pf-portrait">'+avBig(me.display_name,me.id,"pf-av")+(lbRow?'<span class="pf-rankchip">#'+lbRow.rank+'</span>':'')+'</div>'+
         '<div class="pf-id"><h2>'+esc(me.display_name)+'</h2><p class="pf-story">'+esc(storyLine)+'</p>'+
         '<div class="pf-formrow">'+(form.slice(0,6).map(r=>'<i class="fm '+pfRes(r)+'">'+pfRes(r).toUpperCase()+'</i>').join("")||'<em>No matches yet</em>')+'</div>'+
-        '<div class="pf-actions"><button type="button" class="pf-btn" id="pfCompare">Compare'+(signed?' with me':'')+'</button></div></div>'+
+        '<div class="pf-actions"><button type="button" class="pf-btn" id="pfCompare">Compare'+(signed?' with me':'')+'</button><button type="button" class="pf-btn" id="pfShare">Share card</button></div></div>'+
         '<div class="pf-ring" style="--w:'+ringW+';--d:'+ringD+'" role="img" aria-label="Win rate '+st.rate+' percent"><b>'+st.rate+'<small>%</small></b><span>win rate</span></div></div>'+
       '<div class="pf-scope"><button type="button" class="'+(pfScope.mode==="all"?'on':'')+'" data-pfs="all">All time</button><button type="button" class="'+(pfScope.mode==="month"?'on':'')+'" data-pfs="month">Month</button>'+(pfScope.mode==="month"?'<input type="month" id="pfMonth" value="'+esc(pfScope.month)+'">':'')+'</div>'+
       '<div class="pf-tiles">'+
@@ -2282,6 +2418,11 @@ $("playersBody").innerHTML = shown.map(p =>
     });
     box.querySelectorAll("[data-pfs]").forEach(b=>b.addEventListener("click",()=>{pfScope.mode=b.dataset.pfs;renderPlayerPage();}));
     const pm=$("pfMonth");if(pm)pm.addEventListener("change",()=>{pfScope.month=pm.value||monthNow;renderPlayerPage();});
+    $("pfShare").addEventListener("click",async e=>{
+      const b=e.currentTarget;b.disabled=true;const t=b.textContent;b.textContent="Making card…";
+      try{await shareProfileCard({name:me.display_name,rank:lbRow?lbRow.rank:null,line:storyLine.split(". ")[0].replace(/\.$/,""),form:form.slice(0,6).map(pfRes),n:st.n,w:st.w,d:st.d,l:st.l,gf:st.gf,ga:st.ga,cs:st.cs,rate:st.rate,avatar:avUrl({id:id,name:me.display_name})});}
+      finally{b.disabled=false;b.textContent=t;}
+    });
     $("pfCompare").addEventListener("click",async()=>{
       showView("h2h");await loadH2hPage();
       const mine=state.player&&state.player.active?state.player.id:"";

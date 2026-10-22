@@ -1355,3 +1355,20 @@ tr.is-me td:first-child{box-shadow:inset 4px 0 0 var(--flood)}
 .home-podium .lb-podium{margin-top:10px}
 @media(prefers-reduced-motion:reduce){.tk-move{animation:none}.tk-track{overflow-x:auto}.home-hero:before{animation:none}}
 @media(max-width:680px){.home-hero{padding:24px 20px 26px}.tk-tag{padding:0 12px}}
+
+/* reactions, roundup, share */
+.st-react{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px}
+.rx{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;cursor:pointer;transition:transform .15s,background .15s}
+.rx span{font-size:18px;line-height:1}
+.rx b{font:700 13px Inter,inherit;min-width:.6em;color:var(--muted)}
+.rx:hover{transform:translateY(-2px);background:#f4f7fd}
+.rx.on{background:#fff3d4;border-color:#f6b73c}
+.rx.on b{color:#8a5a06}
+.rx.on span{animation:rx-pop .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes rx-pop{from{transform:scale(.5)}to{transform:scale(1)}}
+.ru-panel{display:grid;gap:12px}
+.ru-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.ru-bar label{display:grid;gap:4px}
+.ru-panel textarea{width:100%;font:14px/1.5 Inter,inherit;resize:vertical;padding:12px 14px;border-radius:12px;border:1px solid var(--line)}
+.ru-lang button{padding:5px 12px}
+@media(prefers-reduced-motion:reduce){.rx.on span{animation:none}}
