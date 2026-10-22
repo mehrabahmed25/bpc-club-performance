@@ -2334,11 +2334,19 @@ $("playersBody").innerHTML = shown.map(p =>
     if(!blob&&img){cv=drawShareCard(P,null);blob=await new Promise(r=>cv.toBlob(r,"image/png"));}
     if(!blob){toast("Could not make the card.");return;}
     const file=new File([blob],"bpc-"+String(P.name).toLowerCase().replace(/[^a-z0-9]+/g,"-")+".png",{type:"image/png"});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{await navigator.share({files:[file],title:P.name+" · BPC"});return;}catch(e){if(e&&e.name==="AbortError")return;}
-    }
-    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast("Card saved. Share it from your gallery.");
+    const url=URL.createObjectURL(blob),can=!!(navigator.canShare&&navigator.canShare({files:[file]}));
+    const old=document.getElementById("shareModal");if(old)old.remove();
+    const m=document.createElement("div");m.id="shareModal";m.className="sh-modal";m.setAttribute("role","dialog");m.setAttribute("aria-label","Share card");
+    m.innerHTML='<div class="sh-box"><img src="'+url+'" alt="Share card for '+esc(P.name)+'"><div class="sh-act"><a class="primary" href="'+url+'" download="'+esc(file.name)+'" id="shDl">Download image</a>'+(can?'<button type="button" class="secondary" id="shShare">Share</button>':'')+'<button type="button" class="ghost" id="shClose">Close</button></div></div>';
+    document.body.appendChild(m);
+    const close=()=>{m.remove();URL.revokeObjectURL(url);document.removeEventListener("keydown",esc_);};
+    const esc_=e=>{if(e.key==="Escape")close();};
+    document.addEventListener("keydown",esc_);
+    m.addEventListener("click",e=>{if(e.target===m)close();});
+    m.querySelector("#shClose").addEventListener("click",close);
+    m.querySelector("#shDl").addEventListener("click",()=>toast("Card saved."));
+    const sb=m.querySelector("#shShare");if(sb)sb.addEventListener("click",async()=>{try{await navigator.share({files:[file],title:P.name+" · BPC"});}catch(e){}});
+    m.querySelector("#shDl").focus();
   }
   async function renderPlayerPage(){
     const box=$("playerPage"),id=state.viewPlayerId;

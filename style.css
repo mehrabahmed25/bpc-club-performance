@@ -1372,3 +1372,10 @@ tr.is-me td:first-child{box-shadow:inset 4px 0 0 var(--flood)}
 .ru-panel textarea{width:100%;font:14px/1.5 Inter,inherit;resize:vertical;padding:12px 14px;border-radius:12px;border:1px solid var(--line)}
 .ru-lang button{padding:5px 12px}
 @media(prefers-reduced-motion:reduce){.rx.on span{animation:none}}
+
+.sh-modal{position:fixed;inset:0;z-index:200;background:rgba(5,10,24,.82);display:grid;place-items:center;padding:16px;overflow:auto}
+.sh-box{display:grid;gap:14px;justify-items:center;max-width:min(92vw,420px)}
+.sh-box img{width:100%;max-height:72vh;object-fit:contain;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.sh-act{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.sh-act a.primary{text-decoration:none;display:inline-flex;align-items:center;padding:10px 18px;border-radius:12px}
+.sh-act .ghost{color:#fff;border-color:rgba(255,255,255,.4)}
