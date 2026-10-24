@@ -1398,3 +1398,5 @@ tr.is-me td:first-child{box-shadow:inset 4px 0 0 var(--flood)}
 .ft-dev a{color:var(--flood,#f6b73c);font-weight:700;text-decoration:none;border-bottom:1px solid rgba(246,183,60,.4);transition:border-color .15s,color .15s}
 .ft-dev a:hover,.ft-dev a:focus-visible{color:#fff;border-bottom-color:#fff}
 @media(max-width:680px){.footer{gap:6px}}
+.ft-fb{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;background:#1877f2;color:#fff;font-weight:700;text-decoration:none;transition:filter .15s,transform .15s}
+.ft-fb:hover,.ft-fb:focus-visible{filter:brightness(1.12);transform:translateY(-1px)}
