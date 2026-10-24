@@ -1391,3 +1391,10 @@ tr.is-me td:first-child{box-shadow:inset 4px 0 0 var(--flood)}
 @keyframes rk-up{0%,35%{background:rgba(19,164,107,.22)}100%{background:transparent}}
 @keyframes rk-down{0%,35%{background:rgba(214,71,90,.18)}100%{background:transparent}}
 @media(prefers-reduced-motion:reduce){.st-ph .st-tag{animation:none}#leaderboardBody tr.flash-up,#leaderboardBody tr.flash-down{animation:none}}
+
+/* footer credit */
+.footer{align-items:center;flex-wrap:wrap}
+.ft-dev{color:#9fb0d0}
+.ft-dev a{color:var(--flood,#f6b73c);font-weight:700;text-decoration:none;border-bottom:1px solid rgba(246,183,60,.4);transition:border-color .15s,color .15s}
+.ft-dev a:hover,.ft-dev a:focus-visible{color:#fff;border-bottom-color:#fff}
+@media(max-width:680px){.footer{gap:6px}}
