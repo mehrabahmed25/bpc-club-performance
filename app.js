@@ -80,16 +80,17 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomePodium();loadHomeLegends();loadHomeStories();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
     if(name==="player")renderPlayerPage();
     if(name==="stories")loadStories();
     if(name==="series")loadSeriesPage();
+    if(name==="auction")loadAuctionPage();else if(typeof auStop==="function")auStop();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
-    if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();loadSeriesStrip();}
+    if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();loadSeriesStrip();loadAuctionStrip();}
     if(name==="funds")loadFundsPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
@@ -1812,6 +1813,235 @@ $("playersBody").innerHTML = shown.map(p =>
     }).join("")+'</div>';
     box.classList.remove("hidden");
   }
+  // ================= Auction (Bid Cup) =================
+  var auId=null,auB=null,auOff=0,auPollT=null,auTickT=null,auSeq=null,auOv=null,auBusy=false,auAuto=true,auClosing=false,auNexting=false,auBodySig="",auStageSig="",auAt=0;
+  function auBase(a,t){return t==="A"?a.base_a:t==="B"?a.base_b:a.base_c;}
+  function auNow(){return Date.now()+auOff;}
+  function auRemain(a){if(a.lot_status==="paused")return a.paused_left||0;if(a.lot_status!=="open"||!a.cur_ends)return 0;return Math.max(0,(new Date(a.cur_ends).getTime()-auNow())/1000);}
+  function auMem(id){return auB&&auB.members.find(m=>m.id===id);}
+  function auSquad(id){return auB.picks.filter(k=>k.manager_id===id);}
+  function auStop(){clearTimeout(auPollT);clearInterval(auTickT);auPollT=null;auTickT=null;}
+  async function auCall(name,args,ok){
+    if(auBusy)return false;auBusy=true;
+    try{const {data,error}=await client.rpc(name,args);if(error){toast(error.message);return false;}if(ok)toast(ok);await auFetch(true);return data===undefined?true:(data===null?true:data);}
+    finally{auBusy=false;}
+  }
+  async function loadAuctionPage(){
+    auStop();
+    if(!client)return;
+    if(!auId){await renderAuctionIndex();return;}
+    $("auctionPage").innerHTML='<div class="au-loading">Loading the auction…</div>';
+    auB=null;auSeq=null;auOv=null;auBodySig="";auStageSig="";
+    await ensureAvatars();
+    await auFetch(true);
+    auTickT=setInterval(auTick,250);
+  }
+  async function renderAuctionIndex(){
+    const box=$("auctionPage"),adm=state.tnAdmin;
+    const r=await client.rpc("get_auction_list");const list=r.data||[];
+    box.innerHTML='<div class="section-head"><h2>Bid Cup</h2><p>Member auctions: managers bid for players with a limited purse.</p></div>'+
+      (adm?'<form id="auCreate" class="panel au-create"><h3>New auction</h3><label>Name<input name="name" required maxlength="100" value="BPC Bid Cup"></label><button class="primary" type="submit">Create and open sign-ups</button></form>':'')+
+      (list.length?'<div class="au-list">'+list.map(a=>'<button type="button" class="au-card" data-auction="'+esc(a.id)+'"><b>'+esc(a.name)+'</b><span class="au-chip '+a.status+'">'+({open:a.reg_open?"Sign-ups open":"Sign-ups closed",live:"Live now",finished:"Finished",archived:"Archived"})[a.status]+'</span><small>'+a.managers+' of '+a.manager_slots+' managers · '+a.players+' players'+(a.my_role?' · You: '+a.my_role+(a.my_status==="pending"?' (waiting)':''):'')+'</small></button>').join("")+'</div>':'<div class="panel soft"><p>No auctions yet.</p></div>');
+    const f=$("auCreate");
+    if(f)f.addEventListener("submit",async e=>{e.preventDefault();const {data,error}=await client.rpc("auction_create",{p_name:new FormData(f).get("name")});if(error){toast(error.message);return;}auId=data;loadAuctionPage();});
+  }
+  async function auFetch(force){
+    if(!auId||!client)return;
+    clearTimeout(auPollT);
+    try{
+      const r=await client.rpc("get_auction_bundle",{p_id:auId});
+      if(r.error||!r.data){auId=null;auStop();renderAuctionIndex();return;}
+      auB=r.data;auOff=new Date(auB.now).getTime()-Date.now();
+      auPaint(force);
+    }catch(e){console.warn(e);}
+    if($("view-auction")&&!$("view-auction").classList.contains("hidden")){
+      const live=auB&&auB.auction.status==="live";
+      auPollT=setTimeout(auFetch,live?1500:6000);
+    }
+  }
+  function auChip(t){return '<i class="au-tier t'+t+'">'+t+'</i>';}
+  function auRules(a){return '<div class="au-rules"><span>Purse <b>'+a.purse+'</b></span><span>Step <b>'+a.bid_step+'</b></span><span>Squad <b>'+a.min_squad+'–'+a.max_squad+'</b></span><span>Timer <b>'+a.timer_secs+'s</b></span><span>'+auChip("A")+'<b>'+a.base_a+'</b></span><span>'+auChip("B")+'<b>'+a.base_b+'</b></span><span>'+auChip("C")+'<b>'+a.base_c+'</b></span>'+(a.retentions?'<span>Retain <b>'+a.retentions+'</b></span>':'')+'</div>';}
+  function auPaint(force){
+    const B=auB,a=B.auction,box=$("auctionPage");
+    // result overlay trigger
+    if(auSeq!==null&&a.last_seq>auSeq&&a.last_member){
+      const pm=auMem(a.last_member),lm=a.last_leader?auMem(a.last_leader):null;
+      auOv={until:Date.now()+2800,html:'<div><div class="st'+(lm?'':' un')+'">'+(lm?'SOLD':'UNSOLD')+'</div><p>'+esc(pm?pm.name:"Player")+(lm?' · '+esc(lm.name)+' for '+a.last_price:'')+'</p></div>'};
+      auAt=Date.now();
+      if(lm&&B.me&&lm.id===B.me.member_id&&navigator.vibrate)try{navigator.vibrate([40,40,40]);}catch(e){}
+    }
+    auSeq=a.last_seq;
+    if(!$("auHead")){
+      box.innerHTML='<div id="auHead"></div><div id="auStage"></div><div id="auBody"></div>';
+    }
+    $("auHead").innerHTML='<button type="button" class="ghost au-back" data-auction-list="1">All auctions</button><div class="section-head au-title"><h2>'+esc(a.name)+'</h2><p><span class="au-chip '+a.status+'">'+({open:a.reg_open?"Sign-ups open":"Sign-ups closed",live:"Live now",finished:"Finished",archived:"Archived"})[a.status]+'</span></p></div>'+auRules(a);
+    auPaintStage();
+    const sig=JSON.stringify([a.status,a.reg_open,a.manager_slots,a.purse,a.bid_step,a.min_squad,a.max_squad,a.timer_secs,a.retentions,a.base_a,a.base_b,a.base_c,B.members,B.picks,B.me,B.is_admin]);
+    const body=$("auBody");
+    if((sig!==auBodySig||force)&&!(body.contains(document.activeElement)&&/INPUT|SELECT/.test(document.activeElement.tagName)&&!force)){auBodySig=sig;body.innerHTML=auBodyHtml();wireAuBody();}
+  }
+  function auSquadsHtml(){
+    const B=auB,a=B.auction,mgrs=B.members.filter(m=>m.role==="manager"&&m.status==="approved");
+    if(!mgrs.length)return '';
+    return '<h3 class="au-sub">Squads</h3><div class="au-squads">'+mgrs.map(m=>{
+      const sq=auSquad(m.id),pct=Math.min(100,Math.round(sq.length/a.min_squad*100)),you=B.me&&B.me.member_id===m.id;
+      return '<div class="au-mgr'+(you?' you':'')+'"><div class="au-mh">'+avBig(m.name,m.player_id,"au-av")+'<b>'+esc(m.name)+(you?' <em>You</em>':'')+'</b><span class="au-purse">'+m.purse+'</span></div><div class="au-bar"><i style="width:'+pct+'%"></i></div><small>'+sq.length+' of '+a.min_squad+' minimum · max '+a.max_squad+'</small><div class="au-pl">'+(sq.length?sq.map(k=>{const p=auMem(k.member_id);return p?'<span>'+auChip(p.tier)+esc(p.name)+' <em>'+k.price+(k.retained?' R':'')+'</em>'+(B.is_admin&&a.status==="open"&&k.retained?'<button type="button" class="au-x" data-unretain="'+esc(p.id)+'" aria-label="Remove retention">×</button>':'')+'</span>':'';}).join(""):'<small>No players yet.</small>')+'</div></div>';
+    }).join("")+'</div>';
+  }
+  function auPoolHtml(){
+    const B=auB,a=B.auction,adm=B.is_admin,pl=B.members.filter(m=>m.role==="player"&&m.status==="approved");
+    const mgrs=B.members.filter(m=>m.role==="manager"&&m.status==="approved");
+    const pick={};B.picks.forEach(k=>pick[k.member_id]=k);
+    const open=a.status==="open";
+    return '<h3 class="au-sub">Player pool <span class="au-n">'+pl.length+'</span></h3>'+(pl.length?'<div class="au-pool">'+pl.sort((x,y)=>x.tier.localeCompare(y.tier)||x.name.localeCompare(y.name)).map(m=>{
+      const k=pick[m.id],owner=k?auMem(k.manager_id):null;
+      let right='';
+      if(open&&adm){
+        right='<button type="button" class="au-tierbtn" data-tier="'+esc(m.id)+'" data-cur="'+m.tier+'" title="Change tier">'+auChip(m.tier)+'</button>'+
+          (k?'<small>Retained by '+esc(owner?owner.name:"")+'</small>':(a.retentions&&mgrs.length?'<select data-retain="'+esc(m.id)+'" aria-label="Retain for"><option value="">Retain for…</option>'+mgrs.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("")+'</select>':''))+
+          '<button type="button" class="au-mini" data-mact="to_manager" data-m="'+esc(m.id)+'">Make manager</button><button type="button" class="au-mini" data-mact="remove" data-m="'+esc(m.id)+'">Remove</button>';
+      }else{
+        right=auChip(m.tier)+'<small>'+(k?(k.retained?'Retained':'Sold')+' · '+esc(owner?owner.name:"")+' · '+k.price:m.lot_state==="current"?'On the block':m.lot_state==="unsold"?'Unsold':auBase(a,m.tier)+' base')+'</small>';
+      }
+      return '<div class="au-prow">'+avBig(m.name,m.player_id,"au-av sm")+'<b>'+esc(m.name)+'</b><span class="au-pr">'+right+'</span></div>';
+    }).join("")+'</div>':'<div class="panel soft"><p>No players have joined yet.</p></div>');
+  }
+  function auBodyHtml(){
+    const B=auB,a=B.auction,adm=B.is_admin,me=B.me,open=a.status==="open";
+    let h='';
+    if(open){
+      const joined=me&&me.status!=="removed";
+      h+='<div class="panel au-join">'+(joined?'<p><b>You joined as '+me.role+'.</b> '+(me.status==="pending"?'Waiting for admin approval.':me.role==="manager"?'You are an approved manager.':'You are in the player pool.')+'</p><button type="button" class="secondary" data-aleave="1">Leave</button>':
+        !state.session?'<p>Sign in with your BPC account to join.</p>':!a.reg_open?'<p>Sign-ups are closed.</p>':'<p><b>Join this auction</b></p><div class="au-jb"><button type="button" class="primary" data-ajoin="manager">Join as manager</button><button type="button" class="secondary" data-ajoin="player">Join as player</button></div><p class="small">Managers need admin approval ('+a.manager_slots+' slots).</p>')+'</div>';
+      const mg=B.members.filter(m=>m.role==="manager");
+      h+='<h3 class="au-sub">Managers <span class="au-n">'+mg.filter(m=>m.status==="approved").length+' / '+a.manager_slots+'</span></h3>'+(mg.length?'<div class="au-pool">'+mg.map(m=>'<div class="au-prow">'+avBig(m.name,m.player_id,"au-av sm")+'<b>'+esc(m.name)+'</b><span class="au-pr">'+(m.status==="approved"?'<small class="ok">Approved</small>':'<small>Waiting</small>')+(adm?(m.status!=="approved"?'<button type="button" class="au-mini" data-mact="approve" data-m="'+esc(m.id)+'">Approve</button>':'')+'<button type="button" class="au-mini" data-mact="to_player" data-m="'+esc(m.id)+'">Make player</button><button type="button" class="au-mini" data-mact="remove" data-m="'+esc(m.id)+'">Remove</button>':'')+'</span></div>').join("")+'</div>':'<div class="panel soft"><p>No manager has applied yet.</p></div>');
+    }
+    h+=auSquadsHtml()+auPoolHtml();
+    if(adm&&open){
+      h+='<form id="auRules" class="panel au-form"><h3>Auction rules</h3><div class="au-grid">'+
+        [["manager_slots","Manager slots"],["purse","Purse per manager"],["bid_step","Bid step"],["min_squad","Minimum squad"],["max_squad","Maximum squad"],["timer_secs","Bid timer (seconds)"],["retentions","Retentions per manager"],["base_a","Tier A base price"],["base_b","Tier B base price"],["base_c","Tier C base price"]].map(f=>'<label>'+f[1]+'<input name="'+f[0]+'" type="number" min="0" value="'+a[f[0]]+'"></label>').join("")+
+        '</div><div class="au-act"><button class="primary" type="submit">Save rules</button><button type="button" class="secondary" data-areg="'+(a.reg_open?"close":"open")+'">'+(a.reg_open?"Close sign-ups":"Reopen sign-ups")+'</button></div></form>'+
+        '<div class="panel au-start"><h3>Start the auction</h3><p>Needs at least 2 approved managers and some players. Rules, tiers and retentions lock once it starts.</p><button type="button" class="primary" id="auStart" data-step="1">Start the auction</button></div>';
+    }
+    if(adm&&a.status!=="archived")h+='<div class="au-foot"><button type="button" class="ghost" data-aarchive="1">Archive this auction</button></div>';
+    return h;
+  }
+  function wireAuBody(){/* delegated below */}
+  function auStageHtml(){
+    const B=auB,a=B.auction,adm=B.is_admin,me=B.me;
+    if(a.status==="open")return '';
+    const waiting=B.members.filter(m=>m.role==="player"&&m.lot_state==="waiting"&&m.status==="approved").length;
+    const unsold=B.members.filter(m=>m.role==="player"&&m.lot_state==="unsold").length;
+    let h='<div class="au-stage"><div class="au-lights"></div><div class="au-top"><span class="au-live">'+(a.status==="live"?'<i></i>LIVE AUCTION':'FINISHED')+'</span><span>'+waiting+' waiting · '+unsold+' unsold</span></div>';
+    if(a.status==="live"&&a.lot_status!=="idle"&&a.cur_member){
+      const p=auMem(a.cur_member),lead=a.cur_leader?auMem(a.cur_leader):null,isMgr=me&&me.role==="manager"&&me.status==="approved";
+      const next=a.cur_leader?a.cur_bid+a.bid_step:a.cur_bid;
+      let why='';
+      if(isMgr){const sq=auSquad(me.member_id).length;
+        if(a.lot_status==="paused")why="The auction is paused.";
+        else if(a.cur_leader===me.member_id)why="You are the highest bidder.";
+        else if(sq>=a.max_squad)why="Your squad is full.";
+        else if(next>me.max_bid)why="Over your max bid ("+me.max_bid+"). Keep purse for your minimum squad.";}
+      h+='<div class="au-onblock">'+avBig(p?p.name:"?",p?p.player_id:"","au-big")+'<div class="au-pn"><h3>'+esc(p?p.name:"")+'</h3><p>'+(p?auChip(p.tier):'')+' Base price '+(p?auBase(a,p.tier):'')+'</p></div></div>'+
+        '<div class="au-bidrow"><div><small>Current bid</small><div class="au-amt" id="auAmt">'+a.cur_bid+'</div><div class="au-leader">'+(lead?(me&&lead.id===me.member_id?'You lead':esc(lead.name)+' leads'):'No bids yet. Opening at '+a.cur_bid+'.')+'</div></div><div class="au-ring" id="auRing"><svg viewBox="0 0 78 78" aria-hidden="true"><circle class="bg" cx="39" cy="39" r="33"/><circle class="fg" id="auFg" cx="39" cy="39" r="33" stroke-dasharray="207" stroke-dashoffset="0"/></svg><b id="auTm">0</b></div></div>';
+      if(isMgr)h+='<button type="button" class="au-bidbtn" id="auBid"'+(why?' disabled':'')+'>Bid '+next+'</button><p class="au-why">'+esc(why)+'</p>'+
+        '<div class="au-me"><span>Your purse <b>'+(auMem(me.member_id)||{}).purse+'</b></span><span>Spots left <b>'+Math.max(0,a.max_squad-auSquad(me.member_id).length)+'</b></span><span>Your max bid <b>'+me.max_bid+'</b></span></div>';
+      else h+='<p class="au-why">'+(state.session?'You are watching. Only approved managers can bid.':'Sign in to take part. You can watch live.')+'</p>';
+      if(adm)h+='<div class="au-admin"><button type="button" class="secondary" data-aadm="'+(a.lot_status==="paused"?"resume":"pause")+'">'+(a.lot_status==="paused"?"Resume":"Pause")+'</button><button type="button" class="secondary" data-aadm="close">Close this player now</button></div>';
+      h+='<div class="au-ticker">'+(B.bids.length?B.bids.map(b=>{const m=auMem(b.manager_id);return '<div><b>'+esc(m?m.name:"")+'</b> bid '+b.amount+'</div>';}).join(""):'<div>Waiting for the first bid.</div>')+'</div>';
+    }else if(a.status==="live"){
+      h+='<div class="au-idle"><h3>'+(waiting?'Next player coming up':unsold?'All players have been through':'The pool is empty')+'</h3>'+
+        (adm?'<div class="au-admin">'+(waiting?'<button type="button" class="primary" data-aadm="next">Next player</button>':'')+(unsold?'<button type="button" class="secondary" data-aadm="requeue">Second round for unsold ('+unsold+')</button><button type="button" class="secondary" data-aadm="assign">Assign unsold at base price</button>':'')+(!waiting?'<button type="button" class="primary" data-aadm="finish">Finish the auction</button>':'')+'</div><label class="au-auto"><input type="checkbox" id="auAuto"'+(auAuto?' checked':'')+'> Start the next player automatically</label>':'<p>Waiting for the admin.</p>')+'</div>';
+    }else{
+      h+='<div class="au-idle"><h3>The auction is over</h3><p>Final squads are below.</p></div>';
+    }
+    if(auOv&&Date.now()<auOv.until)h+='<div class="au-sold on">'+auOv.html+'</div>';
+    return h+'</div>';
+  }
+  function auPaintStage(){
+    const B=auB,a=B.auction,sig=JSON.stringify([a.status,a.lot_status,a.cur_member,a.cur_bid,a.cur_leader,a.last_seq,B.me,B.bids.length,B.members.map(m=>m.lot_state+m.purse).join(),auAuto,B.is_admin]);
+    const el=$("auStage");
+    if(sig!==auStageSig){auStageSig=sig;el.innerHTML=auStageHtml();const am=$("auAmt");if(am){am.classList.remove("bump");void am.offsetWidth;am.classList.add("bump");}}
+    auTick();
+  }
+  function auTick(){
+    if(!auB)return;
+    const a=auB.auction;
+    const tm=$("auTm");
+    if(tm){const r=auRemain(a),t=Math.ceil(r);tm.textContent=t;const fg=$("auFg");if(fg)fg.style.strokeDashoffset=207*(1-Math.min(1,r/a.timer_secs));const rg=$("auRing");if(rg)rg.classList.toggle("low",r<=5&&a.lot_status==="open");}
+    // hide overlay when done
+    if(auOv&&Date.now()>=auOv.until){auOv=null;const o=document.querySelector(".au-sold");if(o)o.remove();}
+    if(a.status!=="live")return;
+    const me=auB.me,canAct=auB.is_admin||(me&&me.role==="manager"&&me.status==="approved");
+    if(a.lot_status==="open"&&auRemain(a)<=0&&canAct&&!auClosing){
+      auClosing=true;
+      setTimeout(async()=>{try{await client.rpc("auction_close_lot",{p_id:auId,p_force:false});}catch(e){}await auFetch(true);auClosing=false;},150+Math.random()*900);
+    }
+    if(auB.is_admin&&auAuto&&a.lot_status==="idle"&&!auNexting&&(!auOv)&&Date.now()-auAt>1200&&auB.members.some(m=>m.role==="player"&&m.lot_state==="waiting"&&m.status==="approved")){
+      auNexting=true;
+      setTimeout(async()=>{try{await client.rpc("auction_next_lot",{p_id:auId});}catch(e){}await auFetch(true);auNexting=false;auAt=Date.now();},300);
+    }
+  }
+  // ---- delegated clicks ----
+  document.addEventListener("click",async e=>{
+    const t=e.target;
+    const op=t.closest("[data-auction]");if(op){auId=op.dataset.auction;showView("auction");return;}
+    if(t.closest("[data-auction-list]")){auId=null;showView("auction");return;}
+    if(!$("view-auction")||$("view-auction").classList.contains("hidden"))return;
+    if(t.closest("#auBid")){
+      const a=auB.auction,next=a.cur_leader?a.cur_bid+a.bid_step:a.cur_bid;
+      const ok=await auCall("auction_bid",{p_id:auId,p_amount:next});
+      if(ok&&navigator.vibrate)try{navigator.vibrate(30);}catch(e){}
+      return;
+    }
+    const j=t.closest("[data-ajoin]");if(j){await auCall("auction_register",{p_id:auId,p_role:j.dataset.ajoin},"You joined.");return;}
+    if(t.closest("[data-aleave]")){await auCall("auction_leave",{p_id:auId},"You left the auction.");return;}
+    const m=t.closest("[data-mact]");if(m){await auCall("auction_member_action",{p_member:m.dataset.m,p_action:m.dataset.mact,p_tier:null});return;}
+    const tb=t.closest("[data-tier]");if(tb){const n=({A:"B",B:"C",C:"A"})[tb.dataset.cur];await auCall("auction_member_action",{p_member:tb.dataset.tier,p_action:"tier",p_tier:n});return;}
+    const ur=t.closest("[data-unretain]");if(ur){await auCall("auction_unretain",{p_player:ur.dataset.unretain},"Retention removed.");return;}
+    const rg=t.closest("[data-areg]");if(rg){await auCall("auction_set",{p_id:auId,p_patch:{reg_open:rg.dataset.areg==="open"}},rg.dataset.areg==="open"?"Sign-ups reopened.":"Sign-ups closed.");return;}
+    const ar=t.closest("[data-aarchive]");if(ar){if(ar.dataset.sure!=="1"){ar.dataset.sure="1";ar.textContent="Tap again to archive";return;}await auCall("auction_set",{p_id:auId,p_patch:{status:"archived"}},"Archived.");auId=null;loadAuctionPage();return;}
+    const st=t.closest("#auStart");if(st){if(st.dataset.step==="1"){st.dataset.step="2";st.textContent="Tap again to go live";return;}await auCall("auction_start",{p_id:auId},"The auction is live.");return;}
+    const ad=t.closest("[data-aadm]");if(ad){
+      const k=ad.dataset.aadm;
+      if(k==="next")await auCall("auction_next_lot",{p_id:auId});
+      else if(k==="pause")await auCall("auction_pause",{p_id:auId,p_pause:true});
+      else if(k==="resume")await auCall("auction_pause",{p_id:auId,p_pause:false});
+      else if(k==="close")await auCall("auction_close_lot",{p_id:auId,p_force:true});
+      else if(k==="requeue")await auCall("auction_requeue_unsold",{p_id:auId},"Unsold players are back in the queue.");
+      else if(k==="assign")await auCall("auction_assign_auto",{p_id:auId},"Unsold players assigned.");
+      else if(k==="finish")await auCall("auction_set",{p_id:auId,p_patch:{status:"finished"}},"Auction finished.");
+      return;
+    }
+  });
+  document.addEventListener("change",async e=>{
+    const t=e.target;
+    if(t.id==="auAuto"){auAuto=t.checked;return;}
+    const r=t.closest&&t.closest("[data-retain]");if(r&&r.value){const mgr=r.value;await auCall("auction_retain",{p_manager:mgr,p_player:r.dataset.retain},"Player retained.");}
+  });
+  document.addEventListener("submit",async e=>{
+    if(e.target.id!=="auRules")return;
+    e.preventDefault();
+    const fd=new FormData(e.target),p={};fd.forEach((v,k)=>{p[k]=Number(v);});
+    await auCall("auction_set",{p_id:auId,p_patch:p},"Rules saved.");
+  });
+  async function loadAuctionStrip(){
+    const el=$("auctionStrip");if(!el||!client)return;
+    let list=[];try{const r=await client.rpc("get_auction_list");list=r.data||[];}catch(e){}
+    const adm=state.tnAdmin;
+    if(!list.length&&!adm){el.classList.add("hidden");return;}
+    el.innerHTML='<div><b>Bid Cup auctions</b><span class="small">'+(list.length?'Managers bid for players with a limited purse.':'No auction yet.')+'</span></div><div class="sr-strip-links">'+list.slice(0,3).map(s=>'<button type="button" class="ghost" data-auction="'+esc(s.id)+'">'+esc(s.name)+'</button>').join("")+'<button type="button" class="primary" data-auction-list="1" data-go="1">'+(adm?'Manage auctions':'All auctions')+'</button></div>';
+    el.classList.remove("hidden");
+  }
+  async function loadHomeAuction(){
+    const box=$("homeAuction");if(!box||!client)return;
+    let list=[];try{const r=await client.rpc("get_auction_list");list=(r.data||[]).filter(a=>a.status==="open"||a.status==="live");}catch(e){return;}
+    if(!list.length){box.classList.add("hidden");return;}
+    const a=list[0];
+    box.innerHTML='<button type="button" class="au-banner" data-auction="'+esc(a.id)+'"><span class="au-bn-tag'+(a.status==="live"?' live':'')+'">'+(a.status==="live"?'LIVE NOW':a.reg_open?'SIGN-UPS OPEN':'COMING UP')+'</span><b>'+esc(a.name)+'</b><small>'+a.managers+' of '+a.manager_slots+' managers · '+a.players+' players'+(a.status==="live"?' · Join the bidding':a.reg_open?' · Join as manager or player':'')+'</small></button>';
+    box.classList.remove("hidden");
+  }
+
   // ================= Weekly roundup (admin) =================
   var ruLang="en";
   async function buildRoundup(){
@@ -2442,6 +2672,7 @@ $("playersBody").innerHTML = shown.map(p =>
   setTimeout(loadHomeLegends,0);
   setTimeout(loadHomeStories,0);
   setTimeout(loadHomeSeries,0);
+  setTimeout(loadHomeAuction,0);
   setTimeout(loadHomeTicker,0);
   setTimeout(loadHomePodium,0);
   function legendCard(kind,scope,rows,monthLabel){
