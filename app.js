@@ -565,12 +565,13 @@ $("matchForm").addEventListener("submit", async e => {
     if(cobegError){status("leaderboardStatus","Leaderboard loaded, but COBEG XI match totals could not be loaded: "+cobegError.message,"error");return;}
     const cobegByPlayer={};
     (cobegTotals||[]).forEach(row=>{cobegByPlayer[row.player_id]=Number(row.total_mp_vs_cobeg_xi)||0;});
-    status("leaderboardStatus",data.length+" active players · Approved and counted results only.");
+    const meId=state.player&&state.player.id,mine=meId&&data.some(r=>r.player_id===meId);
+    status("leaderboardStatus",data.length+" player"+(data.length===1?"":"s")+" this month · Approved and counted results only."+(meId&&!mine?" You have no counted match this month yet, so you will appear after your first approved result.":""));
     const formRows=await formP,formBy={};formRows.forEach(f=>formBy[f.player_id]=f.form);
     const body=$("leaderboardBody");
     const oldTop={};body.querySelectorAll("tr[data-pid]").forEach(tr=>{oldTop[tr.dataset.pid]=tr.getBoundingClientRect().top;});
     const maxPts=Math.max(1,...data.map(r=>Number(r.points)||0)),myId=state.player&&state.player.id;
-    if(!data.length){body.innerHTML='<tr><td colspan="13" class="empty">No active players yet. Members can register to appear here.</td></tr>';return;}
+    if(!data.length){body.innerHTML='<tr><td colspan="13" class="empty">No counted matches this month yet. Players appear here after their first approved result.</td></tr>';return;}
     body.innerHTML=data.map(r=>{
       const total=cobegByPlayer[r.player_id]||0;
       const eligible=!!r.award_eligible;
@@ -795,7 +796,8 @@ async function loadHistory(){
       client.rpc("get_my_month_stats",{p_month:pm})
     ]);
     if(lb.error){$("profileStats").innerHTML='<div class="panel">'+esc(lb.error.message)+'</div>';return;}
-    const me=(lb.data||[]).find(r=>r.player_id===state.player?.id);
+    let me=(lb.data||[]).find(r=>r.player_id===state.player?.id);
+    if(!me&&state.player)me={player_id:state.player.id,matches_played:0,wins:0,draws:0,losses:0,goals_for:0,goals_against:0,goal_difference:0,points:0,cobeg_opponents:0,rank:null};
     if(!me){$("profileStats").innerHTML="";$("eligibilityBars").innerHTML="";$("eligibilityText").textContent="Your player profile was not found. Contact an admin.";return;}
     const n=v=>Number(v)||0,played=n(me.matches_played),opps=n(me.cobeg_opponents);
     const cobegMatches=n((ct.data||[]).find(r=>r.player_id===me.player_id)?.total_mp_vs_cobeg_xi);
@@ -1606,7 +1608,8 @@ $("playersBody").innerHTML = shown.map(p =>
   function rankMoves(now,prev){
     const m={};
     if(!now||!prev||!prev.some(r=>Number(r.matches_played)>0))return m;
-    const pm={};prev.forEach(r=>pm[r.player_id]=r);
+    // last week's list still holds players with no matches yet; renumber among players who had played
+    const pm={};prev.filter(r=>Number(r.matches_played)>0).sort((a,b)=>Number(a.rank)-Number(b.rank)).forEach((r,i)=>pm[r.player_id]={matches_played:r.matches_played,rank:i+1});
     now.forEach(r=>{
       const p=pm[r.player_id];
       if(!p||Number(p.matches_played)===0){m[r.player_id]=Number(r.matches_played)>0?{isNew:true}:null;return;}

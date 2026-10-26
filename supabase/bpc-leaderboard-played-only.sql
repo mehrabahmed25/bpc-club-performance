@@ -1,0 +1,4 @@
+-- Leaderboard lists only players with at least one counted match in the month.
+-- get_leaderboard is unchanged except: final_stats now has WHERE s.mp > 0, so ranks count only those players.
+-- Full definition is in the migration history (leaderboard_played_only). get_leaderboard_asof is deliberately unchanged
+-- (the article generator relies on it); the site renumbers last week's ranks client-side for the rank arrows.
