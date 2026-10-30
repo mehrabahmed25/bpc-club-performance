@@ -80,7 +80,7 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeStories();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeBroadcast();loadHomeTeam();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -2649,6 +2649,7 @@ $("playersBody").innerHTML = shown.map(p =>
           '<h3>Highlights</h3><div class="pf-hls">'+hl("Biggest win",bigWin,bigWin?bigWin.gf+" – "+bigWin.ga:"")+hl("Highest scoring",topScore,topScore?topScore.gf+" – "+topScore.ga:"")+'</div></section>'+
       '</div>'+
       (all.length>1?'<section class="pf-card pf-wide"><h3>Goals timeline <small>last '+Math.min(all.length,16)+' matches, oldest to newest</small></h3><div class="pf-tl">'+[...all.slice(0,16)].reverse().map(r=>'<div class="pf-tlc" title="'+esc(prettyDate(r.match_date))+' vs '+esc(r.opponent_name)+': '+r.gf+'–'+r.ga+'"><i class="up" style="height:'+Math.min(r.gf,10)*8+'px"></i><i class="dn" style="height:'+Math.min(r.ga,10)*8+'px"></i></div>').join("")+'</div><p class="pf-note">Green above the line is goals scored, red below is goals conceded.</p></section>':'')+
+      tierCardHtml(me,lbRow,st)+
       '<section class="pf-card pf-wide"><h3>Badges <small>'+earned+' of '+bd.defs.length+' earned</small></h3><div class="pf-badges">'+badges+'</div></section>'+
       '<section class="pf-card pf-wide"><h3>Latest matches</h3><div class="pf-ms">'+recent+'</div></section>'+
       '<div id="pfSeries"></div>';
@@ -2678,6 +2679,8 @@ $("playersBody").innerHTML = shown.map(p =>
   setTimeout(loadHomeAuction,0);
   setTimeout(loadHomeTicker,0);
   setTimeout(loadHomePodium,0);
+  setTimeout(loadHomeBroadcast,0);
+  setTimeout(loadHomeTeam,0);
   function legendCard(kind,scope,rows,monthLabel){
     const isG=kind==="goals";
     const key=isG?"goals_for":"clean_sheets";
@@ -2741,6 +2744,44 @@ $("playersBody").innerHTML = shown.map(p =>
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
+  }
+
+  // ---- Collectible tiers, Team of the month pitch, match broadcast graphic ----
+  function tierOf(rank,elig){
+    const r=Number(rank)||0;
+    const t=!r?{k:"none",n:"Unranked"}:r<=3?{k:"gold",n:"Gold"}:r<=10?{k:"silver",n:"Silver"}:{k:"bronze",n:"Bronze"};
+    return Object.assign({foil:!!elig},t);
+  }
+  const TM_SLOTS=[[50,13],[17,19],[83,19],[19,42],[50,45],[81,42],[14,69],[37,71],[63,71],[86,69],[50,89]];
+  async function loadHomeTeam(){
+    const box=$("homeTeam");if(!box||!client)return;
+    try{
+      const [r]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
+      const top=(r.data||[]).filter(x=>Number(x.matches_played)>0).sort((a,b)=>Number(a.rank)-Number(b.rank)).slice(0,11);
+      if(top.length<4){box.classList.add("hidden");return;}
+      const cards=top.map((p,i)=>{const t=tierOf(p.rank,p.award_eligible),s=TM_SLOTS[i];
+        return '<button type="button" class="tm-p tier-'+t.k+(t.foil?' foil':'')+'" data-player="'+esc(p.player_id)+'" style="left:'+s[0]+'%;top:'+s[1]+'%;--k:'+i+'" aria-label="'+esc(p.player_name)+', rank '+p.rank+', '+p.points+' points"><span class="tm-c">'+avBig(p.player_name,p.player_id,"tm-av")+'<b>'+esc(String(p.player_name).split(/\s+/)[0])+'</b><i>'+p.points+'</i></span><span class="tm-r">#'+p.rank+'</span></button>';}).join("");
+      box.innerHTML='<div class="hl-head"><h2>Team of the month</h2><span class="hl-links"><button type="button" class="hl-link" data-view="leaderboard">Full leaderboard</button></span></div><div class="tm-pitch"><span class="tm-box"></span>'+cards+'</div><p class="tm-note">The top '+top.length+' players by points this month. The top three lead the attack and the rest follow the table, so positions are not real roles. Gold frame: top 3. Silver: 4 to 10. Bronze: 11 and below.</p>';
+      box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+      box.classList.remove("hidden");
+    }catch(e){console.warn(e);}
+  }
+  async function loadHomeBroadcast(){
+    const box=$("homeBroadcast");if(!box||!client)return;
+    try{
+      const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(),-14)),p_end:ymd(new Date())});
+      const rows=(data||[]).filter(m=>m.a_name&&m.b_name);
+      if(!rows.length){box.classList.add("hidden");return;}
+      const m=[...rows].sort((x,y)=>(y.a_goals+y.b_goals)-(x.a_goals+x.b_goals)||String(y.match_date).localeCompare(String(x.match_date)))[0];
+      const tot=m.a_goals+m.b_goals,aw=m.a_goals>m.b_goals,bw=m.b_goals>m.a_goals;
+      const side=(id,name,g,w,cls)=>'<button type="button" class="bc-t '+cls+(w?' w':'')+'"'+(id?' data-player="'+esc(id)+'"':'')+'><span class="bc-nm">'+esc(name)+'</span></button>';
+      box.innerHTML='<div class="bc"><div class="bc-bug">'+side(m.a_id,m.a_name,m.a_goals,aw,"l")+'<span class="bc-sc"><b>'+m.a_goals+'</b><s>FT</s><b>'+m.b_goals+'</b></span>'+side(m.b_id,m.b_name,m.b_goals,bw,"r")+'</div><div class="bc-low"><span class="bc-tag">Match of the fortnight</span><span class="bc-tx">'+tot+' goal'+(tot===1?'':'s')+' · '+esc(prettyDate(m.match_date))+'</span></div></div>';
+      box.classList.remove("hidden");
+    }catch(e){console.warn(e);}
+  }
+  function tierCardHtml(me,lbRow,st){
+    const t=tierOf(lbRow&&lbRow.rank,lbRow&&lbRow.award_eligible);
+    return '<section class="pf-card pf-wide"><h3>Player card <small>frame follows this month\'s table</small></h3><div class="tc-wrap"><div class="tc tier-'+t.k+(t.foil?' foil':'')+'"><span class="tc-top"><b>'+(lbRow?'#'+lbRow.rank:'—')+'</b><em>'+t.n+'</em></span>'+avBig(me.display_name,me.id,"tc-av")+'<h4>'+esc(me.display_name)+'</h4><div class="tc-st"><span><b>'+st.n+'</b>P</span><span><b>'+st.w+'</b>W</span><span><b>'+st.gf+'</b>GF</span><span><b>'+st.pts+'</b>Pts</span></div>'+(t.foil?'<span class="tc-foil">Award eligible</span>':'')+'</div><p class="tc-leg">Gold is the top 3, silver is rank 4 to 10, bronze is 11 and below. A shimmering foil means the player is eligible for this month\'s award. The card changes as the table changes.</p></div></section>';
   }
   function initials(n){return String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";}
   function tnGlyph(format){
