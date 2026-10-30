@@ -80,7 +80,7 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeBroadcast();loadHomeTeam();loadHomeStories();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -2679,7 +2679,6 @@ $("playersBody").innerHTML = shown.map(p =>
   setTimeout(loadHomeAuction,0);
   setTimeout(loadHomeTicker,0);
   setTimeout(loadHomePodium,0);
-  setTimeout(loadHomeBroadcast,0);
   setTimeout(loadHomeTeam,0);
   function legendCard(kind,scope,rows,monthLabel){
     const isG=kind==="goals";
@@ -2763,19 +2762,6 @@ $("playersBody").innerHTML = shown.map(p =>
         return '<button type="button" class="tm-p tier-'+t.k+(t.foil?' foil':'')+'" data-player="'+esc(p.player_id)+'" style="left:'+s[0]+'%;top:'+s[1]+'%;--k:'+i+'" aria-label="'+esc(p.player_name)+', rank '+p.rank+', '+p.points+' points"><span class="tm-c">'+avBig(p.player_name,p.player_id,"tm-av")+'<b>'+esc(String(p.player_name).split(/\s+/)[0])+'</b><i>'+p.points+'</i></span><span class="tm-r">#'+p.rank+'</span></button>';}).join("");
       box.innerHTML='<div class="hl-head"><h2>Team of the month</h2><span class="hl-links"><button type="button" class="hl-link" data-view="leaderboard">Full leaderboard</button></span></div><div class="tm-pitch"><span class="tm-box"></span>'+cards+'</div><p class="tm-note">The top '+top.length+' players by points this month. The top three lead the attack and the rest follow the table, so positions are not real roles. Gold frame: top 3. Silver: 4 to 10. Bronze: 11 and below.</p>';
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
-      box.classList.remove("hidden");
-    }catch(e){console.warn(e);}
-  }
-  async function loadHomeBroadcast(){
-    const box=$("homeBroadcast");if(!box||!client)return;
-    try{
-      const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(),-14)),p_end:ymd(new Date())});
-      const rows=(data||[]).filter(m=>m.a_name&&m.b_name);
-      if(!rows.length){box.classList.add("hidden");return;}
-      const m=[...rows].sort((x,y)=>(y.a_goals+y.b_goals)-(x.a_goals+x.b_goals)||String(y.match_date).localeCompare(String(x.match_date)))[0];
-      const tot=m.a_goals+m.b_goals,aw=m.a_goals>m.b_goals,bw=m.b_goals>m.a_goals;
-      const side=(id,name,g,w,cls)=>'<button type="button" class="bc-t '+cls+(w?' w':'')+'"'+(id?' data-player="'+esc(id)+'"':'')+'><span class="bc-nm">'+esc(name)+'</span></button>';
-      box.innerHTML='<div class="bc"><div class="bc-bug">'+side(m.a_id,m.a_name,m.a_goals,aw,"l")+'<span class="bc-sc"><b>'+m.a_goals+'</b><s>FT</s><b>'+m.b_goals+'</b></span>'+side(m.b_id,m.b_name,m.b_goals,bw,"r")+'</div><div class="bc-low"><span class="bc-tag">Match of the fortnight</span><span class="bc-tx">'+tot+' goal'+(tot===1?'':'s')+' · '+esc(prettyDate(m.match_date))+'</span></div></div>';
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
   }
