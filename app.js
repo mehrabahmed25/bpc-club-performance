@@ -556,6 +556,7 @@ $("matchForm").addEventListener("submit", async e => {
     const month=$("monthPicker").value||monthNow;
     $("leaderboardMonthLabel").textContent=new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"})+" leaderboard";
     status("leaderboardStatus","Loading rankings…");
+    {const lb0=$("leaderboardBody");if(lb0&&!lb0.querySelector("tr[data-pid]"))lb0.innerHTML=skel("rows");}
     const wantMoves=month===monthNow;
     const formP=client.rpc("get_recent_form",{p_limit:5}).then(r=>r.data||[],()=>[]);
     const [{data,error},prev]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),wantMoves?client.rpc("get_leaderboard_asof",{p_month:monthDate(month),p_cutoff:ymd(addDays(new Date(),-7))}):Promise.resolve({data:null}),ensureAvatars()]);
@@ -1526,7 +1527,7 @@ $("playersBody").innerHTML = shown.map(p =>
     if(!a||!b||a===b){
       box.innerHTML='<div class="h2h-empty"><b>'+(a&&a===b?"Pick two different players.":"Choose two players to start the rivalry.")+'</b><span>Every counted result between them shows up here.</span></div>';return;
     }
-    box.innerHTML='<div class="h2h-empty"><span>Loading the rivalry…</span></div>';
+    box.innerHTML=skel("cards");
     const {data,error}=await client.rpc("get_head_to_head",{p_a:a,p_b:b});
     if(error){box.innerHTML='<div class="h2h-empty"><b>Could not load this rivalry.</b><span>'+esc(error.message)+'</span></div>';return;}
     const A=nameOf(P(a)),B=nameOf(P(b)),ms=data||[];
@@ -1833,7 +1834,7 @@ $("playersBody").innerHTML = shown.map(p =>
     auStop();
     if(!client)return;
     if(!auId){await renderAuctionIndex();return;}
-    $("auctionPage").innerHTML='<div class="au-loading">Loading the auction…</div>';
+    $("auctionPage").innerHTML=skel("cards");
     auB=null;auSeq=null;auOv=null;auBodySig="";auStageSig="";
     await ensureAvatars();
     await auFetch(true);
@@ -2186,7 +2187,7 @@ $("playersBody").innerHTML = shown.map(p =>
   }
   async function loadSeriesPage(){
     const box=$("seriesPage");if(!box||!client)return;
-    box.innerHTML='<div class="h2h-empty"><span>Loading…</span></div>';
+    box.innerHTML=skel("cards");
     await ensureAvatars();
     if(seriesId&&seriesId!=="new"){
       const {data,error}=await client.rpc("get_series_bundle",{p_id:seriesId});
@@ -2380,7 +2381,7 @@ $("playersBody").innerHTML = shown.map(p =>
   async function loadStories(){
     const box=$("storiesPage");if(!client||!box)return;
     if(state.scrollArticle)storiesLimit=50;
-    box.innerHTML='<div class="h2h-empty"><span>Loading stories…</span></div>';
+    box.innerHTML=skel("cards");
     const [r]=await Promise.all([client.rpc("get_articles",{p_week:null,p_limit:storiesLimit}),ensureAvatars()]);
     state.storyList=r.data||[];
     state.reacts={};
@@ -2585,7 +2586,7 @@ $("playersBody").innerHTML = shown.map(p =>
   async function renderPlayerPage(){
     const box=$("playerPage"),id=state.viewPlayerId;
     if(!client||!id){box.innerHTML="";return;}
-    box.innerHTML='<div class="h2h-empty"><span>Loading profile…</span></div>';
+    box.innerHTML=skel("profile");
     const lbMonth=monthDate(pfScope.mode==="month"?pfScope.month:monthNow);
     const serP=client.rpc("get_player_series",{p_player:id}).then(r=>r.data||null,()=>null);
     const [mres,dir,lb]=await Promise.all([client.rpc("get_player_matches",{p_player:id}),client.from("active_player_directory").select("id,display_name").eq("id",id).maybeSingle(),client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
@@ -2769,6 +2770,29 @@ $("playersBody").innerHTML = shown.map(p =>
     const t=tierOf(lbRow&&lbRow.rank,lbRow&&lbRow.award_eligible);
     return '<section class="pf-card pf-wide"><h3>Player card <small>frame follows this month\'s table</small></h3><div class="tc-wrap"><div class="tc tier-'+t.k+(t.foil?' foil':'')+'"><span class="tc-top"><b>'+(lbRow?'#'+lbRow.rank:'—')+'</b><em>'+t.n+'</em></span>'+avBig(me.display_name,me.id,"tc-av")+'<h4>'+esc(me.display_name)+'</h4><div class="tc-st"><span><b>'+st.n+'</b>P</span><span><b>'+st.w+'</b>W</span><span><b>'+st.gf+'</b>GF</span><span><b>'+st.pts+'</b>Pts</span></div>'+(t.foil?'<span class="tc-foil">Award eligible</span>':'')+'</div><p class="tc-leg">Gold is the top 3, silver is rank 4 to 10, bronze is 11 and below. A shimmering foil means the player is eligible for this month\'s award. The card changes as the table changes.</p></div></section>';
   }
+
+  // ---- Loading skeletons and installable app ----
+  function skel(kind){
+    const bar=(w,h)=>'<i class="sk" style="width:'+w+'%;height:'+h+'px"></i>';
+    if(kind==="profile")return '<div class="sk-wrap" aria-busy="true" role="status"><span class="sr-only">Loading</span><div class="sk-hero"><i class="sk sk-circle"></i><div>'+bar(48,26)+bar(70,14)+bar(40,14)+'</div></div><div class="sk-tiles">'+'<i class="sk sk-tile"></i>'.repeat(6)+'</div><i class="sk sk-card"></i></div>';
+    if(kind==="cards")return '<div class="sk-wrap" aria-busy="true" role="status"><span class="sr-only">Loading</span>'+'<i class="sk sk-card"></i>'.repeat(3)+'</div>';
+    if(kind==="rows")return Array.from({length:8},(_,i)=>'<tr class="sk-tr" aria-hidden="true"><td colspan="13"><i class="sk" style="width:'+(96-i*3)+'%;height:18px"></i></td></tr>').join("");
+    return '<div class="sk-wrap" aria-busy="true" role="status"><span class="sr-only">Loading</span>'+bar(40,22)+bar(100,64)+bar(100,64)+'</div>';
+  }
+  let installEv=null;
+  const standalone=()=>window.matchMedia("(display-mode: standalone)").matches||window.navigator.standalone===true;
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEv=e;const b=$("installBtn");if(b&&!standalone())b.classList.remove("hidden");});
+  window.addEventListener("appinstalled",()=>{installEv=null;const b=$("installBtn");if(b)b.classList.add("hidden");});
+  (function(){
+    const b=$("installBtn");if(!b)return;
+    const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream;
+    if(ios&&!standalone())b.classList.remove("hidden");
+    b.addEventListener("click",async()=>{
+      if(installEv){installEv.prompt();try{await installEv.userChoice;}catch(e){}installEv=null;b.classList.add("hidden");return;}
+      toast("On iPhone: tap the Share button, then Add to Home Screen.");
+    });
+  })();
+  if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
   function initials(n){return String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";}
   function tnGlyph(format){
     const g={
