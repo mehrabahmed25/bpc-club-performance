@@ -62,15 +62,17 @@
   let posterSlides = [];
   let posterIndex = 0;
   let posterTimer = null;
-  const monthNow = new Date().toISOString().slice(0,7);
+  // The club runs on Bangladesh time, so dates and months follow Asia/Dhaka (not UTC, which is 6 hours behind).
+  function bdToday(){try{return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Dhaka",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());}catch(e){const d=new Date(Date.now()+6*3600e3);return d.toISOString().slice(0,10);}}
+  const monthNow = bdToday().slice(0,7);
   $("monthPicker").value = monthNow;
   $("historyMonth").value = monthNow;
-  $("matchDate").value = new Date().toISOString().slice(0,10);
+  $("matchDate").value = bdToday();
 
   function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3200);}
   function status(id,msg,type=""){const el=$(id);if(!el)return;el.textContent=msg;el.className="status "+type;}
   function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-  function monthDate(v){return v ? v+"-01" : new Date().toISOString().slice(0,10);}
+  function monthDate(v){return v ? v+"-01" : bdToday();}
   function prettyDate(v){if(!v)return "—";const d=new Date(v+"T12:00:00");return d.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"});}
   function showView(name){
     if(name==="account"&&state.session&&!state.recoveryMode)name="profile";
@@ -559,7 +561,7 @@ $("matchForm").addEventListener("submit", async e => {
     {const lb0=$("leaderboardBody");if(lb0&&!lb0.querySelector("tr[data-pid]"))lb0.innerHTML=skel("rows");}
     const wantMoves=month===monthNow;
     const formP=client.rpc("get_recent_form",{p_limit:5}).then(r=>r.data||[],()=>[]);
-    const [{data,error},prev]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),wantMoves?client.rpc("get_leaderboard_asof",{p_month:monthDate(month),p_cutoff:ymd(addDays(new Date(),-7))}):Promise.resolve({data:null}),ensureAvatars()]);
+    const [{data,error},prev]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),wantMoves?client.rpc("get_leaderboard_asof",{p_month:monthDate(month),p_cutoff:ymd(addDays(new Date(bdToday()+"T12:00:00"),-7))}):Promise.resolve({data:null}),ensureAvatars()]);
     if(error){status("leaderboardStatus",error.message,"error");return;}
     const moves=rankMoves(data,prev&&prev.data);
     const {data:cobegTotals,error:cobegError}=await client.rpc("get_cobeg_match_totals",{p_month:monthDate(month)});
@@ -1083,7 +1085,7 @@ $("playersBody").innerHTML = shown.map(p =>
       seasonPicker.innerHTML=officialState.seasons.length?officialState.seasons.map(x=>'<option value="'+x.id+'">'+esc(x.name)+(x.is_closed?' (closed)':'')+'</option>').join(""):'<option value="">No seasons created</option>';
       if(officialState.seasons.some(x=>x.id===old))seasonPicker.value=old;
       $("officialPlayer").innerHTML=officialState.players.map(x=>'<option value="'+x.id+'">'+esc(x.display_name)+'</option>').join("");
-      $("officialMatchDate").value=$("officialMatchDate").value||new Date().toISOString().slice(0,10);
+      $("officialMatchDate").value=$("officialMatchDate").value||bdToday();
       $("officialEditorAccount").innerHTML='<option value="">Choose registered account</option>';
       if(state.isAdmin){
         const {data:accounts,error}=await client.from("players").select("user_id,display_name").not("user_id","is",null).order("display_name");
@@ -2050,7 +2052,7 @@ $("playersBody").innerHTML = shown.map(p =>
   var ruLang="en";
   async function buildRoundup(){
     if(!client)return;
-    const end=$("ruEnd").value||ymd(new Date()),start=ymd(addDays(new Date(end+"T12:00:00"),-6)),l=ruLang,bn=l==="bn",n=x=>numL(x,l);
+    const end=$("ruEnd").value||bdToday(),start=ymd(addDays(new Date(end+"T12:00:00"),-6)),l=ruLang,bn=l==="bn",n=x=>numL(x,l);
     status("ruStatus","Writing…");
     const [mres,lb,ar]=await Promise.all([
       client.rpc("get_week_matches",{p_start:start,p_end:end}),
@@ -2088,7 +2090,7 @@ $("playersBody").innerHTML = shown.map(p =>
     $("ruText").value=L.join("\n");
     status("ruStatus","Draft ready. Edit it, then copy.","ok");
   }
-  $("ruEnd").value=ymd(new Date());
+  $("ruEnd").value=bdToday();
   $("ruBuild").addEventListener("click",buildRoundup);
   document.querySelectorAll("[data-rulang]").forEach(b=>b.addEventListener("click",()=>{
     ruLang=b.dataset.rulang;document.querySelectorAll("[data-rulang]").forEach(x=>x.classList.toggle("on",x===b));
@@ -2709,7 +2711,7 @@ $("playersBody").innerHTML = shown.map(p =>
   async function loadHomeTicker(){
     const box=$("homeTicker");if(!box||!client)return;
     try{
-      const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(),-14)),p_end:ymd(new Date())});
+      const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(bdToday()+"T12:00:00"),-14)),p_end:bdToday()});
       const rows=(data||[]).filter(m=>m.a_name&&m.b_name).slice(0,14);
       if(!rows.length){box.classList.add("hidden");return;}
       const item=m=>{const aw=m.a_goals>m.b_goals,bw=m.b_goals>m.a_goals;return '<span class="tk-i"><b class="'+(aw?'w':'')+'">'+esc(m.a_name)+'</b><em>'+m.a_goals+' – '+m.b_goals+'</em><b class="'+(bw?'w':'')+'">'+esc(m.b_name)+'</b></span>';};
@@ -3186,8 +3188,8 @@ $("playersBody").innerHTML = shown.map(p =>
   async function loadFundsPage(){
     if(!client||!state.session||!state.canAccessFunds){$("fundsDenied").classList.remove("hidden");$("fundsContent").classList.add("hidden");return;}
     $("fundsDenied").classList.add("hidden");$("fundsContent").classList.remove("hidden");
-    $("fundDate").value=$("fundDate").value||new Date().toISOString().slice(0,10);
-    if($("fundExpenseDate"))$("fundExpenseDate").value=$("fundExpenseDate").value||new Date().toISOString().slice(0,10);
+    $("fundDate").value=$("fundDate").value||bdToday();
+    if($("fundExpenseDate"))$("fundExpenseDate").value=$("fundExpenseDate").value||bdToday();
     if($("fundExpenseForm"))$("fundExpenseForm").classList.toggle("hidden",!state.isAdmin);
     status("fundsStatus","Loading fund records…");
     const [donationsResult,expensesResult]=await Promise.all([
@@ -3221,7 +3223,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const btn=ev.submitter;if(btn)btn.disabled=true;
     const {error}=await client.from("bpc_fund_donations").insert({donor_name,amount,donation_date,note:note||null,created_by:state.session.user.id});
     if(error)status("fundFormStatus",error.message,"error");
-    else{$("fundDonationForm").reset();$("fundDate").value=new Date().toISOString().slice(0,10);status("fundFormStatus","Donation saved.");await loadFundsPage();}
+    else{$("fundDonationForm").reset();$("fundDate").value=bdToday();status("fundFormStatus","Donation saved.");await loadFundsPage();}
     if(btn)btn.disabled=false;
   });
   $("fundExpenseForm").addEventListener("submit",async ev=>{
@@ -3232,7 +3234,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const btn=ev.submitter;if(btn)btn.disabled=true;
     const {error}=await client.from("bpc_fund_expenses").insert({description,amount,expense_date,note:note||null,created_by:state.session.user.id});
     if(error)status("fundExpenseStatus",error.message,"error");
-    else{$("fundExpenseForm").reset();$("fundExpenseDate").value=new Date().toISOString().slice(0,10);status("fundExpenseStatus","Expense saved.");await loadFundsPage();}
+    else{$("fundExpenseForm").reset();$("fundExpenseDate").value=bdToday();status("fundExpenseStatus","Expense saved.");await loadFundsPage();}
     if(btn)btn.disabled=false;
   });
   $("refreshFunds").addEventListener("click",loadFundsPage);
