@@ -230,7 +230,7 @@ begin
   select array_agg(id order by sort_order, name), array_agg(name order by sort_order, name) into hs, hn from houses;
   n := coalesce(cardinality(hs), 0);
   if n < 2 then raise exception 'Create at least 2 houses first.'; end if;
-  delete from house_members;
+  delete from house_members where true;
   for r in
     select p.id pid, p.display_name nm, row_number() over (order by coalesce(lb.points, 0) desc, random()) rn
     from players p
