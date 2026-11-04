@@ -52,6 +52,7 @@
   </section>
     <section id="homeSeries" class="home-series hidden" aria-label="Team series"></section>
     <section id="homeAuction" class="home-series hidden" aria-label="Auction"></section>
+    <section id="homeHouses" class="home-houses hidden" aria-label="BPC House Cup"></section>
     <section id="homePodium" class="home-podium hidden" aria-label="This month's table"></section>
     <section id="homeTeam" class="home-team hidden" aria-label="Team of the month"></section>
     <section id="homeStories" class="home-stories hidden" aria-label="Latest stories"></section>
@@ -165,6 +166,8 @@
       <div id="articleAdminStatus" class="status"></div>
       <div id="articleTabs" class="st-tabs"></div>
       <div id="articleAdminList" class="st-admin-list"></div>
+      <div class="section-head compact"><h2>BPC Houses</h2><p>Split the club into named houses that compete for a monthly House Cup. You choose the names, colours and mottos.</p></div>
+      <div class="panel" id="housesAdmin"></div>
       <div class="section-head compact"><h2>Weekly roundup</h2><p>One post for the club group: results, top scorer, biggest win, the table and stories. Edit it if you like, then copy.</p></div>
       <div class="panel ru-panel">
         <div class="ru-bar"><label class="small">Week ending<input type="date" id="ruEnd"></label><span class="st-lang ru-lang" role="group" aria-label="Language"><button type="button" data-rulang="en" class="on">EN</button><button type="button" data-rulang="bn">বাংলা</button></span><button type="button" class="secondary" id="ruBuild">Write roundup</button></div>
@@ -285,6 +288,7 @@
 
 
 
+  <section id="view-houses" class="view hidden"><div id="housesPage"></div></section>
   <section id="view-series" class="view hidden"><div id="seriesPage"></div></section>
   <section id="view-auction" class="view hidden"><div id="auctionPage"></div></section>
   <section id="view-tournaments" class="view hidden">

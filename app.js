@@ -82,13 +82,14 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeStories();}
+    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeHouses();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
     if(name==="player")renderPlayerPage();
     if(name==="stories")loadStories();
     if(name==="series")loadSeriesPage();
+    if(name==="houses")loadHousesPage();
     if(name==="auction")loadAuctionPage();else if(typeof auStop==="function")auStop();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
@@ -570,6 +571,7 @@ $("matchForm").addEventListener("submit", async e => {
     (cobegTotals||[]).forEach(row=>{cobegByPlayer[row.player_id]=Number(row.total_mp_vs_cobeg_xi)||0;});
     const meId=state.player&&state.player.id,mine=meId&&data.some(r=>r.player_id===meId);
     status("leaderboardStatus",data.length+" player"+(data.length===1?"":"s")+" this month · Approved and counted results only."+(meId&&!mine?" You have no counted match this month yet, so you will appear after your first approved result.":""));
+    const hmap=await houseMap().catch(()=>null);
     const formRows=await formP,formBy={};formRows.forEach(f=>formBy[f.player_id]=f.form);
     const body=$("leaderboardBody");
     const oldTop={};body.querySelectorAll("tr[data-pid]").forEach(tr=>{oldTop[tr.dataset.pid]=tr.getBoundingClientRect().top;});
@@ -581,7 +583,7 @@ $("matchForm").addEventListener("submit", async e => {
       const fm=(formBy[r.player_id]||"").split("").map(c=>'<i class="fd '+c.toLowerCase()+'" title="'+({W:"Win",D:"Draw",L:"Loss"})[c]+'"></i>').join("");
       const pct=Math.round((Math.min(Number(r.matches_played)||0,40)/40+Math.min(total,25)/25+Math.min(Number(r.cobeg_opponents)||0,5)/5)/3*100);
       const ring='<span class="aw-ring'+(eligible?' ok':'')+'" style="--p:'+(eligible?100:pct)+'" title="'+(eligible?"Award eligible":"Award progress "+pct+"%")+'"><b>'+(eligible?"✓":pct+"%")+'</b></span>';
-      return '<tr data-pid="'+esc(r.player_id)+'"'+(myId&&r.player_id===myId?' class="is-me"':'')+'><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'"><span class="rk">'+r.rank+'</span>'+moveHtml(moves[r.player_id])+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><span class="pc-name"><b>'+esc(r.player_name)+'</b>'+(myId&&r.player_id===myId?'<em class="you">You</em>':'')+(fm?'<span class="lb-form" aria-label="Recent form">'+fm+'</span>':'')+'</span></div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points"><div class="pts-cell"><b>'+r.points+'</b><span class="pts-bar"><i style="width:'+Math.round((Number(r.points)||0)/maxPts*100)+'%"></i></span></div></td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td>'+ring+'</td></tr>';
+      return '<tr data-pid="'+esc(r.player_id)+'"'+(myId&&r.player_id===myId?' class="is-me"':'')+'><td class="'+(r.rank<=3?'rank-'+r.rank:'')+'"><span class="rk">'+r.rank+'</span>'+moveHtml(moves[r.player_id])+'</td><td><div class="player-cell link-player" data-player="'+esc(r.player_id)+'"><span class="avatar"'+av(r.player_name,{id:r.player_id})+'>'+esc(initials(r.player_name))+'</span><span class="pc-name"><b>'+esc(r.player_name)+'</b>'+hsDot(hmap,r.player_id)+(myId&&r.player_id===myId?'<em class="you">You</em>':'')+(fm?'<span class="lb-form" aria-label="Recent form">'+fm+'</span>':'')+'</span></div></td><td>'+r.matches_played+'</td><td>'+r.wins+'</td><td>'+r.draws+'</td><td>'+r.losses+'</td><td>'+r.goals_for+'</td><td>'+r.goals_against+'</td><td>'+signed(r.goal_difference)+'</td><td class="points"><div class="pts-cell"><b>'+r.points+'</b><span class="pts-bar"><i style="width:'+Math.round((Number(r.points)||0)/maxPts*100)+'%"></i></span></div></td><td>'+r.cobeg_opponents+'/5</td><td>'+total+'/25</td><td>'+ring+'</td></tr>';
     }).join("");
     body.querySelectorAll("tr[data-pid]").forEach(tr=>{const x=moves[tr.dataset.pid];if(x&&x.d)tr.classList.add(x.d>0?"flash-up":"flash-down");});
     // re-shuffle: rows slide from their old position when the table reloads
@@ -826,6 +828,7 @@ async function loadHistory(){
     $("adminContent").classList.toggle("hidden",!state.isAdmin);
     if(!state.isAdmin)return;
     loadArticleAdmin();
+    loadHousesAdmin();
     await loadPosterAdmin();
     await loadFundsAccessAdmin();
     status("adminStatus","Loading pending submissions…");
@@ -2593,6 +2596,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const serP=client.rpc("get_player_series",{p_player:id}).then(r=>r.data||null,()=>null);
     const [mres,dir,lb]=await Promise.all([client.rpc("get_player_matches",{p_player:id}),client.from("active_player_directory").select("id,display_name").eq("id",id).maybeSingle(),client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
     const me=dir.data;
+    const hmap=await houseMap().catch(()=>null);
     if(!me||mres.error){box.innerHTML='<div class="h2h-empty"><b>Player not found.</b><span>This profile is not available.</span></div>';return;}
     const all=(mres.data||[]).map(r=>({...r,gf:Number(r.gf),ga:Number(r.ga)}));
     const rows=pfScope.mode==="month"?all.filter(r=>r.match_date.slice(0,7)===pfScope.month):all;
@@ -2638,7 +2642,7 @@ $("playersBody").innerHTML = shown.map(p =>
     box.innerHTML=
       '<div class="pf-head pf-hero2"><div class="pf-fx" aria-hidden="true"><i class="a"></i><i class="b"></i><span class="pf-ghost">'+esc(String(me.display_name).split(/\s+/).slice(-1)[0])+'</span></div>'+
         '<div class="pf-portrait">'+avBig(me.display_name,me.id,"pf-av")+(lbRow?'<span class="pf-rankchip">#'+lbRow.rank+'</span>':'')+'</div>'+
-        '<div class="pf-id"><h2>'+esc(me.display_name)+'</h2><p class="pf-story">'+esc(storyLine)+'</p>'+
+        '<div class="pf-id"><h2>'+esc(me.display_name)+'</h2>'+hsChip(hmap,id)+'<p class="pf-story">'+esc(storyLine)+'</p>'+
         '<div class="pf-formrow">'+(form.slice(0,6).map(r=>'<i class="fm '+pfRes(r)+'">'+pfRes(r).toUpperCase()+'</i>').join("")||'<em>No matches yet</em>')+'</div>'+
         '<div class="pf-actions"><button type="button" class="pf-btn" id="pfCompare">Compare'+(signed?' with me':'')+'</button><button type="button" class="pf-btn" id="pfShare">Share card</button></div></div>'+
         '<div class="pf-ring" style="--w:'+ringW+';--d:'+ringD+'" role="img" aria-label="Win rate '+st.rate+' percent"><b>'+st.rate+'<small>%</small></b><span>win rate</span></div></div>'+
@@ -2682,6 +2686,7 @@ $("playersBody").innerHTML = shown.map(p =>
   setTimeout(loadHomeAuction,0);
   setTimeout(loadHomeTicker,0);
   setTimeout(loadHomePodium,0);
+  setTimeout(loadHomeHouses,0);
   setTimeout(loadHomeTeam,0);
   function legendCard(kind,scope,rows,monthLabel){
     const isG=kind==="goals";
@@ -2773,6 +2778,140 @@ $("playersBody").innerHTML = shown.map(p =>
     return '<section class="pf-card pf-wide"><h3>Player card <small>frame follows this month\'s table</small></h3><div class="tc-wrap"><div class="tc tier-'+t.k+(t.foil?' foil':'')+'"><span class="tc-top"><b>'+(lbRow?'#'+lbRow.rank:'—')+'</b><em>'+t.n+'</em></span>'+avBig(me.display_name,me.id,"tc-av")+'<h4>'+esc(me.display_name)+'</h4><div class="tc-st"><span><b>'+st.n+'</b>P</span><span><b>'+st.w+'</b>W</span><span><b>'+st.gf+'</b>GF</span><span><b>'+st.pts+'</b>Pts</span></div>'+(t.foil?'<span class="tc-foil">Award eligible</span>':'')+'</div><p class="tc-leg">Gold is the top 3, silver is rank 4 to 10, bronze is 11 and below. A shimmering foil means the player is eligible for this month\'s award. The card changes as the table changes.</p></div></section>';
   }
 
+
+  // ---- BPC Houses ----
+  let hsCache=null;
+  const HS_SETS={
+    "Brahmanbaria pride":[["Titas Titans","#2459e8","Rule the river"],["Ashuganj Thunder","#f6b73c","Power every match"],["Kasba Kings","#d33b45","Bow to the crown"],["Akhaura Warriors","#13a46b","Never back down"]],
+    "Game feel":[["Blaze","#e8791f","Burn bright"],["Storm","#3b6fe0","Strike fast"],["Phantom","#8a4fff","Unseen, unbeaten"],["Titan","#13a46b","Built different"]],
+    "Bengal feel":[["Royal Tigers","#e8791f","Fear the stripes"],["Padma Panthers","#364152","Silent and deadly"],["Meghna Hawks","#2459e8","Eyes on the prize"],["Jamuna Lions","#f6b73c","Pride of the club"]]
+  };
+  const HS_COLORS=["#2459e8","#f6b73c","#d33b45","#13a46b","#8a4fff","#e8791f"];
+  async function houseData(month,force){
+    const key=month||"";
+    if(!force&&hsCache&&hsCache.key===key&&Date.now()-hsCache.at<45000)return hsCache.data;
+    const {data,error}=await client.rpc("get_house_bundle",{p_month:month?month+"-01":null});
+    if(error)throw error;
+    hsCache={key,at:Date.now(),data};return data;
+  }
+  async function houseMap(){
+    if(!client)return null;
+    const d=await houseData("");
+    if(!d||!d.enabled)return null;
+    const m={};(d.houses||[]).forEach(hh=>(hh.roster||[]).forEach(p=>{m[p.player_id]={id:hh.id,name:hh.name,color:hh.color};}));
+    return m;
+  }
+  const hsDot=(m,id)=>m&&m[id]?'<i class="hs-dot" style="--hc:'+esc(m[id].color)+'" title="'+esc(m[id].name)+'"></i>':'';
+  const hsChip=(m,id)=>m&&m[id]?'<button type="button" class="hs-chip" data-house-open style="--hc:'+esc(m[id].color)+'"><i></i>'+esc(m[id].name)+'</button>':'';
+  function hsCard(x,i,max,leader){
+    return '<article class="hs-card'+(leader?' lead':'')+'" style="--hc:'+esc(x.color)+'"><span class="hs-pos">'+(i+1)+'</span><div class="hs-top"><b>'+esc(x.name)+'</b>'+(leader?'<em>Leading</em>':'')+'</div>'+(x.motto?'<small>'+esc(x.motto)+'</small>':'')+'<div class="hs-pts"><strong>'+x.points+'</strong><span>pts</span></div><div class="hs-bar"><i style="width:'+(max?Math.round(x.points/max*100):0)+'%"></i></div><div class="hs-meta"><span>'+x.members+' players</span><span>'+x.avg+' per player</span><span>'+x.months_won+' month'+(x.months_won===1?'':'s')+' won</span></div></article>';
+  }
+  async function loadHomeHouses(){
+    const box=$("homeHouses");if(!box||!client)return;
+    try{
+      let d=await houseData("");
+      if(!d||!d.enabled||!d.houses||d.houses.length<2){box.classList.add("hidden");return;}
+      if(d.unassigned>0){const r=await client.rpc("house_sync");if(!r.error&&r.data>0)d=await houseData("",true);}
+      const hs=d.houses,max=Math.max(1,...hs.map(x=>x.points));
+      const tied=hs.length>1&&hs[0].points===hs[1].points;
+      const label=new Date(d.month+"T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
+      box.innerHTML='<div class="hl-head"><h2>BPC House Cup</h2><span class="hl-links"><button type="button" class="hl-link" data-house-open>House page</button></span></div><p class="hs-sub">'+esc(label)+' · house points are the combined points of each house\'s players.</p><div class="hs-grid">'+hs.map((x,i)=>hsCard(x,i,max,i===0&&x.points>0&&!tied)).join("")+'</div>';
+      box.classList.remove("hidden");
+    }catch(e){console.warn(e);box.classList.add("hidden");}
+  }
+  async function loadHousesPage(){
+    const box=$("housesPage");if(!box||!client)return;
+    const month=(box.dataset.month)||monthNow;
+    box.innerHTML=skel("cards");
+    try{
+      await ensureAvatars();
+      const d=await houseData(month,true);
+      if(!d||!d.enabled||!d.houses||!d.houses.length){box.innerHTML='<div class="h2h-empty"><b>No House Cup yet.</b><span>The houses have not been set up. Check back soon.</span></div>';return;}
+      const hs=d.houses,max=Math.max(1,...hs.map(x=>x.points));
+      const tied=hs.length>1&&hs[0].points===hs[1].points;
+      const myId=state.player&&state.player.id;
+      const roster=x=>'<div class="hs-roster">'+(x.roster.length?x.roster.map((p,j)=>'<button type="button" class="hs-pl'+(myId&&p.player_id===myId?' me':'')+'" data-player="'+esc(p.player_id)+'">'+avBig(p.name,p.player_id,"hs-av")+'<span class="hs-nm">'+esc(p.name)+(j===0&&p.points>0?' <em>Top</em>':'')+'</span><span class="hs-pp">'+p.points+'<small> pts · '+p.matches+' P</small></span></button>').join(""):'<p class="small">No players yet.</p>')+'</div>';
+      const derby=d.derby||[];
+      box.innerHTML='<div class="section-head"><p class="eyebrow">HOUSE CUP</p><h2>BPC Houses</h2><p>Each house\'s points are the combined counted points of its players this month. '+(d.best_n>0?"Only each house's best "+d.best_n+" players count. ":"")+'Matches still count for the individual leaderboard exactly as before.</p></div>'+
+        '<div class="hs-bar-row"><label class="small">Month<input type="month" id="hsMonth" value="'+esc(month)+'" max="'+esc(monthNow)+'"></label></div>'+
+        '<div class="hs-grid hs-grid-page">'+hs.map((x,i)=>hsCard(x,i,max,i===0&&x.points>0&&!tied)).join("")+'</div>'+
+        '<div class="hs-houses">'+hs.map(x=>'<section class="pf-card hs-hcard" style="--hc:'+esc(x.color)+'"><h3><i class="hs-dot" style="--hc:'+esc(x.color)+'"></i>'+esc(x.name)+' <small>'+x.members+' players</small></h3>'+roster(x)+'</section>').join("")+'</div>'+
+        '<section class="pf-card pf-wide"><h3>House v house <small>matches between players of different houses, each game counted once</small></h3>'+(derby.length?'<div class="hs-derby">'+derby.map(y=>'<div class="hs-dv"><span class="a" style="--hc:'+esc(y.a.color)+'">'+esc(y.a.name)+'</span><b>'+y.a_wins+' – '+y.draws+' – '+y.b_wins+'</b><span class="b" style="--hc:'+esc(y.b.color)+'">'+esc(y.b.name)+'</span><small>'+y.played+' played · goals '+y.a_goals+'–'+y.b_goals+'</small></div>').join("")+'</div>':'<p class="pf-none">No matches between different houses this month yet.</p>')+'</section>'+
+        '<p class="small hs-foot">Months won counts the completed months since the cup started where one house finished clear on top.</p>';
+      $("hsMonth").addEventListener("change",e=>{box.dataset.month=e.target.value||monthNow;loadHousesPage();});
+    }catch(e){console.warn(e);box.innerHTML='<div class="h2h-empty"><b>Could not load the houses.</b><span>Please try again.</span></div>';}
+  }
+  document.addEventListener("click",e=>{
+    if(e.target.closest("[data-house-open]")){e.preventDefault();$("housesPage").dataset.month="";showView("houses");}
+  });
+  // admin
+  async function loadHousesAdmin(){
+    const box=$("housesAdmin");if(!box||!client||!state.isAdmin)return;
+    box.innerHTML=skel("cards");
+    let d;try{d=await houseData("",true);}catch(e){box.innerHTML='<p class="small">Could not load houses: '+esc(e.message||e)+'</p>';return;}
+    const hs=(d&&d.houses)||[];
+    const row=(x,i)=>'<div class="hsa-row" data-id="'+esc(x?x.id:"")+'"><input type="color" class="hsa-c" value="'+esc(x?x.color:HS_COLORS[i%6])+'" aria-label="House colour"><input class="hsa-n" maxlength="24" placeholder="House name" value="'+esc(x?x.name:"")+'" aria-label="House name"><input class="hsa-m" maxlength="60" placeholder="Motto (optional)" value="'+esc(x?x.motto:"")+'" aria-label="Motto"><button type="button" class="reject-btn hsa-del">Delete</button></div>';
+    const all=[];hs.forEach(x=>(x.roster||[]).forEach(p=>all.push({p,h:x.id})));all.sort((a,b)=>a.p.name.localeCompare(b.p.name));
+    box.innerHTML='<div class="hsa-set"><label class="hsa-tog"><input type="checkbox" id="hsaOn"'+(d.enabled?' checked':'')+'> House Cup is on (visible to everyone)</label><label class="small">Count each house\'s best players<input type="number" id="hsaBest" min="0" max="30" value="'+(d.best_n||0)+'"><em>0 = every player counts</em></label><label class="small">Cup starts from<input type="month" id="hsaStart" value="'+esc((d.started_month||monthNow+"-01").slice(0,7))+'"></label><button type="button" class="secondary" id="hsaSaveSet">Save settings</button></div>'+
+      '<h3 class="hsa-h">Houses</h3><div class="hsa-sets"><span class="small">Name ideas:</span>'+Object.keys(HS_SETS).map(k=>'<button type="button" class="hs-set" data-set="'+esc(k)+'">'+esc(k)+'</button>').join("")+'</div><div id="hsaRows">'+hs.map((x,i)=>row(x,i)).join("")+'</div><div class="hsa-act"><button type="button" class="secondary" id="hsaAdd">+ Add house</button><button type="button" class="primary" id="hsaSaveAll">Save houses</button></div>'+
+      '<h3 class="hsa-h">Players</h3><p class="small">'+(d.drawn_at?'Last draw: '+esc(new Date(d.drawn_at).toLocaleString())+'. ':'No draw yet. ')+'The balanced draw ranks players by last month\'s points and deals them to the houses in a snake order. It replaces the current teams.</p><div class="hsa-act"><button type="button" class="primary" id="hsaDraw">Run balanced draw</button><button type="button" class="secondary" id="hsaSync">Add new players ('+(d.unassigned||0)+' waiting)</button></div><div id="hsaStatus" class="status"></div>'+
+      (all.length?'<details class="hsa-mv"><summary>Move a player ('+all.length+')</summary><div class="hsa-mvlist">'+all.map(({p,h:hid})=>'<label><span>'+esc(p.name)+'</span><select data-mv="'+esc(p.player_id)+'">'+hs.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===hid?' selected':'')+'>'+esc(x.name)+'</option>').join("")+'<option value="">No house</option></select></label>').join("")+'</div></details>':'');
+    const rows=$("hsaRows"),say=(m,t)=>status("hsaStatus",m,t||"");
+    const refresh=async()=>{await loadHousesAdmin();loadHomeHouses();};
+    box.querySelectorAll(".hsa-del").forEach(b=>b.addEventListener("click",()=>hsDel(b)));
+    function hsDel(b){const r=b.closest(".hsa-row"),id=r.dataset.id;if(!id){r.remove();return;}
+      if(!confirm("Delete this house? Its players become unassigned."))return;
+      client.rpc("house_admin_delete",{p_id:id}).then(x=>{if(x.error)say(x.error.message,"error");else refresh();});}
+    $("hsaAdd").addEventListener("click",()=>{const n=rows.querySelectorAll(".hsa-row").length;if(n>=6){say("You can have at most 6 houses.","error");return;}rows.insertAdjacentHTML("beforeend",row(null,n));rows.lastElementChild.querySelector(".hsa-del").addEventListener("click",e=>hsDel(e.currentTarget));});
+    box.querySelectorAll("[data-set]").forEach(b=>b.addEventListener("click",()=>{
+      const s=HS_SETS[b.dataset.set];
+      while(rows.querySelectorAll(".hsa-row").length<s.length&&rows.querySelectorAll(".hsa-row").length<6)$("hsaAdd").click();
+      rows.querySelectorAll(".hsa-row").forEach((r,i)=>{if(s[i]){r.querySelector(".hsa-n").value=s[i][0];r.querySelector(".hsa-c").value=s[i][1];r.querySelector(".hsa-m").value=s[i][2];}});
+      say("Names filled in. Press Save houses to keep them. You can edit any of them first.");
+    }));
+    $("hsaSaveAll").addEventListener("click",async()=>{
+      const rs=[...rows.querySelectorAll(".hsa-row")];if(!rs.length){say("Add at least one house.","error");return;}
+      $("hsaSaveAll").disabled=true;
+      for(const r of rs){
+        const {error}=await client.rpc("house_admin_save",{p_id:r.dataset.id||null,p_name:r.querySelector(".hsa-n").value,p_color:r.querySelector(".hsa-c").value,p_motto:r.querySelector(".hsa-m").value});
+        if(error){say(error.message,"error");$("hsaSaveAll").disabled=false;return;}
+      }
+      toast("Houses saved.");refresh();
+    });
+    $("hsaSaveSet").addEventListener("click",async()=>{
+      const {error}=await client.rpc("house_admin_settings",{p_enabled:$("hsaOn").checked,p_best_n:Number($("hsaBest").value)||0,p_started_month:($("hsaStart").value||monthNow)+"-01"});
+      if(error){say(error.message,"error");return;}toast("Settings saved.");refresh();
+    });
+    $("hsaSync").addEventListener("click",async()=>{
+      const {data,error}=await client.rpc("house_sync");
+      if(error){say(error.message,"error");return;}
+      say(data>0?data+" new player(s) added to the smallest houses.":"Nobody is waiting. (The House Cup must be on, with 2 or more houses.)","success");if(data>0)refresh();
+    });
+    $("hsaDraw").addEventListener("click",async()=>{
+      if(!confirm("Run the draw? This replaces every player's current house."))return;
+      $("hsaDraw").disabled=true;
+      const {data,error}=await client.rpc("house_admin_draw");$("hsaDraw").disabled=false;
+      if(error){say(error.message,"error");return;}
+      hsReveal(data||[],hs,refresh);
+    });
+    box.querySelectorAll("[data-mv]").forEach(s=>s.addEventListener("change",async()=>{
+      const {error}=await client.rpc("house_admin_move",{p_player:s.dataset.mv,p_house:s.value||null});
+      if(error){say(error.message,"error");return;}toast("Player moved.");hsCache=null;loadHomeHouses();
+    }));
+  }
+  function hsReveal(list,hs,done){
+    const reduce=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const colors={};hs.forEach(x=>colors[x.id]=x.color);
+    const ov=document.createElement("div");ov.className="hs-reveal";ov.setAttribute("role","dialog");ov.setAttribute("aria-label","House draw");
+    ov.innerHTML='<div class="hs-rv-in"><h2>The draw</h2><p class="hs-rv-now" id="hsRvNow" aria-live="polite">Drawing…</p><div class="hs-rv-cols">'+hs.map(x=>'<div class="hs-rv-col" style="--hc:'+esc(x.color)+'"><b>'+esc(x.name)+'</b><div data-col="'+esc(x.id)+'"></div></div>').join("")+'</div><div class="hs-rv-act"><button type="button" class="secondary" id="hsRvSkip">Skip</button><button type="button" class="primary" id="hsRvClose" disabled>Done</button></div></div>';
+    document.body.appendChild(ov);
+    let i=0,t=null;
+    const put=p=>{const col=ov.querySelector('[data-col="'+p.house_id+'"]');if(col)col.insertAdjacentHTML("beforeend",'<span class="hs-rv-chip">'+esc(p.name)+'</span>');$("hsRvNow").textContent="#"+p.pick+" "+p.name+" joins "+p.house_name;};
+    const fin=()=>{clearInterval(t);while(i<list.length)put(list[i++]);$("hsRvNow").textContent="Draw complete: "+list.length+" players placed.";$("hsRvClose").disabled=false;$("hsRvSkip").disabled=true;};
+    if(reduce||!list.length)fin();else t=setInterval(()=>{if(i>=list.length){fin();return;}put(list[i++]);},380);
+    $("hsRvSkip").addEventListener("click",fin);
+    $("hsRvClose").addEventListener("click",()=>{ov.remove();done();});
+  }
   // ---- Loading skeletons and installable app ----
   function skel(kind){
     const bar=(w,h)=>'<i class="sk" style="width:'+w+'%;height:'+h+'px"></i>';
