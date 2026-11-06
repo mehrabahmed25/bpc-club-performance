@@ -1280,7 +1280,7 @@ $("playersBody").innerHTML = shown.map(p =>
   const tnOpt=(name,val,title,text,on)=>'<label class="tn-opt"><input type="radio" name="'+name+'" value="'+esc(val)+'"'+(on?' checked':'')+'><span><b>'+esc(title)+'</b><small>'+esc(text)+'</small></span></label>';
   function openTnWizard(){
     if(!state.tnAdmin||!state.session)return;
-    const d={name:"",description:"",type:"individual",format:"round_robin",join:"both",approval:false,deadline:"",limit:"",see:"all_members",flow:"participant_admin"};
+    const d={name:"",description:"",type:"individual",format:"round_robin",join:"both",approval:false,deadline:"",limit:"",see:"all_members",flow:"participant_admin",multi:false,teamSize:"3",games:"3"};
     const STEPS=["Basics","Players","Scores"];let step=0,busy=false;
     const ov=document.createElement("div");ov.className="modal-overlay";
     ov.innerHTML='<div class="modal-box tn-wiz" role="dialog" aria-modal="true" aria-labelledby="wizTitle"><div class="tn-wiz-head"><div><h3 id="wizTitle">New tournament</h3><p class="small" id="wizSub"></p></div><button type="button" class="tn-wiz-x" id="wizX" aria-label="Close">&times;</button></div><ol class="tn-wiz-steps" id="wizSteps"></ol><div class="tn-wiz-body" id="wizBody"></div><div class="status" id="wizErr" role="alert"></div><div class="tn-wiz-foot" id="wizFoot"></div></div>';
@@ -1293,7 +1293,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const err=m=>{$w("wizErr").textContent=m||"";};
     const summary=()=>{
       const f=TN_PICK_FORMAT.find(x=>x[0]===d.format)[1],fl=TN_PICK_FLOW.find(x=>x[0]===d.flow)[1],j=TN_PICK_JOIN.find(x=>x[0]===d.join)[1];
-      const rows=[["Name",d.name.trim()],["Type",d.type==="team"?"Teams":"Individual players"],["Format",f],["Joining",j+(d.join!=="admin"&&d.approval?", approved by you":"")],["Visible to",TN_PICK_SEE.find(x=>x[0]===d.see)[1]],["Scores",fl]];
+      const rows=[["Name",d.name.trim()],["Type",d.type==="team"?"Teams":"Individual players"],...(d.multi?[["Fixtures",d.games+" games per fixture, "+d.teamSize+" players per team"]]:[]),["Format",f],["Joining",j+(d.join!=="admin"&&d.approval?", approved by you":"")],["Visible to",TN_PICK_SEE.find(x=>x[0]===d.see)[1]],["Scores",fl]];
       if(d.join!=="admin"&&d.deadline)rows.push(["Sign-ups close",tournamentDate(new Date(d.deadline).toISOString())]);
       if(d.limit)rows.push(["Player limit",d.limit]);
       return '<dl class="tn-sum">'+rows.map(r=>'<div><dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd></div>').join("")+'</dl>';
@@ -1307,6 +1307,8 @@ $("playersBody").innerHTML = shown.map(p =>
         body='<label class="tn-field">Tournament name<input id="wName" maxlength="120" required placeholder="e.g. BPC Autumn Cup" value="'+esc(d.name)+'"></label>'
           +'<label class="tn-field">Short description <em>(optional)</em><textarea id="wDesc" rows="2" maxlength="3000" placeholder="Rules, prizes, anything players should know">'+esc(d.description)+'</textarea></label>'
           +'<fieldset class="tn-set"><legend>Who plays</legend><div class="tn-opts two">'+tnOpt("wType","individual","Individual players","Each player enters on their own.",d.type==="individual")+tnOpt("wType","team","Teams","A player registers a team with a name.",d.type==="team")+'</div></fieldset>'
+          +'<div id="wTeamBox" class="'+(d.type==="team"?'':'hidden')+'"><label class="tn-switch"><input type="checkbox" id="wMulti"'+(d.multi?' checked':'')+'><span><b>Each fixture is several 1v1 games</b><small>Like a trio match: every team lines up its players and each board is its own game. The team with more games wins.</small></span></label>'
+          +'<div id="wMultiBox" class="tn-two '+(d.multi?'':'hidden')+'"><label class="tn-field">Players per team<input type="number" id="wTeamSize" min="2" max="11" step="1" value="'+esc(d.teamSize)+'"></label><label class="tn-field">Games per fixture<input type="number" id="wGames" min="2" max="11" step="1" value="'+esc(d.games)+'"></label></div></div>'
           +'<fieldset class="tn-set"><legend>Format</legend><div class="tn-opts two">'+TN_PICK_FORMAT.map(x=>tnOpt("wFormat",x[0],x[1],x[2],d.format===x[0])).join("")+'</div></fieldset>';
       }else if(step===1){
         body='<fieldset class="tn-set"><legend>How do players join?</legend><div class="tn-opts">'+TN_PICK_JOIN.map(x=>tnOpt("wJoin",x[0],x[1],x[2],d.join===x[0])).join("")+'</div></fieldset>'
@@ -1325,12 +1327,15 @@ $("playersBody").innerHTML = shown.map(p =>
     }
     function read(){
       const g=id=>$w(id);
-      if(step===0){d.name=g("wName").value;d.description=g("wDesc").value;d.type=ov.querySelector('input[name=wType]:checked').value;d.format=ov.querySelector('input[name=wFormat]:checked').value;}
+      if(step===0){d.name=g("wName").value;d.description=g("wDesc").value;d.type=ov.querySelector('input[name=wType]:checked').value;d.multi=d.type==="team"&&!!g("wMulti")?.checked;if(g("wTeamSize")){d.teamSize=g("wTeamSize").value;d.games=g("wGames").value;}d.format=ov.querySelector('input[name=wFormat]:checked').value;}
       else if(step===1){d.join=ov.querySelector('input[name=wJoin]:checked').value;d.approval=!!g("wApproval")?.checked;d.deadline=g("wDeadline")?.value||"";d.limit=g("wLimit")?.value||"";d.see=ov.querySelector('input[name=wSee]:checked').value;}
       else{d.flow=ov.querySelector('input[name=wFlow]:checked').value;}
     }
     function validate(){
-      if(step===0){if(!tournamentSlug(d.name.trim())||d.name.trim().length<3)return "Give the tournament a name of at least 3 letters.";}
+      if(step===0){if(!tournamentSlug(d.name.trim())||d.name.trim().length<3)return "Give the tournament a name of at least 3 letters.";
+        if(d.multi){const sz=Number(d.teamSize),gm=Number(d.games);
+          if(!Number.isInteger(sz)||sz<2||sz>11)return "Players per team must be a whole number from 2 to 11.";
+          if(!Number.isInteger(gm)||gm<2||gm>sz)return "Games per fixture must be a whole number from 2 up to the team size.";}}
       if(step===1&&d.join!=="admin"){
         if(d.limit&&(!Number.isInteger(Number(d.limit))||Number(d.limit)<2))return "The player limit must be a whole number of 2 or more.";
         if(d.deadline&&new Date(d.deadline)<=new Date())return "Sign-ups must close at a time in the future.";
@@ -1341,6 +1346,8 @@ $("playersBody").innerHTML = shown.map(p =>
       $w("wCancel")&&($w("wCancel").onclick=()=>close());
       $w("wBack")&&($w("wBack").onclick=()=>{read();step--;render();});
       $w("wNext")&&($w("wNext").onclick=()=>{read();const m=validate();if(m){err(m);return;}step++;render();});
+      ov.querySelectorAll('input[name=wType]').forEach(r=>r.addEventListener("change",()=>{$w("wTeamBox").classList.toggle("hidden",ov.querySelector('input[name=wType]:checked').value!=="team");}));
+      $w("wMulti")&&($w("wMulti").onchange=()=>{$w("wMultiBox").classList.toggle("hidden",!$w("wMulti").checked);});
       ov.querySelectorAll('input[name=wJoin]').forEach(r=>r.addEventListener("change",()=>{$w("wSignup").classList.toggle("hidden",r.value==="admin"&&r.checked);}));
       ov.querySelectorAll('input[name=wFlow]').forEach(r=>r.addEventListener("change",()=>{read();$w("wizBody").querySelector(".tn-sum").outerHTML=summary();}));
       $w("wizBody").querySelectorAll("input[type=text],input:not([type]),textarea").forEach(i=>i.addEventListener("keydown",e=>{if(e.key==="Enter"&&i.tagName!=="TEXTAREA"){e.preventDefault();$w("wNext")?.click();}}));
@@ -1352,6 +1359,7 @@ $("playersBody").innerHTML = shown.map(p =>
       busy=true;ov.querySelectorAll("button").forEach(b=>b.disabled=true);err("");$w("wCreate")&&($w("wCreate").textContent="Creating…");
       const base=tournamentSlug(d.name.trim());
       const payload={name:d.name.trim(),slug:base,description:d.description.trim()||null,competition_type:d.type,format:d.format,status:"draft",visibility:d.see,registration_mode:d.join,registration_requires_approval:d.join!=="admin"&&d.approval,registration_deadline:d.join!=="admin"&&d.deadline?new Date(d.deadline).toISOString():null,participant_limit:d.join!=="admin"&&d.limit?Number(d.limit):null,score_workflow:d.flow,created_by:state.session.user.id};
+      if(d.multi)payload.rules_json={team_size:Number(d.teamSize),games_per_fixture:Number(d.games)};
       let res=await client.from("tournament_tournaments").insert(payload).select("id").single();
       if(res.error&&res.error.code==="23505"){payload.slug=base.slice(0,64)+"-"+Math.random().toString(36).slice(2,6);res=await client.from("tournament_tournaments").insert(payload).select("id").single();}
       if(res.error){busy=false;ov.querySelectorAll("button").forEach(b=>b.disabled=false);err(res.error.message);$w("wCreate")&&($w("wCreate").textContent="Create and open sign-ups");return;}
@@ -2983,7 +2991,144 @@ $("playersBody").innerHTML = shown.map(p =>
       done(kind);
     }));
   }
-  async function openTournament(id){
+  
+  // ---- Trio / multi-game team fixtures ----------------------------------------------
+  const TN_BOARD_ST={scheduled:"Not played",awaiting_opponent:"Waiting for opponent",pending:"Waiting for admin",approved:"Final",disputed:"Under review"};
+  function trioCard(m,f,o){
+    const games=f.games,sm=f.summary,left={name:o.a,you:o.mineA,score:m.score_a},right={name:o.b,you:o.mineB,score:m.score_b};
+    const head=renderBoard({id:m.id,mode:"view",done:o.done,foot:o.foot,mine:o.mineA||o.mineB,left,right});
+    const tied=f.admin&&!o.ended&&sm.approved===games&&sm.a_games===sm.b_games&&sm.a_goals===sm.b_goals;
+    const sumLine=sm.approved?'Games '+sm.a_games+'–'+sm.b_games+', goals '+sm.a_goals+'–'+sm.b_goals:'No games played yet';
+    const sideBlock=(s,name)=>{
+      const lbl='<b>'+esc(name)+'</b>';
+      if(s.can_lineup)return '<form class="tn-lineup" data-trio-lineup="'+esc(m.id)+'" data-part="'+esc(s.participant_id)+'">'+lbl+'<small>Choose who plays each board. Your opponent cannot see it until both captains lock.</small>'
+        +Array.from({length:games},(_,k)=>'<label>Board '+(k+1)+'<select data-slot required><option value="">Choose a player</option>'+s.roster.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join("")+'</select></label>').join("")
+        +'<button type="submit" class="primary">Lock lineup</button></form>';
+      if(s.locked)return '<div class="tn-lineup done">'+lbl+'<small>'+(s.slots?s.slots.map((x,i)=>(i+1)+'. '+esc(x.name)).join(' &nbsp; '):'Lineup locked. Hidden until both captains are ready.')+'</small></div>';
+      return '<div class="tn-lineup wait">'+lbl+'<small>'+(s.is_captain?'Set your lineup above.':'Waiting for the captain to set the lineup.')+'</small></div>';
+    };
+    const lineups=f.boards.length?'':'<div class="tn-lineups">'+sideBlock(f.a,o.a)+sideBlock(f.b,o.b)+'</div>';
+    const scoreForm=(b,kind)=>'<form class="tn-gform" data-trio-score="'+esc(b.id)+'" data-kind="'+kind+'" data-na="'+esc(b.a.name)+'" data-nb="'+esc(b.b.name)+'"><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.a.name)+' goals" value="'+(kind==="admin"&&b.score_a!=null?b.score_a:'')+'"><span>–</span><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.b.name)+' goals" value="'+(kind==="admin"&&b.score_b!=null?b.score_b:'')+'"><button type="submit" class="'+(kind==="admin"?'secondary':'primary')+'">'+(kind==="admin"?'Save as admin':'Submit')+'</button></form>';
+    const boards=f.boards.map(b=>{
+      const has=b.score_a!=null;
+      let act='';
+      if(b.can_submit)act+=scoreForm(b,"player");
+      if(b.can_confirm)act+='<div class="tn-actions"><button type="button" class="primary" data-trio-confirm="'+esc(b.id)+'" data-v="1">Confirm score</button><button type="button" class="secondary" data-trio-confirm="'+esc(b.id)+'" data-v="0">Dispute</button></div>';
+      if(f.admin&&!o.ended&&["pending","disputed","awaiting_opponent"].includes(b.status))act+='<div class="tn-actions"><button type="button" class="primary" data-trio-review="'+esc(b.id)+'" data-d="approve">Approve</button><button type="button" class="secondary" data-trio-review="'+esc(b.id)+'" data-d="reject">Reject</button></div>';
+      if(f.admin&&!o.ended&&b.status!=="approved"&&!b.can_submit)act+=scoreForm(b,"admin");
+      if(f.admin&&!o.ended&&b.status==="approved")act+=scoreForm(b,"admin");
+      return '<li class="tn-bd st-'+esc(b.status)+'"><div class="tn-bd-row"><span class="tn-bd-no">Board '+b.board_no+'</span><span class="tn-bd-p">'+esc(b.a.name)+'</span><b class="tn-bd-s">'+(has?b.score_a+' – '+b.score_b:'vs')+'</b><span class="tn-bd-p r">'+esc(b.b.name)+'</span></div><div class="tn-bd-st">'+esc(TN_BOARD_ST[b.status]||b.status)+'</div>'+act+'</li>';
+    }).join("");
+    const admin=f.admin&&!o.ended?'<div class="tn-actions">'+(f.boards.length&&sm.approved===0?'<button type="button" class="secondary" data-trio-reset="'+esc(m.id)+'">Reset lineups</button>':'')
+      +(tied?'<span class="small">Level on games and goals. Pick the winner:</span><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.a.participant_id)+'">'+esc(o.a)+'</button><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.b.participant_id)+'">'+esc(o.b)+'</button>':'')+'</div>':'';
+    const decidedNote=f.decided&&o.done?'<p class="small">Winner chosen by an admin after a level result.</p>':'';
+    const open=tnTrioOpen.has(m.id);
+    return '<div class="tn-trio-wrap">'+head+'<details class="tn-trio" data-trio-id="'+esc(m.id)+'"'+(open?' open':'')+'><summary>'+games+' games &middot; '+esc(sumLine)+'</summary>'+lineups+(boards?'<ol class="tn-bds">'+boards+'</ol>':'')+decidedNote+admin+'</details></div>';
+  }
+  function rosterSection(rosters,t,ended){
+    const sz=Number(t.rules_json?.team_size)||0;
+    const canAdd=state.tnAdmin&&!ended;
+    const cards=rosters.map(r=>{
+      const n=r.members.length,full=sz&&n>=sz,bad=sz&&n!==sz;
+      const list=r.members.map(mb=>'<li><span>'+esc(mb.name)+(mb.captain?' <em class="tn-you">Captain</em>':'')+'</span>'+(r.can_manage&&!mb.captain?'<button type="button" class="tn-x" data-roster-remove="'+esc(mb.id)+'" aria-label="Remove '+esc(mb.name)+'">&times;</button>':'')+'</li>').join("");
+      const add=r.can_manage&&!full?'<div class="tn-ros-add"><select data-ros-pick="'+esc(r.team_id)+'"><option value="">Add a registered player</option></select><input type="text" maxlength="60" placeholder="or type a name" data-ros-name="'+esc(r.team_id)+'"><button type="button" class="secondary" data-roster-add="'+esc(r.team_id)+'">Add</button></div>':'';
+      return '<article class="tn-ros'+(bad&&!ended?' short':'')+'"><div class="tn-ros-head"><b>'+esc(r.team_name)+'</b>'+(sz?'<span class="tn-chip'+(bad?' warn':'')+'">'+n+' of '+sz+' players</span>':'')+(r.status!=="confirmed"?'<span class="tn-chip">'+esc(r.status)+'</span>':'')+'</div><ul>'+list+'</ul>'+add+'</article>';
+    }).join("");
+    const create=canAdd?'<div class="tn-ros-create"><b>Add a team</b><input type="text" id="rosNewName" maxlength="100" placeholder="Team name"><select id="rosNewCaptain"><option value="">Choose the captain</option></select><button type="button" class="secondary" id="rosCreate">Create team</button></div>':'';
+    return '<section class="tn-section"><div class="tn-section-head"><h3>Teams</h3><span class="tn-count">'+rosters.length+'</span></div>'+(sz?'<p class="small">Each team needs exactly '+sz+' players. Rosters lock when sign-ups close, and fixtures cannot be made until every team is complete.</p>':'')+(cards?'<div class="tn-ros-grid">'+cards+'</div>':'<div class="tn-empty">No teams yet.</div>')+create+'</section>';
+  }
+  async function bindRosters(detail,id,rosters,t){
+    const needPicker=rosters.some(r=>r.can_manage)||!!detail.querySelector("#rosNewCaptain");
+    if(!needPicker)return;
+    const q=await client.from("players").select("user_id,display_name,active").not("user_id","is",null).eq("active",true).order("display_name");
+    const used=new Set(rosters.flatMap(r=>r.members.map(x=>x.user_id).filter(Boolean)));
+    const opts=(q.data||[]).filter(p=>!used.has(p.user_id)).map(p=>'<option value="'+esc(p.user_id)+'">'+esc(p.display_name||"Player")+'</option>').join("");
+    detail.querySelectorAll("[data-ros-pick]").forEach(sel=>sel.insertAdjacentHTML("beforeend",opts));
+    detail.querySelector("#rosNewCaptain")?.insertAdjacentHTML("beforeend",opts);
+    const fail=m=>{status("tournamentStatus",m,"error");toast(m);};
+    detail.querySelectorAll("[data-roster-add]").forEach(b=>b.addEventListener("click",async()=>{
+      const tid=b.dataset.rosterAdd,uidv=detail.querySelector('[data-ros-pick="'+tid+'"]').value,nm=detail.querySelector('[data-ros-name="'+tid+'"]').value.trim();
+      if(!uidv&&!nm){fail("Choose a registered player or type a name.");return;}
+      if(uidv&&nm){fail("Use either the list or a typed name, not both.");return;}
+      b.disabled=true;
+      const {error}=await client.rpc("tournament_team_add_member",{p_team_id:tid,p_user_id:uidv||null,p_cobeg_member_id:null,p_external_name:uidv?null:nm});
+      if(error){b.disabled=false;fail(error.message);return;}
+      toast("Player added.");openTournament(id,{keep:true});
+    }));
+    detail.querySelectorAll("[data-roster-remove]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Remove this player from the team?"))return;
+      const {error}=await client.rpc("tournament_team_remove_member",{p_member_id:b.dataset.rosterRemove});
+      if(error){fail(error.message);return;}
+      toast("Player removed.");openTournament(id,{keep:true});
+    }));
+    detail.querySelector("#rosCreate")?.addEventListener("click",async()=>{
+      const nm=detail.querySelector("#rosNewName").value.trim(),cap=detail.querySelector("#rosNewCaptain").value;
+      if(nm.length<2||!cap){fail("Enter a team name and choose a captain.");return;}
+      const {error}=await client.rpc("tournament_admin_create_team",{p_tournament_id:id,p_team_name:nm,p_captain_user_id:cap});
+      if(error){fail(error.message);return;}
+      toast("Team created.");openTournament(id,{keep:true});
+    });
+  }
+  async function loadTrioPerf(id){
+    const box=$("trioPerf");if(!box)return;
+    const {data,error}=await client.rpc("tournament_trio_top_performers",{p_tournament_id:id});
+    if(error){box.innerHTML='<div class="tn-empty">Could not load top performers.</div>';return;}
+    if(!(data||[]).length){box.innerHTML='<div class="tn-empty">Appears once the first game is approved.</div>';return;}
+    box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Player</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>Goals</th></tr></thead><tbody>'+data.map(x=>'<tr><td>'+esc(x.player_name)+'</td><td>'+esc(x.team_name)+'</td><td>'+x.played+'</td><td>'+x.wins+'</td><td>'+x.draws+'</td><td>'+x.losses+'</td><td>'+x.goals_for+'–'+x.goals_against+'</td></tr>').join("")+'</tbody></table></div>';
+  }
+  function bindTrio(detail,id){
+    const fail=m=>{status("tournamentStatus",m,"error");toast(m);};
+    const again=msg=>{if(msg)toast(msg);openTournament(id,{keep:true});};
+    detail.querySelectorAll("details[data-trio-id]").forEach(d=>d.addEventListener("toggle",()=>{d.open?tnTrioOpen.add(d.dataset.trioId):tnTrioOpen.delete(d.dataset.trioId);}));
+    detail.querySelectorAll("form[data-trio-lineup]").forEach(f=>f.addEventListener("submit",async ev=>{
+      ev.preventDefault();
+      const slots=[...f.querySelectorAll("[data-slot]")].map(x=>x.value);
+      if(slots.some(x=>!x)||new Set(slots).size!==slots.length){fail("Pick a different player for each board.");return;}
+      if(!confirm("Lock this lineup? It cannot be changed afterwards."))return;
+      const b=f.querySelector("button");b.disabled=true;
+      const {error}=await client.rpc("tournament_trio_set_lineup",{p_match_id:f.dataset.trioLineup,p_participant_id:f.dataset.part,p_slots:slots});
+      if(error){b.disabled=false;fail(error.message);return;}
+      tnTrioOpen.add(f.dataset.trioLineup);again("Lineup locked.");
+    }));
+    detail.querySelectorAll("form[data-trio-score]").forEach(f=>f.addEventListener("submit",async ev=>{
+      ev.preventDefault();
+      const ins=f.querySelectorAll("input"),a=ins[0].value.trim(),z=ins[1].value.trim();
+      if(!/^\d{1,2}$/.test(a)||!/^\d{1,2}$/.test(z)){fail("Enter a whole-number score (0 to 99) in both boxes.");return;}
+      const admin=f.dataset.kind==="admin";
+      if(!confirm((admin?"Save and approve ":"Submit ")+f.dataset.na+" "+a+" – "+z+" "+f.dataset.nb+"?"))return;
+      const b=f.querySelector("button");b.disabled=true;
+      const args={p_board_id:f.dataset.trioScore,p_score_a:Number(a),p_score_b:Number(z)};
+      const {error}=admin?await client.rpc("tournament_trio_admin_set_game",{...args,p_reason:"Admin-entered score"}):await client.rpc("tournament_trio_submit_game",args);
+      if(error){b.disabled=false;fail(error.message);return;}
+      again(admin?"Game saved and approved.":"Score submitted.");
+    }));
+    detail.querySelectorAll("[data-trio-confirm]").forEach(b=>b.addEventListener("click",async()=>{
+      const ok=b.dataset.v==="1";
+      const {error}=await client.rpc("tournament_trio_confirm_game",{p_board_id:b.dataset.trioConfirm,p_confirm:ok,p_reason:ok?null:"Disputed by opponent"});
+      if(error){fail(error.message);return;}
+      again(ok?"Score confirmed.":"Score disputed. An admin will review it.");
+    }));
+    detail.querySelectorAll("[data-trio-review]").forEach(b=>b.addEventListener("click",async()=>{
+      const {error}=await client.rpc("tournament_trio_review_game",{p_board_id:b.dataset.trioReview,p_decision:b.dataset.d,p_reason:null});
+      if(error){fail(error.message);return;}
+      again(b.dataset.d==="approve"?"Game approved.":"Score rejected. Players can submit again.");
+    }));
+    detail.querySelectorAll("[data-trio-reset]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Reset both lineups for this fixture? Captains will choose again."))return;
+      const {error}=await client.rpc("tournament_trio_admin_reset_lineup",{p_match_id:b.dataset.trioReset,p_reason:"Admin reset"});
+      if(error){fail(error.message);return;}
+      again("Lineups reset.");
+    }));
+    detail.querySelectorAll("[data-trio-decide]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Give this fixture to "+b.textContent+"?"))return;
+      const {error}=await client.rpc("tournament_trio_admin_decide",{p_match_id:b.dataset.trioDecide,p_winner:b.dataset.w,p_reason:"Level on games and goals"});
+      if(error){fail(error.message);return;}
+      again("Winner saved.");
+    }));
+  }
+  const tnTrioOpen=new Set();
+  async function openTournament(id,opts){
+    const keepY=window.scrollY;
     const {data:t,error}=await client.from("tournament_tournaments").select("*").eq("id",id).maybeSingle();
     if(error||!t){status("tournamentStatus",error?.message||"Tournament unavailable.","error");return;}
     const [pr,mr,sr,rr]=await Promise.all([
@@ -3015,6 +3160,11 @@ $("playersBody").innerHTML = shown.map(p =>
     if(accountIds.length){const q=await client.from("profiles").select("id,display_name").in("id",accountIds);(q.data||[]).forEach(x=>entrantNames[x.id]=x.display_name);}
     if(memberIds.length){const q=await client.from("cobeg_members").select("id,name").in("id",memberIds);(q.data||[]).forEach(x=>entrantNames[x.id]=x.name);}
     if(participantIds.length){const q=await client.from("tournament_teams").select("participant_id,team_name").in("participant_id",participantIds);(q.data||[]).forEach(x=>entrantNames[x.participant_id]=x.team_name);}
+    const tGames=Number(t.rules_json?.games_per_fixture)||1,isTrio=t.competition_type==="team"&&tGames>1;
+    let rosters=[];
+    if(t.competition_type==="team"){const rq=await client.rpc("tournament_rosters",{p_tournament_id:id});rosters=rq.data||[];rosters.forEach(r=>{entrantNames[r.participant_id]=r.team_name;});}
+    const fx={};
+    if(isTrio){await Promise.all(matches.filter(m=>m.participant_b_id).map(async m=>{const q=await client.rpc("tournament_trio_fixture",{p_match_id:m.id});if(q.data&&q.data.trio)fx[m.id]=q.data;}));}
     const entrantLabel=p=>p.external_name||entrantNames[p.id]||entrantNames[p.user_id]||entrantNames[p.cobeg_member_id]||"Registered entrant";
     const uid=state.session?.user?.id,ended=TN_ENDED.includes(t.status);
     const myRes=state.session?await client.rpc("tournament_my_matches"):{data:[]};
@@ -3042,6 +3192,7 @@ $("playersBody").innerHTML = shown.map(p =>
             +(m.status==="rejected"?'<span class="tn-due late">Last score rejected</span>':'')
             +(TN_MATCH[m.status]?'<span class="tn-due none">'+esc(TN_MATCH[m.status])+'</span>':'');
           const mineA=myPartIds.has(m.participant_a_id),mineB=myPartIds.has(m.participant_b_id);
+          if(fx[m.id])return trioCard(m,fx[m.id],{a,b,done,foot,mineA,mineB,ended});
           return renderBoard({id:m.id,mode,done,foot,mine:mineA||mineB,left:{name:a,you:mineA,score:m.score_a},right:{name:b,you:mineB,score:m.score_b}});
         };
         const gids=[...new Set(rm.map(m=>m.group_id).filter(Boolean))];
@@ -3113,7 +3264,12 @@ $("playersBody").innerHTML = shown.map(p =>
     }).join("")+'</div>':'<div class="tn-empty">No participants yet.</div>')+'</section>';
     tnOpen=id;
     const detail=$("tournamentDetail");
-    detail.innerHTML=hero+banner+checklist+confirmHtml+queue+fixturesHtml+peopleHtml;
+    const rosterHtml=t.competition_type==="team"?rosterSection(rosters,t,ended):"";
+    const perfHtml=isTrio?'<section class="tn-section"><div class="tn-section-head"><h3>Top performers</h3></div><div id="trioPerf"><div class="tn-empty">Loading…</div></div></section>':"";
+    detail.innerHTML=hero+banner+checklist+confirmHtml+queue+rosterHtml+fixturesHtml+perfHtml+peopleHtml;
+    if(isTrio)loadTrioPerf(id);
+    bindRosters(detail,id,rosters,t);
+    bindTrio(detail,id);
     applyTnVisibility();
     $("tournamentSetupStages")?.addEventListener("click",async()=>{
       let groups=4,random=false;
@@ -3241,10 +3397,8 @@ $("playersBody").innerHTML = shown.map(p =>
       const joined=await client.from("tournament_participants").select("status").eq("tournament_id",id).eq("user_id",state.session.user.id).not("status","in","(withdrawn,rejected)").maybeSingle();
       toast(joined.data?.status==="confirmed"?"You are in. Good luck!":joined.data?.status==="waitlisted"?"The tournament is full, so you are on the waitlist.":"Sign-up sent. An admin will confirm it.");await openTournament(id);await loadTournaments();
     });
-    window.scrollTo({top:0,behavior:"smooth"});
+    if(opts&&opts.keep)window.scrollTo({top:keepY});else window.scrollTo({top:0,behavior:"smooth"});
   }
-
-
   async function tournamentShowAddEntrant(tournamentId){
     if(!state.tnAdmin)return;
     const detail=$("tournamentDetail");
