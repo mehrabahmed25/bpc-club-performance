@@ -2995,21 +2995,27 @@ $("playersBody").innerHTML = shown.map(p =>
   
   // ---- Trio / multi-game team fixtures ----------------------------------------------
   const TN_BOARD_ST={scheduled:"Not played",awaiting_opponent:"Waiting for opponent",pending:"Waiting for admin",approved:"Final",disputed:"Under review"};
-  function trioCard(m,f,o){
-    const games=f.games,sm=f.summary,left={name:o.a,you:o.mineA,score:m.score_a},right={name:o.b,you:o.mineB,score:m.score_b};
-    const sb=(name,you,side,win)=>'<div class="tn-sb-team '+side+(win?' win':'')+'"><span class="tn-av" aria-hidden="true"'+av(name)+'>'+esc(initials(name))+'</span><b>'+esc(name)+'</b>'+(you?'<em class="tn-you">Your team</em>':'')+'</div>';
-    const shown=o.done?[m.score_a,m.score_b]:sm.approved?[sm.a_games,sm.b_games]:null;
-    const pips=Array.from({length:games},(_,i)=>{const bd=f.boards[i];let c="",tt="Board "+(i+1);
-      if(bd){tt+=": "+bd.a.name+(bd.score_a!=null?" "+bd.score_a+"–"+bd.score_b+" ":" vs ")+bd.b.name;
-        if(bd.status==="approved")c=bd.score_a>bd.score_b?"a":bd.score_b>bd.score_a?"b":"d";else if(["awaiting_opponent","pending","disputed"].includes(bd.status))c="live";}
-      return '<i class="tn-pip '+c+'" title="'+esc(tt)+'"></i>';}).join("");
-    const bothLocked=f.a.locked&&f.b.locked;
-    const state2=o.done?"Full time":sm.approved?"In play":bothLocked?"Lineups locked":(f.a.locked||f.b.locked)?"One lineup in":"Awaiting lineups";
-    const head='<div class="tn-sb'+(o.mineA||o.mineB?' mine':'')+(o.done?' done':'')+'"><div class="tn-sb-row">'+sb(o.a,o.mineA,"a",o.done&&m.score_a>m.score_b)
-      +'<div class="tn-sb-mid"><div class="tn-sb-score">'+(shown?'<i>'+shown[0]+'</i><span>:</span><i>'+shown[1]+'</i>':'<i class="dim">–</i><span>:</span><i class="dim">–</i>')+'</div><div class="tn-pips">'+pips+'</div><small>'+esc(state2)+'</small></div>'
-      +sb(o.b,o.mineB,"b",o.done&&m.score_b>m.score_a)+'</div><div class="tn-sb-foot">'+(o.foot||"")+'</div></div>';
+  const tcol=n=>{let h=0;for(const c of String(n||"?"))h=(h*31+c.charCodeAt(0))%360;return "hsl("+h+" 58% 40%)";};
+  const mono=(n,big)=>'<span class="tx-mono'+(big?' big':'')+'" style="--c:'+tcol(n)+'" aria-hidden="true">'+esc(initials(n))+'</span>';
+  function trioNeedsMe(f){return f.admin?f.boards.some(b=>["pending","disputed"].includes(b.status)):(f.a.can_lineup&&f.a.is_captain)||(f.b.can_lineup&&f.b.is_captain)||f.boards.some(b=>b.can_submit||b.can_confirm);}
+  function trioState(m,f,o){const sm=f.summary;return o.done?"Full time":sm.approved?"In play":(f.a.locked&&f.b.locked)?"Lineups locked":(f.a.locked||f.b.locked)?"One lineup in":"Awaiting lineups";}
+  function trioBar(f,games){return '<span class="tx-bar" aria-hidden="true">'+Array.from({length:games},(_,i)=>{const bd=f.boards[i];let c="";if(bd){if(bd.status==="approved")c=bd.score_a>bd.score_b?"a":bd.score_b>bd.score_a?"b":"d";else if(["awaiting_opponent","pending","disputed"].includes(bd.status))c="live";}return '<i class="'+c+'"></i>';}).join("")+'</span>';}
+  function trioRow(m,f,o){
+    const sm=f.summary,shown=o.done?[m.score_a,m.score_b]:sm.approved?[sm.a_games,sm.b_games]:null;
+    const need=trioNeedsMe(f)&&!o.ended;
+    return '<div class="tx-fix'+(o.mineA||o.mineB?' mine':'')+(o.done?' done':'')+'"><button type="button" class="tx-row" data-centre-open="'+esc(m.id)+'" aria-label="Open match centre: '+esc(o.a)+' versus '+esc(o.b)+'">'
+      +'<span class="tx-side a'+(o.done&&m.score_a>m.score_b?' win':'')+'">'+mono(o.a)+'<b>'+esc(o.a)+'</b></span>'
+      +'<span class="tx-mid">'+(shown?'<b class="tx-sc">'+shown[0]+'<em>–</em>'+shown[1]+'</b>':'<b class="tx-sc dim">v</b>')+trioBar(f,f.games)+'<small>'+esc(trioState(m,f,o))+'</small></span>'
+      +'<span class="tx-side b'+(o.done&&m.score_b>m.score_a?' win':'')+'"><b>'+esc(o.b)+'</b>'+mono(o.b)+'</span>'
+      +(need?'<span class="tx-need">Your move</span>':'')+'</button><div class="tx-meta">'+(o.foot||"")+'</div></div>';
+  }
+  function trioCentre(m,f,o){
+    const games=f.games,sm=f.summary;
     const tied=f.admin&&!o.ended&&sm.approved===games&&sm.a_games===sm.b_games&&sm.a_goals===sm.b_goals;
-    const sumLine=sm.approved?'Games '+sm.a_games+'–'+sm.b_games+', goals '+sm.a_goals+'–'+sm.b_goals:'No games played yet';
+    const shown=o.done?[m.score_a,m.score_b]:sm.approved?[sm.a_games,sm.b_games]:null;
+    const sumLine=sm.approved?'Games '+sm.a_games+'–'+sm.b_games+' · goals '+sm.a_goals+'–'+sm.b_goals:'No games played yet';
+    const head='<div class="tx-ch-head"><div class="tx-ch-team">'+mono(o.a,true)+'<b>'+esc(o.a)+'</b>'+(o.mineA?'<em class="tn-you">Your team</em>':'')+'</div><div class="tx-ch-score"><b>'+(shown?shown[0]+'<em>–</em>'+shown[1]:'<span>v</span>')+'</b><small>'+esc(trioState(m,f,o))+'</small></div><div class="tx-ch-team">'+mono(o.b,true)+'<b>'+esc(o.b)+'</b>'+(o.mineB?'<em class="tn-you">Your team</em>':'')+'</div></div>'
+      +'<p class="tx-ch-sub">Round '+m.round_number+' · Match '+m.match_number+' · '+esc(sumLine)+'</p><div class="tx-meta c">'+(o.foot||"")+'</div>';
     const sideBlock=(s,name)=>{
       const lbl='<b>'+esc(name)+'</b>';
       if(s.can_lineup)return '<form class="tn-lineup" data-trio-lineup="'+esc(m.id)+'" data-part="'+esc(s.participant_id)+'">'+lbl+'<small>Choose who plays each board. Your opponent cannot see it until both captains lock.</small>'
@@ -3021,20 +3027,75 @@ $("playersBody").innerHTML = shown.map(p =>
     const lineups=f.boards.length?'':'<div class="tn-lineups">'+sideBlock(f.a,o.a)+sideBlock(f.b,o.b)+'</div>';
     const scoreForm=(b,kind)=>'<form class="tn-gform" data-trio-score="'+esc(b.id)+'" data-kind="'+kind+'" data-na="'+esc(b.a.name)+'" data-nb="'+esc(b.b.name)+'"><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.a.name)+' goals" value="'+(kind==="admin"&&b.score_a!=null?b.score_a:'')+'"><span>–</span><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.b.name)+' goals" value="'+(kind==="admin"&&b.score_b!=null?b.score_b:'')+'"><button type="submit" class="'+(kind==="admin"?'secondary':'primary')+'">'+(kind==="admin"?'Save as admin':'Submit')+'</button></form>';
     const boards=f.boards.map(b=>{
-      const has=b.score_a!=null;
-      let act='';
+      const has=b.score_a!=null;let act='';
       if(b.can_submit)act+=scoreForm(b,"player");
       if(b.can_confirm)act+='<div class="tn-actions"><button type="button" class="primary" data-trio-confirm="'+esc(b.id)+'" data-v="1">Confirm score</button><button type="button" class="secondary" data-trio-confirm="'+esc(b.id)+'" data-v="0">Dispute</button></div>';
       if(f.admin&&!o.ended&&["pending","disputed","awaiting_opponent"].includes(b.status))act+='<div class="tn-actions"><button type="button" class="primary" data-trio-review="'+esc(b.id)+'" data-d="approve">Approve</button><button type="button" class="secondary" data-trio-review="'+esc(b.id)+'" data-d="reject">Reject</button></div>';
-      if(f.admin&&!o.ended&&b.status!=="approved"&&!b.can_submit)act+=scoreForm(b,"admin");
-      if(f.admin&&!o.ended&&b.status==="approved")act+=scoreForm(b,"admin");
-      return '<li class="tn-bd st-'+esc(b.status)+'"><div class="tn-bd-row"><span class="tn-bd-no">Board '+b.board_no+'</span><span class="tn-bd-p">'+esc(b.a.name)+'</span><b class="tn-bd-s">'+(has?b.score_a+' – '+b.score_b:'vs')+'</b><span class="tn-bd-p r">'+esc(b.b.name)+'</span></div><div class="tn-bd-st">'+esc(TN_BOARD_ST[b.status]||b.status)+'</div>'+act+'</li>';
+      if(f.admin&&!o.ended&&!b.can_submit)act+=scoreForm(b,"admin");
+      const win=b.status==="approved"?(b.score_a>b.score_b?"a":b.score_b>b.score_a?"b":"d"):"";
+      return '<li class="tx-bd st-'+esc(b.status)+' w-'+win+'"><span class="tx-bd-no">Board '+b.board_no+'</span><div class="tx-bd-row"><span class="tx-bd-p">'+esc(b.a.name)+'</span><b class="tx-bd-s">'+(has?b.score_a+'<em>–</em>'+b.score_b:'v')+'</b><span class="tx-bd-p r">'+esc(b.b.name)+'</span></div><span class="tx-bd-st">'+esc(TN_BOARD_ST[b.status]||b.status)+'</span>'+act+'</li>';
     }).join("");
     const admin=f.admin&&!o.ended?'<div class="tn-actions">'+(f.boards.length&&sm.approved===0?'<button type="button" class="secondary" data-trio-reset="'+esc(m.id)+'">Reset lineups</button>':'')
       +(tied?'<span class="small">Level on games and goals. Pick the winner:</span><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.a.participant_id)+'">'+esc(o.a)+'</button><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.b.participant_id)+'">'+esc(o.b)+'</button>':'')+'</div>':'';
     const decidedNote=f.decided&&o.done?'<p class="small">Winner chosen by an admin after a level result.</p>':'';
-    const open=tnTrioOpen.has(m.id);
-    return '<div class="tn-trio-wrap">'+head+'<details class="tn-trio" data-trio-id="'+esc(m.id)+'"'+(open?' open':'')+'><summary>'+games+' games &middot; '+esc(sumLine)+'</summary>'+lineups+(boards?'<ol class="tn-bds">'+boards+'</ol>':'')+decidedNote+admin+'</details></div>';
+    return '<div class="tx-centre" data-centre="'+esc(m.id)+'" hidden>'+head+lineups+(boards?'<ol class="tx-bds">'+boards+'</ol>':'')+decidedNote+admin+'</div>';
+  }
+  let tnTab=null,tnRoundSel=null,tnSheet=null;
+  function trioPage(c){
+    const {t,id,matches,stages,fx,nameOf,myPartIds,ended,rosters,tGames,isTrio,facts,regBtn,adminBar,banner,checklist,queue,confirmHtml,peopleHtml,participants,state:st,dueCh,openStage}=c;
+    const sz=Number(t.rules_json?.team_size)||tGames;
+    const live=matches.filter(m=>m.participant_b_id);
+    const cardOpts=m=>{const done=["approved","completed"].includes(m.status),open=["scheduled","rejected"].includes(m.status);
+      const foot='<span class="tn-meta">Match '+m.match_number+'</span>'+(open&&ended?'<span class="tn-due none">Not played</span>':open?dueCh(m.deadline_at,false):'')+(m.status==="rejected"?'<span class="tn-due late">Last score rejected</span>':'')+(TN_MATCH[m.status]?'<span class="tn-due none">'+esc(TN_MATCH[m.status])+'</span>':'');
+      return {a:nameOf(m.participant_a_id),b:nameOf(m.participant_b_id),done,foot,mineA:myPartIds.has(m.participant_a_id),mineB:myPartIds.has(m.participant_b_id),ended};};
+    const rounds=[...new Set(live.map(m=>m.round_number))].sort((a,b)=>a-b);
+    const firstOpen=rounds.find(r=>live.some(m=>m.round_number===r&&["scheduled","rejected"].includes(m.status)));
+    const selRound=rounds.includes(tnRoundSel)?tnRoundSel:(firstOpen??rounds[rounds.length-1]);
+    // featured ticket
+    const open=live.filter(m=>["scheduled","rejected"].includes(m.status)&&fx[m.id]).sort((a,b)=>a.round_number-b.round_number||a.match_number-b.match_number);
+    const myOpen=open.find(m=>myPartIds.has(m.participant_a_id)||myPartIds.has(m.participant_b_id));
+    const lastDone=[...live].filter(m=>["approved","completed"].includes(m.status)&&fx[m.id]).sort((a,b)=>b.round_number-a.round_number||b.match_number-a.match_number)[0];
+    const fm=myOpen||open[0]||lastDone;
+    let ticket="";
+    if(fm){const o=cardOpts(fm),f=fx[fm.id];const lbl=myOpen?"Your next match":open[0]?"Next match":"Latest result";
+      const sm=f.summary,shown=o.done?[fm.score_a,fm.score_b]:sm.approved?[sm.a_games,sm.b_games]:null;
+      ticket='<article class="tx-ticket"><div class="tx-tk-main"><span class="tx-tk-lbl">'+lbl+'</span><div class="tx-tk-teams"><div>'+mono(o.a,true)+'<b>'+esc(o.a)+'</b></div><span class="tx-tk-v">'+(shown?shown[0]+'–'+shown[1]:'v')+'</span><div>'+mono(o.b,true)+'<b>'+esc(o.b)+'</b></div></div><div class="tx-meta">'+'<span class="tn-meta">Round '+fm.round_number+'</span>'+o.foot+'</div></div><div class="tx-tk-stub"><small>'+esc(trioState(fm,f,o))+'</small><button type="button" class="primary" data-centre-open="'+esc(fm.id)+'">'+(trioNeedsMe(f)&&!ended?'Your move':'Match centre')+'</button></div></article>';}
+    // rounds
+    const strip=rounds.length>1?'<div class="tx-rounds" role="tablist" aria-label="Rounds">'+rounds.map(r=>'<button type="button" role="tab" class="'+(r===selRound?'on':'')+'" data-tx-round="'+r+'">Round '+r+'</button>').join("")+'</div>':'';
+    const roundSecs=rounds.map(r=>{
+      const rm=live.filter(m=>m.round_number===r).sort((a,b)=>a.match_number-b.match_number);
+      const dl=rm.map(m=>m.deadline_at).find(Boolean),roundOpen=rm.some(m=>["scheduled","rejected"].includes(m.status));
+      return '<section class="tx-round" data-round="'+r+'"'+(r===selRound?'':' hidden')+'><div class="tx-round-head"><h3>Round '+r+'</h3>'+(roundOpen&&!ended?dueCh(dl,true):'')+(st.tnAdmin&&roundOpen&&!ended?'<button type="button" class="secondary" data-set-deadline="'+esc(rm[0].stage_id)+'" data-round="'+r+'">'+(dl?'Change deadline':'Set deadline')+'</button>':'')+'</div>'
+        +rm.map(m=>fx[m.id]?trioRow(m,fx[m.id],cardOpts(m)):'').join("")+'</section>';
+    }).join("");
+    const byes=matches.filter(m=>!m.participant_b_id).map(m=>'<div class="tn-bye"><span><b>'+esc(nameOf(m.participant_a_id))+'</b> advances with a bye</span></div>').join("");
+    const centres=live.map(m=>fx[m.id]?trioCentre(m,fx[m.id],cardOpts(m)):'').join("");
+    const emptyMatches='<div class="tn-empty">'+(matches.length?'Fixtures are loading.':'Fixtures have not been made yet.'+(st.tnAdmin&&!ended?' Open the Manage tab to set up stages and generate round 1.':' They appear here once every team has its full squad.'))+'</div>';
+    const matchesPanel='<div class="tx-split"><div class="tx-main">'+confirmHtml+ticket+strip+(roundSecs||emptyMatches)+byes+'</div><aside class="tx-rail"><h3>League table</h3><div id="trioRail" class="tx-compact"></div><div id="trioRailMvp"></div></aside></div>';
+    const stageAdmin=st.tnAdmin&&!ended?stages.map(s=>'<div class="tx-stage"><div><b>'+esc(s.name)+'</b><small>'+esc(s.stage_type.replaceAll("_"," "))+', '+esc(s.status)+'</small></div><div class="tn-actions"><button type="button" class="primary" data-generate-stage="'+esc(s.id)+'">Generate next round</button></div></div>').join(""):"";
+    const manage=st.tnAdmin?'<div class="tx-manage">'+(checklist.includes("Everything is set up")?checklist:"")+adminBar+(stageAdmin?'<h3>Fixtures</h3>'+stageAdmin:'')+queue+'</div>':"";
+    const info='<div class="tx-info"><ol class="tx-how"><li><b>Lock</b><span>Each captain picks who plays Board 1, 2 and 3. Lineups stay hidden until both are locked.</span></li><li><b>Play</b><span>'+tGames+' separate 1v1 games, one per board.</span></li><li><b>Win</b><span>The team with more games takes 3 points. A draw is 1 point.</span></li></ol><ul class="tx-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'<li><span>Squad size</span><b>'+sz+' players</b></li></ul>'+(t.description?'<p class="tx-desc">'+esc(t.description)+'</p>':'')+peopleHtml+'</div>';
+    const hasMatches=matches.length>0;
+    const tabs=[["matches","Matches",hasMatches?live.length:null],["table","Table",null],["teams","Teams",rosters.length],["players","Players",null],["info","Info",null]].concat(st.tnAdmin?[["manage","Manage",null]]:[]);
+    const cur=tabs.some(x=>x[0]===tnTab)?tnTab:(hasMatches?"matches":"teams");
+    const panels={matches:matchesPanel,table:'<h3 class="tx-h">League table</h3><p class="small">3 points for a win, 1 for a draw. Level on points: games difference, then goals.</p><div id="trioLadder"><div class="tn-empty">Loading…</div></div>',teams:c.rosterHtml,players:'<h3 class="tx-h">Top performers</h3><p class="small">Best records across all board games.</p><div id="trioPerf"><div class="tn-empty">Loading…</div></div>',info,manage};
+    return '<header class="tx-head" id="tnHero"><button type="button" class="tn-back" id="tnBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All tournaments</button>'
+      +'<div class="tx-title"><h2>'+esc(t.name)+'</h2><div class="tx-sub">'+tnStateHtml(t.status)+'<span>'+sz+'v'+sz+' team league</span><span>'+tGames+' games per fixture</span></div></div></header>'
+      +banner+(checklist.includes("Everything is set up")?"":checklist)+'<div class="tx-reg">'+regBtn+'</div>'
+      +'<nav class="tx-tabs" role="tablist" aria-label="Tournament sections">'+tabs.map(x=>'<button type="button" role="tab" data-tx-tab="'+x[0]+'" class="'+(x[0]===cur?'on':'')+'">'+x[1]+(x[2]!=null?'<i>'+x[2]+'</i>':'')+'</button>').join("")+'</nav>'
+      +tabs.map(x=>'<section class="tx-pane" data-tx-pane="'+x[0]+'"'+(x[0]===cur?'':' hidden')+'>'+panels[x[0]]+'</section>').join("")
+      +'<div class="tx-sheet" id="txSheet" aria-hidden="true"><div class="tx-scrim" data-sheet-close></div><div class="tx-sheet-panel" role="dialog" aria-modal="true" aria-label="Match centre"><button type="button" class="tx-close" data-sheet-close aria-label="Close match centre">&times;</button><div class="tx-sheet-body">'+centres+'</div></div></div>';
+  }
+  function bindTrioPage(detail){
+    const sheet=detail.querySelector("#txSheet");
+    const closeSheet=()=>{tnSheet=null;sheet.classList.remove("open");sheet.setAttribute("aria-hidden","true");document.body.classList.remove("tx-lock");};
+    const openSheet=mid=>{const c=detail.querySelector('.tx-centre[data-centre="'+mid+'"]');if(!c)return;sheet.querySelectorAll(".tx-centre").forEach(x=>x.hidden=x!==c);tnSheet=mid;sheet.classList.add("open");sheet.setAttribute("aria-hidden","false");document.body.classList.add("tx-lock");sheet.querySelector(".tx-sheet-panel").scrollTop=0;};
+    detail.querySelectorAll("[data-centre-open]").forEach(b=>b.addEventListener("click",()=>openSheet(b.dataset.centreOpen)));
+    detail.querySelectorAll("[data-sheet-close]").forEach(b=>b.addEventListener("click",closeSheet));
+    if(!detail._txEsc){detail._txEsc=true;document.addEventListener("keydown",e=>{if(e.key==="Escape"){const sh=document.querySelector("#txSheet.open");if(sh){tnSheet=null;sh.classList.remove("open");document.body.classList.remove("tx-lock");}}});}
+    detail.querySelectorAll("[data-tx-tab]").forEach(b=>b.addEventListener("click",()=>{tnTab=b.dataset.txTab;detail.querySelectorAll("[data-tx-tab]").forEach(x=>x.classList.toggle("on",x===b));detail.querySelectorAll("[data-tx-pane]").forEach(x=>x.hidden=x.dataset.txPane!==tnTab);const nav=detail.querySelector(".tx-tabs");if(nav&&nav.getBoundingClientRect().top<0)window.scrollTo({top:window.scrollY+nav.getBoundingClientRect().top-8});}));
+    detail.querySelectorAll("[data-tx-round]").forEach(b=>b.addEventListener("click",()=>{tnRoundSel=Number(b.dataset.txRound);detail.querySelectorAll("[data-tx-round]").forEach(x=>x.classList.toggle("on",x===b));detail.querySelectorAll(".tx-round").forEach(x=>x.hidden=Number(x.dataset.round)!==tnRoundSel);}));
+    if(tnSheet)openSheet(tnSheet);
   }
   function rosterSection(rosters,t,ended){
     const sz=Number(t.rules_json?.team_size)||0;
@@ -3089,6 +3150,7 @@ $("playersBody").innerHTML = shown.map(p =>
     if(!(data||[]).length){box.innerHTML='<div class="tn-empty">Appears once the first game is approved.</div>';return;}
     const top=data[0],maxG=Math.max(...data.map(x=>Number(x.goals_for)),1);
     const mvp='<div class="tn-mvp"><span class="tn-mvp-tag">&#9733; Top performer</span><span class="tn-av big" aria-hidden="true"'+av(top.player_name)+'>'+esc(initials(top.player_name))+'</span><div><b>'+esc(top.player_name)+'</b><small>'+esc(top.team_name)+'</small></div><dl><div><dt>Won</dt><dd>'+top.wins+'</dd></div><div><dt>Played</dt><dd>'+top.played+'</dd></div><div><dt>Goals</dt><dd>'+top.goals_for+'</dd></div></dl></div>';
+    const rm=$("trioRailMvp");if(rm)rm.innerHTML='<h3>Top performer</h3>'+mvp;
     box.innerHTML=mvp+'<ol class="tn-perf">'+data.map((x,i)=>'<li><span class="rk">'+(i+1)+'</span><div class="nm"><b>'+esc(x.player_name)+'</b><small>'+esc(x.team_name)+' &middot; '+x.wins+'W '+x.draws+'D '+x.losses+'L</small><span class="bar"><i style="width:'+Math.round(Number(x.goals_for)/maxG*100)+'%"></i></span></div><span class="g">'+x.goals_for+'<small>goals</small></span></li>').join("")+'</ol>';
   }
   async function loadTrioLadder(stages,matches,myPartIds){
@@ -3102,12 +3164,12 @@ $("playersBody").innerHTML = shown.map(p =>
       parts.push((stages.length>1?'<h4 class="tn-lad-stage">'+esc(sg.name)+'</h4>':'')+'<div class="tn-ladder"><div class="tn-lad-row head"><span>#</span><span>Team</span><span>P</span><span>W-D-L</span><span>GD</span><span>Pts</span></div>'
         +(data||[]).map((x,i)=>'<div class="tn-lad-row r'+(i+1)+(myPartIds.has(x.participant_id)?' mine':'')+'"><span class="rk">'+(i+1)+'</span><span class="tm"><b>'+esc(x.entrant_name)+'</b><span class="tn-form">'+form(x.participant_id).map(c=>'<i class="'+c+'">'+c.toUpperCase()+'</i>').join("")+'</span></span><span>'+x.played+'</span><span>'+x.wins+'-'+x.draws+'-'+x.losses+'</span><span>'+(x.score_difference>0?'+':'')+x.score_difference+'</span><span class="pts">'+x.points+'</span></div>').join("")+'</div>');
     }
-    box.innerHTML=parts.join("")||'<div class="tn-empty">The table appears once fixtures exist.</div>';
+    const lh=parts.join("")||'<div class="tn-empty">The table appears once fixtures exist.</div>';
+    box.innerHTML=lh;const rail=$("trioRail");if(rail)rail.innerHTML=lh;
   }
   function bindTrio(detail,id){
     const fail=m=>{status("tournamentStatus",m,"error");toast(m);};
     const again=msg=>{if(msg)toast(msg);openTournament(id,{keep:true});};
-    detail.querySelectorAll("details[data-trio-id]").forEach(d=>d.addEventListener("toggle",()=>{d.open?tnTrioOpen.add(d.dataset.trioId):tnTrioOpen.delete(d.dataset.trioId);}));
     detail.querySelectorAll("form[data-trio-lineup]").forEach(f=>f.addEventListener("submit",async ev=>{
       ev.preventDefault();
       const slots=[...f.querySelectorAll("[data-slot]")].map(x=>x.value);
@@ -3116,7 +3178,7 @@ $("playersBody").innerHTML = shown.map(p =>
       const b=f.querySelector("button");b.disabled=true;
       const {error}=await client.rpc("tournament_trio_set_lineup",{p_match_id:f.dataset.trioLineup,p_participant_id:f.dataset.part,p_slots:slots});
       if(error){b.disabled=false;fail(error.message);return;}
-      tnTrioOpen.add(f.dataset.trioLineup);again("Lineup locked.");
+      tnSheet=f.dataset.trioLineup;again("Lineup locked.");
     }));
     detail.querySelectorAll("form[data-trio-score]").forEach(f=>f.addEventListener("submit",async ev=>{
       ev.preventDefault();
@@ -3154,8 +3216,7 @@ $("playersBody").innerHTML = shown.map(p =>
       again("Winner saved.");
     }));
   }
-  const tnTrioOpen=new Set();
-  async function openTournament(id,opts){
+    async function openTournament(id,opts){
     const keepY=window.scrollY;
     const {data:t,error}=await client.from("tournament_tournaments").select("*").eq("id",id).maybeSingle();
     if(error||!t){status("tournamentStatus",error?.message||"Tournament unavailable.","error");return;}
@@ -3220,7 +3281,6 @@ $("playersBody").innerHTML = shown.map(p =>
             +(m.status==="rejected"?'<span class="tn-due late">Last score rejected</span>':'')
             +(TN_MATCH[m.status]?'<span class="tn-due none">'+esc(TN_MATCH[m.status])+'</span>':'');
           const mineA=myPartIds.has(m.participant_a_id),mineB=myPartIds.has(m.participant_b_id);
-          if(fx[m.id])return trioCard(m,fx[m.id],{a,b,done,foot,mineA,mineB,ended});
           return renderBoard({id:m.id,mode,done,foot,mine:mineA||mineB,left:{name:a,you:mineA,score:m.score_a},right:{name:b,you:mineB,score:m.score_b}});
         };
         const gids=[...new Set(rm.map(m=>m.group_id).filter(Boolean))];
@@ -3296,8 +3356,10 @@ $("playersBody").innerHTML = shown.map(p =>
     const perfHtml=isTrio?'<section class="tn-section tn-arena-sec"><div class="tn-section-head"><h3>Top performers</h3><span class="small">Best records across all board games</span></div><div id="trioPerf"><div class="tn-empty">Loading…</div></div></section>':"";
     const ladderHtml=isTrio&&matches.length?'<section class="tn-section tn-arena-sec"><div class="tn-section-head"><h3>League table</h3><span class="small">3 for a win, 1 for a draw. Level on points: games difference, then goals.</span></div><div id="trioLadder"><div class="tn-empty">Loading…</div></div></section>':"";
     const early=!matches.length;
-    detail.innerHTML=hero+banner+checklist+confirmHtml+queue+(early?rosterHtml:"")+ladderHtml+fixturesHtml+(early?"":rosterHtml)+perfHtml+peopleHtml;
-    if(isTrio){loadTrioPerf(id);if(matches.length)loadTrioLadder(stages,matches,myPartIds);}
+    if(isTrio){
+      detail.innerHTML=trioPage({t,id,matches,stages,fx,nameOf,myPartIds,ended,rosters,rosterHtml,tGames,isTrio,facts,regBtn,adminBar,banner,checklist,queue,confirmHtml,peopleHtml,participants,state,dueCh:dueChip});
+      bindTrioPage(detail);loadTrioPerf(id);if(matches.length)loadTrioLadder(stages,matches,myPartIds);
+    }else detail.innerHTML=hero+banner+checklist+confirmHtml+queue+(early?rosterHtml:"")+ladderHtml+fixturesHtml+(early?"":rosterHtml)+perfHtml+peopleHtml;
     bindRosters(detail,id,rosters,t);
     bindTrio(detail,id);
     applyTnVisibility();
