@@ -452,3 +452,18 @@ revoke all on function public.tournament_rosters(uuid) from public;
 grant execute on function public.tournament_rosters(uuid) to anon, authenticated;
 revoke all on function public.tournament_admin_create_team(uuid, text, uuid) from public, anon;
 grant execute on function public.tournament_admin_create_team(uuid, text, uuid) to authenticated;
+
+-- Reuse after a team is removed: players on withdrawn or rejected teams no longer block new teams.
+-- (tournament_admin_create_team and tournament_team_add_member now call this helper in their duplicate check.)
+create or replace function public.tournament_player_on_live_team(p_tournament uuid, p_user uuid, p_cobeg uuid, p_name text) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select exists(
+    select 1 from tournament_team_members tm
+    join tournament_teams tt on tt.id = tm.team_id
+    join tournament_participants p on p.id = tt.participant_id
+    where tt.tournament_id = p_tournament and tm.status = 'active' and p.status not in ('withdrawn','rejected')
+      and ((p_user is not null and tm.user_id = p_user)
+        or (p_cobeg is not null and tm.cobeg_member_id = p_cobeg)
+        or (p_user is null and p_cobeg is null and p_name is not null and lower(tm.external_name) = lower(trim(p_name)))))
+$$;
+revoke all on function public.tournament_player_on_live_team(uuid, uuid, uuid, text) from public, anon, authenticated;
