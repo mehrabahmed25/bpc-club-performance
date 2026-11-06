@@ -424,7 +424,8 @@ begin
                   from tournament_team_members tm where tm.team_id = tt.id and tm.status = 'active')
     ) order by tt.team_name), '[]') into res
   from tournament_teams tt join tournament_participants p on p.id = tt.participant_id
-  where tt.tournament_id = p_tournament_id and (adm or p.status = 'confirmed' or tt.captain_user_id = uid);
+  where tt.tournament_id = p_tournament_id and p.status not in ('withdrawn','rejected','disqualified')
+    and (adm or p.status = 'confirmed' or tt.captain_user_id = uid);
   return res;
 end $$;
 
