@@ -1185,6 +1185,7 @@ $("playersBody").innerHTML = shown.map(p =>
     $("tournamentTabs").classList.toggle("hidden",open||!tnRows.length);
     $("tournamentAdminPanel").classList.toggle("hidden",open||!state.tnAdmin);
     $("tnManagersPanel").classList.toggle("hidden",open||!state.isAdmin);
+    $("view-tournaments")?.classList.toggle("tn-focus",open);
   }
   function tournamentCard(t){
     const cat=tnCategory(t),c=tnCounts[t.id]||{confirmed:0,pending:0},limit=t.participant_limit,id=esc(t.id);
@@ -2996,7 +2997,17 @@ $("playersBody").innerHTML = shown.map(p =>
   const TN_BOARD_ST={scheduled:"Not played",awaiting_opponent:"Waiting for opponent",pending:"Waiting for admin",approved:"Final",disputed:"Under review"};
   function trioCard(m,f,o){
     const games=f.games,sm=f.summary,left={name:o.a,you:o.mineA,score:m.score_a},right={name:o.b,you:o.mineB,score:m.score_b};
-    const head=renderBoard({id:m.id,mode:"view",done:o.done,foot:o.foot,mine:o.mineA||o.mineB,left,right});
+    const sb=(name,you,side,win)=>'<div class="tn-sb-team '+side+(win?' win':'')+'"><span class="tn-av" aria-hidden="true"'+av(name)+'>'+esc(initials(name))+'</span><b>'+esc(name)+'</b>'+(you?'<em class="tn-you">Your team</em>':'')+'</div>';
+    const shown=o.done?[m.score_a,m.score_b]:sm.approved?[sm.a_games,sm.b_games]:null;
+    const pips=Array.from({length:games},(_,i)=>{const bd=f.boards[i];let c="",tt="Board "+(i+1);
+      if(bd){tt+=": "+bd.a.name+(bd.score_a!=null?" "+bd.score_a+"–"+bd.score_b+" ":" vs ")+bd.b.name;
+        if(bd.status==="approved")c=bd.score_a>bd.score_b?"a":bd.score_b>bd.score_a?"b":"d";else if(["awaiting_opponent","pending","disputed"].includes(bd.status))c="live";}
+      return '<i class="tn-pip '+c+'" title="'+esc(tt)+'"></i>';}).join("");
+    const bothLocked=f.a.locked&&f.b.locked;
+    const state2=o.done?"Full time":sm.approved?"In play":bothLocked?"Lineups locked":(f.a.locked||f.b.locked)?"One lineup in":"Awaiting lineups";
+    const head='<div class="tn-sb'+(o.mineA||o.mineB?' mine':'')+(o.done?' done':'')+'"><div class="tn-sb-row">'+sb(o.a,o.mineA,"a",o.done&&m.score_a>m.score_b)
+      +'<div class="tn-sb-mid"><div class="tn-sb-score">'+(shown?'<i>'+shown[0]+'</i><span>:</span><i>'+shown[1]+'</i>':'<i class="dim">–</i><span>:</span><i class="dim">–</i>')+'</div><div class="tn-pips">'+pips+'</div><small>'+esc(state2)+'</small></div>'
+      +sb(o.b,o.mineB,"b",o.done&&m.score_b>m.score_a)+'</div><div class="tn-sb-foot">'+(o.foot||"")+'</div></div>';
     const tied=f.admin&&!o.ended&&sm.approved===games&&sm.a_games===sm.b_games&&sm.a_goals===sm.b_goals;
     const sumLine=sm.approved?'Games '+sm.a_games+'–'+sm.b_games+', goals '+sm.a_goals+'–'+sm.b_goals:'No games played yet';
     const sideBlock=(s,name)=>{
@@ -3030,7 +3041,9 @@ $("playersBody").innerHTML = shown.map(p =>
     const canAdd=state.tnAdmin&&!ended;
     const cards=rosters.map(r=>{
       const n=r.members.length,full=sz&&n>=sz,bad=sz&&n!==sz;
-      const list=r.members.map(mb=>'<li><span>'+esc(mb.name)+(mb.captain?' <em class="tn-you">Captain</em>':'')+'</span>'+(r.can_manage&&!mb.captain?'<button type="button" class="tn-x" data-roster-remove="'+esc(mb.id)+'" aria-label="Remove '+esc(mb.name)+'">&times;</button>':'')+'</li>').join("");
+      const list=Array.from({length:Math.max(sz,n)},(_,i)=>{const mb=r.members[i];
+        return mb?'<li><span class="tn-jer">'+(i+1)+'</span><span class="tn-ros-n">'+esc(mb.name)+(mb.captain?' <em class="tn-you">Captain</em>':'')+'</span>'+(r.can_manage&&!mb.captain?'<button type="button" class="tn-x" data-roster-remove="'+esc(mb.id)+'" aria-label="Remove '+esc(mb.name)+'">&times;</button>':'')+'</li>'
+          :'<li class="open"><span class="tn-jer">'+(i+1)+'</span><span class="tn-ros-n">Open slot</span></li>';}).join("");
       const add=r.can_manage&&!full?'<div class="tn-ros-add"><select data-ros-pick="'+esc(r.team_id)+'"><option value="">Add a registered player</option></select><input type="text" maxlength="60" placeholder="or type a name" data-ros-name="'+esc(r.team_id)+'"><button type="button" class="secondary" data-roster-add="'+esc(r.team_id)+'">Add</button></div>':'';
       return '<article class="tn-ros'+(bad&&!ended?' short':'')+'"><div class="tn-ros-head"><b>'+esc(r.team_name)+'</b>'+(sz?'<span class="tn-chip'+(bad?' warn':'')+'">'+n+' of '+sz+' players</span>':'')+(r.status!=="confirmed"?'<span class="tn-chip">'+esc(r.status)+'</span>':'')+'</div><ul>'+list+'</ul>'+add+'</article>';
     }).join("");
@@ -3074,7 +3087,22 @@ $("playersBody").innerHTML = shown.map(p =>
     const {data,error}=await client.rpc("tournament_trio_top_performers",{p_tournament_id:id});
     if(error){box.innerHTML='<div class="tn-empty">Could not load top performers.</div>';return;}
     if(!(data||[]).length){box.innerHTML='<div class="tn-empty">Appears once the first game is approved.</div>';return;}
-    box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Player</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>Goals</th></tr></thead><tbody>'+data.map(x=>'<tr><td>'+esc(x.player_name)+'</td><td>'+esc(x.team_name)+'</td><td>'+x.played+'</td><td>'+x.wins+'</td><td>'+x.draws+'</td><td>'+x.losses+'</td><td>'+x.goals_for+'–'+x.goals_against+'</td></tr>').join("")+'</tbody></table></div>';
+    const top=data[0],maxG=Math.max(...data.map(x=>Number(x.goals_for)),1);
+    const mvp='<div class="tn-mvp"><span class="tn-mvp-tag">&#9733; Top performer</span><span class="tn-av big" aria-hidden="true"'+av(top.player_name)+'>'+esc(initials(top.player_name))+'</span><div><b>'+esc(top.player_name)+'</b><small>'+esc(top.team_name)+'</small></div><dl><div><dt>Won</dt><dd>'+top.wins+'</dd></div><div><dt>Played</dt><dd>'+top.played+'</dd></div><div><dt>Goals</dt><dd>'+top.goals_for+'</dd></div></dl></div>';
+    box.innerHTML=mvp+'<ol class="tn-perf">'+data.map((x,i)=>'<li><span class="rk">'+(i+1)+'</span><div class="nm"><b>'+esc(x.player_name)+'</b><small>'+esc(x.team_name)+' &middot; '+x.wins+'W '+x.draws+'D '+x.losses+'L</small><span class="bar"><i style="width:'+Math.round(Number(x.goals_for)/maxG*100)+'%"></i></span></div><span class="g">'+x.goals_for+'<small>goals</small></span></li>').join("")+'</ol>';
+  }
+  async function loadTrioLadder(stages,matches,myPartIds){
+    const box=$("trioLadder");if(!box)return;
+    const parts=[];
+    for(const sg of stages.filter(x=>matches.some(m=>m.stage_id===x.id))){
+      const {data,error}=await client.rpc("tournament_standings_for_stage",{p_stage_id:sg.id});
+      if(error){box.innerHTML='<div class="tn-empty">Could not load the table.</div>';return;}
+      const form=pid=>matches.filter(m=>m.stage_id===sg.id&&m.status==="approved"&&(m.participant_a_id===pid||m.participant_b_id===pid)).sort((a,b)=>a.round_number-b.round_number||a.match_number-b.match_number).slice(-5)
+        .map(m=>m.winner_participant_id===pid?"w":m.winner_participant_id?"l":"d");
+      parts.push((stages.length>1?'<h4 class="tn-lad-stage">'+esc(sg.name)+'</h4>':'')+'<div class="tn-ladder"><div class="tn-lad-row head"><span>#</span><span>Team</span><span>P</span><span>W-D-L</span><span>GD</span><span>Pts</span></div>'
+        +(data||[]).map((x,i)=>'<div class="tn-lad-row r'+(i+1)+(myPartIds.has(x.participant_id)?' mine':'')+'"><span class="rk">'+(i+1)+'</span><span class="tm"><b>'+esc(x.entrant_name)+'</b><span class="tn-form">'+form(x.participant_id).map(c=>'<i class="'+c+'">'+c.toUpperCase()+'</i>').join("")+'</span></span><span>'+x.played+'</span><span>'+x.wins+'-'+x.draws+'-'+x.losses+'</span><span>'+(x.score_difference>0?'+':'')+x.score_difference+'</span><span class="pts">'+x.points+'</span></div>').join("")+'</div>');
+    }
+    box.innerHTML=parts.join("")||'<div class="tn-empty">The table appears once fixtures exist.</div>';
   }
   function bindTrio(detail,id){
     const fail=m=>{status("tournamentStatus",m,"error");toast(m);};
@@ -3236,8 +3264,8 @@ $("playersBody").innerHTML = shown.map(p =>
       const life=t.status==="draft"?'':t.status==="archived"?'<button type="button" class="secondary" id="tnRestore">Restore tournament</button>'+(t.hidden_at?'<button type="button" class="secondary" id="tnUnhide">Unhide</button>':'<button type="button" class="secondary" id="tnHide">Hide from list</button>'):ended?'<button type="button" class="secondary danger" id="tnArchive">Archive</button>':'<button type="button" class="secondary danger" id="tnEnd">End tournament</button><button type="button" class="secondary danger" id="tnArchive">Archive</button>';
       adminBar='<div class="tn-admin-bar" data-tn-actions>'+setup+life+'</div>';
     }
-    const hero='<header class="tn-hero" id="tnHero"><div class="tn-hero-top"><button type="button" class="tn-back" id="tnBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All tournaments</button>'+tnStateHtml(t.status)+'</div><h2>'+esc(t.name)+'</h2>'+(t.description?'<p class="tn-lede">'+esc(t.description)+'</p>':'')
-      +'<div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span></div><ul class="tn-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'</ul>'+regBtn+mineLine+adminBar+'</header>';
+    const hero='<header class="tn-hero" id="tnHero"><div class="tn-hero-top"><button type="button" class="tn-back" id="tnBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All tournaments</button>'+tnStateHtml(t.status)+'</div>'+(isTrio?'<span class="tn-ghost" aria-hidden="true">'+(Number(t.rules_json?.team_size)||tGames)+'v'+(Number(t.rules_json?.team_size)||tGames)+'</span>':'')+'<h2>'+esc(t.name)+'</h2>'+(t.description?'<p class="tn-lede">'+esc(t.description)+'</p>':'')
+      +'<div class="tn-chips"><span class="tn-chip">'+esc(TN_FORMAT[t.format]||t.format)+'</span><span class="tn-chip">'+(t.competition_type==="team"?"Team":"Individual")+'</span></div><ul class="tn-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'</ul>'+(isTrio?'<ol class="tn-how"><li><b>Lock</b><span>Captains pick who plays each board</span></li><li><b>Play</b><span>'+tGames+' separate 1v1 games</span></li><li><b>Win</b><span>More games takes the 3 points</span></li></ol>':'')+regBtn+mineLine+adminBar+'</header>';
     const banner=ended?'<div class="tn-banner"><span><b>'+(t.status==="archived"?"This tournament is archived.":t.status==="cancelled"?"This tournament was cancelled.":"This tournament has ended.")+'</b> Fixtures and approved results stay here for reference. New fixtures and scores are closed.</span></div>':'';
     let checklist="";
     if(state.tnAdmin&&!ended){
@@ -3265,9 +3293,11 @@ $("playersBody").innerHTML = shown.map(p =>
     tnOpen=id;
     const detail=$("tournamentDetail");
     const rosterHtml=t.competition_type==="team"?rosterSection(rosters,t,ended):"";
-    const perfHtml=isTrio?'<section class="tn-section"><div class="tn-section-head"><h3>Top performers</h3></div><div id="trioPerf"><div class="tn-empty">Loading…</div></div></section>':"";
-    detail.innerHTML=hero+banner+checklist+confirmHtml+queue+rosterHtml+fixturesHtml+perfHtml+peopleHtml;
-    if(isTrio)loadTrioPerf(id);
+    const perfHtml=isTrio?'<section class="tn-section tn-arena-sec"><div class="tn-section-head"><h3>Top performers</h3><span class="small">Best records across all board games</span></div><div id="trioPerf"><div class="tn-empty">Loading…</div></div></section>':"";
+    const ladderHtml=isTrio&&matches.length?'<section class="tn-section tn-arena-sec"><div class="tn-section-head"><h3>League table</h3><span class="small">3 for a win, 1 for a draw. Level on points: games difference, then goals.</span></div><div id="trioLadder"><div class="tn-empty">Loading…</div></div></section>':"";
+    const early=!matches.length;
+    detail.innerHTML=hero+banner+checklist+confirmHtml+queue+(early?rosterHtml:"")+ladderHtml+fixturesHtml+(early?"":rosterHtml)+perfHtml+peopleHtml;
+    if(isTrio){loadTrioPerf(id);if(matches.length)loadTrioLadder(stages,matches,myPartIds);}
     bindRosters(detail,id,rosters,t);
     bindTrio(detail,id);
     applyTnVisibility();
