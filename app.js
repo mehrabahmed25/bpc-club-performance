@@ -3040,9 +3040,130 @@ $("playersBody").innerHTML = shown.map(p =>
     const decidedNote=f.decided&&o.done?'<p class="small">Winner chosen by an admin after a level result.</p>':'';
     return '<div class="tx-centre" data-centre="'+esc(m.id)+'" hidden>'+head+lineups+(boards?'<ol class="tx-bds">'+boards+'</ol>':'')+decidedNote+admin+'</div>';
   }
+
+  // ---- Trio draft: pool, pick order lottery, captain picks, lottery pick, substitutes ----
+  let tnDraftTimer=null;
+  function txReveal(title,items,onClose){
+    const o=document.createElement("div");o.className="tx-reveal";o.setAttribute("role","dialog");o.setAttribute("aria-modal","true");o.setAttribute("aria-label",title);
+    o.innerHTML='<div class="tx-rv-card"><h3>'+esc(title)+'</h3><ol>'+items.map((x,i)=>'<li style="--d:'+(i*0.75)+'s"><span class="n">'+esc(x.n)+'</span><b>'+esc(x.big)+'</b><small>'+esc(x.small||"")+'</small></li>').join("")+'</ol><button type="button" class="primary">Close</button></div>';
+    document.body.appendChild(o);document.body.classList.add("tx-lock");
+    const close=()=>{o.remove();document.body.classList.remove("tx-lock");onClose&&onClose();};
+    o.querySelector("button").addEventListener("click",close);
+    o.querySelector("button").focus();
+  }
+  function draftHtml(d,ctx){
+    const adm=ctx.admin,teams=d.exists?d.order:[];
+    const steps=[["Pool",["setup"]],["Pick order",["setup"]],["Captain picks",["picking"]],["Lottery pick",["lottery"]]];
+    const idx={setup:d.exists&&d.pool.length?1:0,picking:2,lottery:3,complete:4};
+    const at=d.exists?idx[d.status]:0;
+    const stepper='<ol class="dr-steps">'+["Pool","Pick order","Captain picks","Lottery pick"].map((n,i)=>'<li class="'+(i<at?'done':i===at?'now':'')+'"><i>'+(i<at?'✓':i+1)+'</i><span>'+n+'</span></li>').join("")+'</ol>';
+    if(!d.exists){
+      return stepper+'<div class="dr-card"><h3>Team draft</h3><p class="small">Captains are set. Add the players who will be drafted, then draw the pick order.</p>'+(adm?draftAdd(ctx,d):'<div class="tn-empty">The draft has not started yet.</div>')+'</div>';
+    }
+    const free=d.pool.filter(x=>!x.team_id),cur=teams.find(t=>t.team_id===d.current_team_id);
+    let banner="";
+    if(d.status==="setup")banner='<b>Setting up.</b> '+free.length+' players in the pool. Each team needs two, so at least '+(d.teams*2)+' are needed.';
+    else if(d.status==="picking")banner=(d.my_turn?'<b>Your turn to pick.</b> ':'<b>Pick '+(d.pick_index+1)+' of '+d.teams+'.</b> ')+esc(cur?cur.name:"")+' is on the clock.';
+    else if(d.status==="lottery")banner='<b>Captain picks are done.</b> The lottery pick gives each team one more player at random.';
+    else banner='<b>Draft complete.</b> Every team has its trio. Leftover players are in the substitute pool.';
+    const adminBtns=adm?'<div class="tn-actions">'
+      +(d.status==="setup"?'<button type="button" class="primary" data-dr="order">Draw pick order</button>':'')
+      +(d.status==="lottery"?'<button type="button" class="primary" data-dr="lottery">Draw third players</button>':'')
+      +(!d.pool.some(x=>x.team_id)&&d.status!=="complete"?'<button type="button" class="secondary" data-dr="reset">Start over</button><button type="button" class="secondary danger" data-dr="cancel">Cancel draft</button>':'')+'</div>':'';
+    const board='<div class="dr-board">'+teams.map(t=>{
+      const slots=[["Captain","captain"],["Captain’s pick","captain_pick"],["Lottery pick","lottery"]].map(([lb,how])=>{
+        const m=(t.members||[]).find(x=>x.how===how);
+        return '<li class="'+(m?'full':'open')+'"><small>'+lb+'</small><b>'+(m?esc(m.name):'—')+'</b></li>';}).join("");
+      const subs=(t.members||[]).filter(x=>x.how==="substitute").map(x=>'<li class="full sub"><small>Substitute</small><b>'+esc(x.name)+'</b></li>').join("");
+      const clock=d.status==="picking"&&t.team_id===d.current_team_id;
+      return '<article class="dr-team'+(clock?' clock':'')+(t.team_id===d.my_team_id?' mine':'')+'"><div class="dr-team-h">'+(t.pick_no?'<span class="no">'+t.pick_no+'</span>':'')+mono(t.name)+'<b>'+esc(t.name)+'</b>'+(clock?'<em class="dr-now">On the clock</em>':'')+'</div><ul>'+slots+subs+'</ul></article>';}).join("")+'</div>';
+    const canPick=d.status==="picking"&&d.my_turn;
+    const pool='<div class="dr-pool-h"><h3>'+(d.status==="complete"?'Substitute pool':'Player pool')+'</h3><span class="tn-count">'+free.length+'</span></div>'
+      +(free.length?'<div class="dr-pool">'+free.map(x=>'<div class="dr-chip">'+'<span>'+esc(x.name)+'</span>'+(canPick?'<button type="button" class="primary" data-pick="'+esc(x.id)+'" data-name="'+esc(x.name)+'">Pick</button>':'')+(adm&&d.status!=="complete"||adm&&d.status==="complete"?'<button type="button" class="tn-x" data-pool-del="'+esc(x.id)+'" aria-label="Remove '+esc(x.name)+' from the pool">&times;</button>':'')+'</div>').join("")+'</div>':'<div class="tn-empty">'+(d.status==="complete"?'No substitutes left.':'No players left in the pool.')+'</div>')
+      +(adm&&d.status!=="complete"?draftAdd(ctx,d):adm?draftAdd(ctx,d,"Add more substitutes"):"");
+    const subSec=d.status==="complete"?draftSubs(d,ctx,free):"";
+    return stepper+'<div class="dr-banner">'+banner+'</div>'+adminBtns+board+pool+subSec;
+  }
+  function draftAdd(ctx,d,label){
+    const inPool=new Set((d.pool||[]).map(x=>x.name.toLowerCase()));
+    const opts=(ctx.players||[]).filter(p=>!ctx.onTeams.has(p.user_id)&&!inPool.has(String(p.display_name||"").toLowerCase())).map(p=>'<option value="'+esc(p.user_id)+'">'+esc(p.display_name||"Player")+'</option>').join("");
+    return '<div class="tn-ros-create dr-add"><b>'+esc(label||"Add players to the pool")+'</b><select id="drUser"><option value="">Choose a registered player</option>'+opts+'</select><input type="text" id="drName" maxlength="60" placeholder="or type a name"><button type="button" class="secondary" id="drAdd">Add</button></div>';
+  }
+  function draftSubs(d,ctx,free){
+    const myTeam=d.order.find(t=>t.team_id===d.my_team_id);
+    const reqs=d.requests||[];
+    const teamsSel=ctx.admin?'<select id="drSubTeam">'+d.order.map(t=>'<option value="'+esc(t.team_id)+'">'+esc(t.name)+'</option>').join("")+'</select>':"";
+    const subForm=(myTeam||ctx.admin)&&free.length?'<div class="tn-ros-create dr-add" id="drSubForm"><b>'+(ctx.admin?'Substitute a player':'Request a substitute')+'</b>'+teamsSel
+      +'<select id="drOut">'+(ctx.admin?'':(myTeam.members||[]).filter(m=>!m.captain).map(m=>'<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>').join(""))+'</select>'
+      +'<select id="drIn">'+free.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("")+'</select><input type="text" id="drWhy" maxlength="120" placeholder="Reason (optional)"><button type="button" class="secondary" id="drSubGo">'+(ctx.admin?'Substitute':'Send request')+'</button></div>':"";
+    const list=reqs.length?'<ul class="dr-reqs">'+reqs.map(r=>'<li><div><b>'+esc(r.team_name)+'</b>: '+esc(r.out_name)+' out, '+esc(r.in_name)+' in'+(r.reason?'<small>'+esc(r.reason)+'</small>':'')+'</div><span class="tn-chip '+(r.status==="pending"?'warn':'')+'">'+esc(r.status)+'</span>'+(ctx.admin&&r.status==="pending"?'<div class="tn-actions"><button type="button" class="primary" data-sub="'+esc(r.id)+'" data-ok="1">Approve</button><button type="button" class="secondary" data-sub="'+esc(r.id)+'" data-ok="0">Reject</button></div>':'')+'</li>').join("")+'</ul>':"";
+    return '<div class="dr-pool-h"><h3>Substitutes</h3></div><p class="small">If a team member cannot play, the captain asks for a replacement from the pool above. An admin approves it, and the new player takes over any fixtures not yet played.</p>'+subForm+list;
+  }
+  async function mountDraft(detail,id,ctx){
+    const pane=detail.querySelector("#draftPane");if(!pane)return;
+    let d=ctx.draft;
+    const fail=m=>{status("tournamentStatus",m,"error");toast(m);};
+    const reload=async()=>{const q=await client.rpc("tournament_draft_state",{p_tournament_id:id});if(q.data){d=q.data;paint();}};
+    const act=async(fn,args,msg)=>{const {data,error}=await client.rpc(fn,args);if(error){fail(error.message);return null;}if(msg)toast(msg);return data===null?true:data;};
+    function paint(){
+      ctx.onTeams=new Set((d.exists?d.order:[]).flatMap(t=>(t.members||[]).map(x=>x.user_id)).filter(Boolean));
+      (ctx.rosters||[]).forEach(r=>(r.members||[]).forEach(x=>x.user_id&&ctx.onTeams.add(x.user_id)));
+      pane.innerHTML=draftHtml(d,ctx);
+      pane.querySelector("#drAdd")?.addEventListener("click",async()=>{
+        const u=pane.querySelector("#drUser").value,nm=pane.querySelector("#drName").value.trim();
+        if(!u&&!nm){fail("Choose a registered player or type a name.");return;}
+        if(u&&nm){fail("Use either the list or a typed name, not both.");return;}
+        if(await act("tournament_draft_add_pool",{p_tournament_id:id,p_user_id:u||null,p_name:u?null:nm},"Added to the pool."))reload();
+      });
+      pane.querySelectorAll("[data-pool-del]").forEach(b=>b.addEventListener("click",async()=>{if(await act("tournament_draft_remove_pool",{p_pool_id:b.dataset.poolDel}))reload();}));
+      pane.querySelector('[data-dr="order"]')?.addEventListener("click",async()=>{
+        if(!confirm("Draw the pick order now? This cannot be undone."))return;
+        const r=await act("tournament_draft_draw_order",{p_tournament_id:id});if(!r)return;
+        txReveal("Pick order",(Array.isArray(r)?r:[]).map((x,i)=>({n:i+1,big:x.name,small:i===0?"Picks first":""})),()=>openTournament(id,{keep:true}));
+      });
+      pane.querySelector('[data-dr="lottery"]')?.addEventListener("click",async()=>{
+        if(!confirm("Draw the third player for every team now? This cannot be undone."))return;
+        const r=await act("tournament_draft_lottery",{p_tournament_id:id});if(!r)return;
+        txReveal("Lottery pick",(Array.isArray(r)?r:[]).map((x,i)=>({n:i+1,big:x.player,small:"joins "+x.team})),()=>openTournament(id,{keep:true}));
+      });
+      pane.querySelector('[data-dr="reset"]')?.addEventListener("click",async()=>{if(confirm("Start over and redraw the pick order?")&&await act("tournament_draft_reset",{p_tournament_id:id,p_cancel:false},"Draft reset."))reload();});
+      pane.querySelector('[data-dr="cancel"]')?.addEventListener("click",async()=>{if(confirm("Cancel the draft and empty the pool?")&&await act("tournament_draft_reset",{p_tournament_id:id,p_cancel:true},"Draft cancelled."))openTournament(id,{keep:true});});
+      pane.querySelectorAll("[data-pick]").forEach(b=>b.addEventListener("click",async()=>{
+        if(!confirm("Pick "+b.dataset.name+"?"))return;
+        if(await act("tournament_draft_pick",{p_tournament_id:id,p_pool_id:b.dataset.pick},"Pick made."))reload();
+      }));
+      const team=pane.querySelector("#drSubTeam"),out=pane.querySelector("#drOut");
+      if(team&&out){const fill=()=>{const t=d.order.find(x=>x.team_id===team.value);out.innerHTML=((t&&t.members)||[]).filter(m=>!m.captain).map(m=>'<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>').join("");};team.addEventListener("change",fill);fill();}
+      pane.querySelector("#drSubGo")?.addEventListener("click",async()=>{
+        const tid=team?team.value:d.my_team_id,o=pane.querySelector("#drOut").value,inn=pane.querySelector("#drIn").value;
+        if(!tid||!o||!inn){fail("Choose the player going out and the substitute coming in.");return;}
+        if(!confirm(ctx.admin?"Make this substitution now?":"Send this substitute request to the admins?"))return;
+        const r=await act("tournament_draft_request_sub",{p_team_id:tid,p_out_member:o,p_pool_id:inn,p_reason:pane.querySelector("#drWhy").value.trim()||null});
+        if(r){toast(r==="applied"?"Substitution made.":"Request sent.");if(r==="applied")openTournament(id,{keep:true});else reload();}
+      });
+      pane.querySelectorAll("[data-sub]").forEach(b=>b.addEventListener("click",async()=>{
+        if(await act("tournament_draft_decide_sub",{p_request_id:b.dataset.sub,p_approve:b.dataset.ok==="1"},b.dataset.ok==="1"?"Substitution approved.":"Request rejected."))b.dataset.ok==="1"?openTournament(id,{keep:true}):reload();
+      }));
+    }
+    paint();
+    clearInterval(tnDraftTimer);
+    if(d.exists&&d.status!=="complete"||(!d.exists&&!ctx.admin)){
+      tnDraftTimer=setInterval(()=>{
+        if(!document.body.contains(pane)){clearInterval(tnDraftTimer);return;}
+        if(pane.closest("[hidden]")||document.querySelector(".tx-reveal"))return;
+        const a=document.activeElement;if(a&&pane.contains(a)&&/INPUT|SELECT/.test(a.tagName))return;
+        reload();
+      },8000);
+    }
+  }
+  async function mountDraftLater(detail,id,ctx){
+    if(!ctx.draft)return;
+    if(ctx.admin){const q=await client.from("players").select("user_id,display_name,active").not("user_id","is",null).eq("active",true).order("display_name");ctx.players=q.data||[];}
+    mountDraft(detail,id,ctx);
+  }
   let tnTab=null,tnRoundSel=null,tnSheet=null;
   function trioPage(c){
-    const {t,id,matches,stages,fx,nameOf,myPartIds,ended,rosters,tGames,isTrio,facts,regBtn,adminBar,banner,checklist,queue,confirmHtml,peopleHtml,participants,state:st,dueCh,openStage}=c;
+    const {t,id,matches,stages,fx,nameOf,myPartIds,ended,rosters,tGames,isTrio,facts,regBtn,adminBar,banner,checklist,queue,confirmHtml,peopleHtml,participants,state:st,dueCh,openStage,draft}=c;
     const sz=Number(t.rules_json?.team_size)||tGames;
     const live=matches.filter(m=>m.participant_b_id);
     const cardOpts=m=>{const done=["approved","completed"].includes(m.status),open=["scheduled","rejected"].includes(m.status);
@@ -3076,9 +3197,9 @@ $("playersBody").innerHTML = shown.map(p =>
     const manage=st.tnAdmin?'<div class="tx-manage">'+(checklist.includes("Everything is set up")?checklist:"")+adminBar+(stageAdmin?'<h3>Fixtures</h3>'+stageAdmin:'')+queue+'</div>':"";
     const info='<div class="tx-info"><ol class="tx-how"><li><b>Lock</b><span>Each captain picks who plays Board 1, 2 and 3. Lineups stay hidden until both are locked.</span></li><li><b>Play</b><span>'+tGames+' separate 1v1 games, one per board.</span></li><li><b>Win</b><span>The team with more games takes 3 points. A draw is 1 point.</span></li></ol><ul class="tx-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'<li><span>Squad size</span><b>'+sz+' players</b></li></ul>'+(t.description?'<p class="tx-desc">'+esc(t.description)+'</p>':'')+peopleHtml+'</div>';
     const hasMatches=matches.length>0;
-    const tabs=[["matches","Matches",hasMatches?live.length:null],["table","Table",null],["teams","Teams",rosters.length],["players","Players",null],["info","Info",null]].concat(st.tnAdmin?[["manage","Manage",null]]:[]);
-    const cur=tabs.some(x=>x[0]===tnTab)?tnTab:(hasMatches?"matches":"teams");
-    const panels={matches:matchesPanel,table:'<h3 class="tx-h">League table</h3><p class="small">3 points for a win, 1 for a draw. Level on points: games difference, then goals.</p><div id="trioLadder"><div class="tn-empty">Loading…</div></div>',teams:c.rosterHtml,players:'<h3 class="tx-h">Top performers</h3><p class="small">Best records across all board games.</p><div id="trioPerf"><div class="tn-empty">Loading…</div></div>',info,manage};
+    const tabs=[["matches","Matches",hasMatches?live.length:null],["table","Table",null],["teams","Teams",rosters.length]].concat((draft&&draft.exists)||st.tnAdmin?[["draft","Draft",null]]:[]).concat([["players","Players",null],["info","Info",null]]).concat(st.tnAdmin?[["manage","Manage",null]]:[]);
+    const cur=tabs.some(x=>x[0]===tnTab)?tnTab:(hasMatches?"matches":(draft&&draft.exists&&draft.status!=="complete"?"draft":"teams"));
+    const panels={matches:matchesPanel,table:'<h3 class="tx-h">League table</h3><p class="small">3 points for a win, 1 for a draw. Level on points: games difference, then goals.</p><div id="trioLadder"><div class="tn-empty">Loading…</div></div>',teams:c.rosterHtml,draft:'<div id="draftPane"></div>',players:'<h3 class="tx-h">Top performers</h3><p class="small">Best records across all board games.</p><div id="trioPerf"><div class="tn-empty">Loading…</div></div>',info,manage};
     return '<header class="tx-head" id="tnHero"><button type="button" class="tn-back" id="tnBack"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>All tournaments</button>'
       +'<div class="tx-title"><h2>'+esc(t.name)+'</h2><div class="tx-sub">'+tnStateHtml(t.status)+'<span>'+sz+'v'+sz+' team league</span><span>'+tGames+' games per fixture</span></div></div></header>'
       +banner+(checklist.includes("Everything is set up")?"":checklist)+'<div class="tx-reg">'+regBtn+'</div>'
@@ -3217,7 +3338,7 @@ $("playersBody").innerHTML = shown.map(p =>
     }));
   }
     async function openTournament(id,opts){
-    const keepY=window.scrollY;
+    const keepY=window.scrollY;clearInterval(tnDraftTimer);
     const {data:t,error}=await client.from("tournament_tournaments").select("*").eq("id",id).maybeSingle();
     if(error||!t){status("tournamentStatus",error?.message||"Tournament unavailable.","error");return;}
     const [pr,mr,sr,rr]=await Promise.all([
@@ -3252,6 +3373,8 @@ $("playersBody").innerHTML = shown.map(p =>
     const tGames=Number(t.rules_json?.games_per_fixture)||1,isTrio=t.competition_type==="team"&&tGames>1;
     let rosters=[];
     if(t.competition_type==="team"){const rq=await client.rpc("tournament_rosters",{p_tournament_id:id});rosters=rq.data||[];rosters.forEach(r=>{entrantNames[r.participant_id]=r.team_name;});}
+    let draft=null;
+    if(isTrio){const dq=await client.rpc("tournament_draft_state",{p_tournament_id:id});draft=dq.data||null;if(draft&&draft.exists&&!state.tnAdmin)rosters.forEach(r=>{r.can_manage=false;});}
     const fx={};
     if(isTrio){await Promise.all(matches.filter(m=>m.participant_b_id).map(async m=>{const q=await client.rpc("tournament_trio_fixture",{p_match_id:m.id});if(q.data&&q.data.trio)fx[m.id]=q.data;}));}
     const entrantLabel=p=>p.external_name||entrantNames[p.id]||entrantNames[p.user_id]||entrantNames[p.cobeg_member_id]||"Registered entrant";
@@ -3357,8 +3480,8 @@ $("playersBody").innerHTML = shown.map(p =>
     const ladderHtml=isTrio&&matches.length?'<section class="tn-section tn-arena-sec"><div class="tn-section-head"><h3>League table</h3><span class="small">3 for a win, 1 for a draw. Level on points: games difference, then goals.</span></div><div id="trioLadder"><div class="tn-empty">Loading…</div></div></section>':"";
     const early=!matches.length;
     if(isTrio){
-      detail.innerHTML=trioPage({t,id,matches,stages,fx,nameOf,myPartIds,ended,rosters,rosterHtml,tGames,isTrio,facts,regBtn,adminBar,banner,checklist,queue,confirmHtml,peopleHtml,participants,state,dueCh:dueChip});
-      bindTrioPage(detail);loadTrioPerf(id);if(matches.length)loadTrioLadder(stages,matches,myPartIds);
+      detail.innerHTML=trioPage({t,id,matches,stages,fx,nameOf,myPartIds,ended,rosters,rosterHtml,tGames,isTrio,facts,regBtn,adminBar,banner,checklist,queue,confirmHtml,peopleHtml,participants,state,dueCh:dueChip,draft});
+      bindTrioPage(detail);mountDraftLater(detail,id,{draft,admin:state.tnAdmin,rosters});loadTrioPerf(id);if(matches.length)loadTrioLadder(stages,matches,myPartIds);
     }else detail.innerHTML=hero+banner+checklist+confirmHtml+queue+(early?rosterHtml:"")+ladderHtml+fixturesHtml+(early?"":rosterHtml)+perfHtml+peopleHtml;
     bindRosters(detail,id,rosters,t);
     bindTrio(detail,id);
