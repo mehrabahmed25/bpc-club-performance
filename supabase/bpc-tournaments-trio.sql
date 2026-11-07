@@ -23,6 +23,7 @@ create table if not exists public.tournament_lineups(
   slots uuid[] not null,
   locked_by uuid, locked_at timestamptz not null default now(),
   primary key (match_id, participant_id));
+alter table public.tournament_lineups add column if not exists swapped_at timestamptz, add column if not exists swap_boards int[];
 create table if not exists public.tournament_boards(
   id uuid primary key default gen_random_uuid(),
   match_id uuid not null references public.tournament_matches(id) on delete cascade,
@@ -61,7 +62,7 @@ declare
   m tournament_matches; t tournament_tournaments; uid uuid := auth.uid();
   adm boolean := coalesce(public.tournament_is_admin(), false); games int; ended boolean;
   capa uuid; capb uuid; la uuid[]; lb uuid[]; lka boolean; lkb boolean; bothl boolean;
-  ra jsonb; rb jsonb; bj jsonb; sm jsonb; dl boolean;
+  ra jsonb; rb jsonb; bj jsonb; sm jsonb; dl boolean; swa timestamptz; swb timestamptz; swba int[]; swbb int[]; nopen int;
 begin
   select * into m from tournament_matches where id = p_match_id;
   if not found then raise exception 'Match not found'; end if;
@@ -76,6 +77,9 @@ begin
   select slots into la from tournament_lineups where match_id = m.id and participant_id = m.participant_a_id;
   select slots into lb from tournament_lineups where match_id = m.id and participant_id = m.participant_b_id;
   lka := la is not null; lkb := lb is not null; bothl := lka and lkb;
+  select swapped_at, swap_boards into swa, swba from tournament_lineups where match_id = m.id and participant_id = m.participant_a_id;
+  select swapped_at, swap_boards into swb, swbb from tournament_lineups where match_id = m.id and participant_id = m.participant_b_id;
+  select count(*) into nopen from tournament_boards where match_id = m.id and status = 'scheduled';
   select coalesce(jsonb_agg(jsonb_build_object('id', tm.id, 'name', public.tournament_member_name(tm.id), 'captain', tm.role = 'captain') order by (tm.role = 'captain') desc, tm.joined_at), '[]')
     into ra from tournament_team_members tm join tournament_teams tt on tt.id = tm.team_id where tt.participant_id = m.participant_a_id and tm.status = 'active';
   select coalesce(jsonb_agg(jsonb_build_object('id', tm.id, 'name', public.tournament_member_name(tm.id), 'captain', tm.role = 'captain') order by (tm.role = 'captain') desc, tm.joined_at), '[]')
@@ -104,10 +108,14 @@ begin
     'a', jsonb_build_object('participant_id', m.participant_a_id, 'locked', lka, 'roster', ra,
           'can_lineup', not ended and not lka and m.status in ('scheduled','rejected') and (adm or uid = capa) and (adm or not dl),
           'is_captain', uid is not null and uid = capa,
+          'swap', case when swa is not null then jsonb_build_object('at', swa, 'boards', swba) end,
+          'can_swap', not ended and bothl and m.status in ('scheduled','rejected') and (adm or (swa is null and uid = capa and not dl)) and nopen >= 2,
           'slots', case when lka and (bothl or adm or uid = capa) then (select jsonb_agg(jsonb_build_object('id', s, 'name', public.tournament_member_name(s)) order by o) from unnest(la) with ordinality x(s, o)) end),
     'b', jsonb_build_object('participant_id', m.participant_b_id, 'locked', lkb, 'roster', rb,
           'can_lineup', not ended and not lkb and m.status in ('scheduled','rejected') and (adm or uid = capb) and (adm or not dl),
           'is_captain', uid is not null and uid = capb,
+          'swap', case when swb is not null then jsonb_build_object('at', swb, 'boards', swbb) end,
+          'can_swap', not ended and bothl and m.status in ('scheduled','rejected') and (adm or (swb is null and uid = capb and not dl)) and nopen >= 2,
           'slots', case when lkb and (bothl or adm or uid = capb) then (select jsonb_agg(jsonb_build_object('id', s, 'name', public.tournament_member_name(s)) order by o) from unnest(lb) with ordinality x(s, o)) end),
     'boards', bj);
 end $$;
@@ -467,3 +475,48 @@ language sql stable security definer set search_path = public, pg_temp as $$
         or (p_user is null and p_cobeg is null and p_name is not null and lower(tm.external_name) = lower(trim(p_name)))))
 $$;
 revoke all on function public.tournament_player_on_live_team(uuid, uuid, uuid, text) from public, anon, authenticated;
+
+
+-- one swap per team per fixture: the captain swaps two of their own players between two unplayed boards
+create or replace function public.tournament_trio_swap(p_match_id uuid, p_participant_id uuid, p_board_a int, p_board_b int) returns void
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare m tournament_matches; t tournament_tournaments; cap uuid; lu tournament_lineups; ba tournament_boards; bb tournament_boards;
+  adm boolean := coalesce(public.tournament_is_admin(), false); isa boolean; ma uuid; mb uuid; ns uuid[];
+begin
+  if auth.uid() is null then raise exception 'Sign in required'; end if;
+  select * into m from tournament_matches where id = p_match_id for update;
+  if not found then raise exception 'Match not found'; end if;
+  select * into t from tournament_tournaments where id = m.tournament_id;
+  if t.status in ('completed','archived','cancelled') then raise exception 'This tournament has ended'; end if;
+  if p_participant_id not in (m.participant_a_id, m.participant_b_id) then raise exception 'That team is not in this fixture'; end if;
+  if m.status not in ('scheduled','rejected') then raise exception 'This fixture is no longer open'; end if;
+  select captain_user_id into cap from tournament_teams where participant_id = p_participant_id;
+  if not adm then
+    if cap is distinct from auth.uid() then raise exception 'Only the team captain can swap players'; end if;
+    if m.deadline_at is not null and now() > m.deadline_at then raise exception 'The deadline for this fixture has passed. Please contact an administrator.'; end if;
+  end if;
+  if p_board_a is null or p_board_b is null or p_board_a = p_board_b then raise exception 'Choose two different boards'; end if;
+  select * into lu from tournament_lineups where match_id = m.id and participant_id = p_participant_id for update;
+  if not found or not exists(select 1 from tournament_lineups where match_id = m.id and participant_id <> p_participant_id) then
+    raise exception 'Swaps open once both lineups are locked'; end if;
+  if lu.swapped_at is not null and not adm then raise exception 'Your team has already used its swap for this fixture'; end if;
+  select * into ba from tournament_boards where match_id = m.id and board_no = p_board_a for update;
+  select * into bb from tournament_boards where match_id = m.id and board_no = p_board_b for update;
+  if ba.id is null or bb.id is null then raise exception 'Board not found'; end if;
+  if ba.status <> 'scheduled' or bb.status <> 'scheduled' then raise exception 'Only boards that have not been played can be swapped'; end if;
+  isa := p_participant_id = m.participant_a_id;
+  if isa then ma := ba.a_member_id; mb := bb.a_member_id;
+    update tournament_boards set a_member_id = mb where id = ba.id;
+    update tournament_boards set a_member_id = ma where id = bb.id;
+  else ma := ba.b_member_id; mb := bb.b_member_id;
+    update tournament_boards set b_member_id = mb where id = ba.id;
+    update tournament_boards set b_member_id = ma where id = bb.id;
+  end if;
+  ns := lu.slots; ns[p_board_a] := mb; ns[p_board_b] := ma;
+  update tournament_lineups set slots = ns, swapped_at = now(), swap_boards = array[p_board_a, p_board_b]
+    where match_id = m.id and participant_id = p_participant_id;
+  insert into tournament_audit_logs(tournament_id, actor_user_id, action, entity_type, entity_id, reason)
+    values (m.tournament_id, auth.uid(), 'trio_swap', 'match', m.id::text, 'Boards '||p_board_a||' and '||p_board_b);
+end $$;
+revoke all on function public.tournament_trio_swap(uuid, uuid, int, int) from public;
+grant execute on function public.tournament_trio_swap(uuid, uuid, int, int) to authenticated;

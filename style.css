@@ -1850,43 +1850,10 @@ body.tx-lock{overflow:hidden}
 .tx-stage{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:#fff}
 .tx-stage small{display:block;color:var(--muted)}
 
-/* BPC Trio draft */
-.tx-reveal{position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:rgba(8,14,28,.88);padding:16px}
-.tx-rv-card{width:min(460px,100%);max-height:90vh;overflow:auto;background:var(--night);color:#fff;border-radius:16px;padding:22px;border-top:4px solid var(--flood)}
-.tx-rv-card h3{margin:0 0 14px;font:800 22px var(--display)}
-.tx-rv-card ol{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:8px}
-.tx-rv-card li{display:grid;grid-template-columns:34px 1fr;column-gap:12px;align-items:center;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.08);opacity:0;animation:txrv .5s var(--d,0s) forwards}
-.tx-rv-card li .n{grid-row:span 2;width:30px;height:30px;border-radius:50%;background:var(--flood);color:#1a1200;display:grid;place-items:center;font:800 14px var(--display)}
-.tx-rv-card li b{font:800 17px var(--display)}
-.tx-rv-card li small{color:#b9c4dc}
-@keyframes txrv{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.tx-rv-card li{animation:none;opacity:1}}
-.dr-steps{list-style:none;display:flex;gap:6px;margin:16px 0;padding:0;overflow-x:auto}
-.dr-steps li{flex:1;min-width:86px;display:flex;flex-direction:column;align-items:center;gap:4px;font:700 12px var(--display);color:var(--muted);text-align:center}
-.dr-steps i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#e3e9f4;color:#44546f}
-.dr-steps li.done i{background:var(--turf);color:#fff}
-.dr-steps li.now i{background:var(--flood);color:#1a1200}
-.dr-steps li.now{color:var(--ink)}
-.dr-card,.dr-banner{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
-.dr-banner{border-left:5px solid var(--flood)}
-.dr-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:14px 0}
-.dr-team{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
-.dr-team.clock{border-color:var(--flood);box-shadow:0 0 0 3px rgba(246,183,60,.3)}
-.dr-team.mine .dr-team-h b::after{content:" (you)";font-weight:600;color:var(--muted)}
-.dr-team-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.dr-team-h .no{width:22px;height:22px;border-radius:50%;background:var(--night);color:#fff;display:grid;place-items:center;font:800 12px var(--display)}
-.dr-now{margin-left:auto;white-space:nowrap;font:800 11px var(--display);background:var(--flood);color:#1a1200;padding:3px 8px;border-radius:999px;font-style:normal}
-.dr-team ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.dr-team li{display:flex;flex-direction:column;padding:7px 10px;border-radius:8px;border:1px dashed var(--line);color:var(--muted)}
-.dr-team li.full{border-style:solid;color:var(--ink);background:#f6f8fc}
-.dr-team li small{font-size:11.5px;color:var(--muted)}
-.dr-pool-h{display:flex;align-items:center;gap:8px;margin:18px 0 8px}
-.dr-pool-h h3{margin:0;font:800 18px var(--display)}
-.dr-pool{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
-.dr-chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
-.dr-chip span{flex:1;font-weight:700;overflow-wrap:anywhere}
-.dr-add{margin-top:12px}
-.dr-reqs{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
-.dr-reqs li{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.dr-reqs li>div:first-child{flex:1;min-width:200px}
-.dr-reqs small{display:block;color:var(--muted)}
+/* BPC Trio swap */
+.tx-swaps{display:grid;gap:10px;margin-top:14px}
+.tx-swap{display:grid;gap:6px;padding:12px;border:1px dashed var(--line);border-radius:10px;background:#fff}
+.tx-swap small{color:var(--muted)}
+.tx-swap-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.tx-swap-row select{flex:1;min-width:140px}
+@media(max-width:560px){.tx-swap-row select{flex:1 1 100%}.tx-swap-row>span{display:none}.tx-swap-row button{width:100%}}
