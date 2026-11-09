@@ -1921,7 +1921,7 @@ body.tx-lock{overflow:hidden}
 .pc-tier em{display:block;font:800 13px var(--display);font-style:normal}
 .pc-tier small{font-size:11px;font-weight:700;opacity:.8}
 .pc-av{display:grid;place-items:center;width:104px;height:104px;margin:4px auto 6px;border-radius:26px;font:800 32px var(--display);background:linear-gradient(135deg,#2a4fb8,#0b1d5c);color:#fff;border:3px solid #ffffffd0;overflow:hidden;position:relative}
-.pc-name{margin:0 0 6px;text-align:center;font:800 18px/1.1 var(--display);position:relative}
+.pc-title{margin:0 0 6px;text-align:center;font:800 18px/1.1 var(--display);position:relative}
 .pc-attrs{list-style:none;margin:0;padding:8px 6px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px 6px;background:color-mix(in srgb,var(--ink) 16%,transparent);border-radius:12px;position:relative}
 .pc-attrs li{display:flex;gap:6px;align-items:baseline;justify-content:center}
 .pc-attrs b{font:800 17px var(--display)}.pc-attrs span{font:700 11px var(--display);opacity:.8}

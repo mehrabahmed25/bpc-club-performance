@@ -2868,10 +2868,10 @@ $("playersBody").innerHTML = shown.map(p =>
     const foil=!!(lbRow&&lbRow.award_eligible);
     const front='<div class="pc-face pc-front"><div class="pc-top"><div class="pc-ovr"><b>'+(R.n?R.ovr:"–")+'</b><span>OVR</span></div><div class="pc-tier"><em>'+R.tier.n+'</em><small>'+(lbRow?'Table #'+lbRow.rank:'BPC')+'</small></div></div>'
       +avBig(me.display_name,me.id,"pc-av")
-      +'<h4 class="pc-name">'+esc(first.slice(0,2).join(" "))+'</h4>'
+      +'<h4 class="pc-title">'+esc(first.slice(0,2).join(" "))+'</h4>'
       +'<ul class="pc-attrs">'+R.a.map(x=>'<li><b>'+(R.n?x[1]:"–")+'</b><span>'+x[0]+'</span></li>').join("")+'</ul>'
       +'<div class="pc-foot">'+(h?'<i style="background:'+esc(h.color)+'"></i>'+esc(h.name):'Brahmanbaria Pes Club')+(foil?'<em>Award eligible</em>':'')+'</div></div>';
-    const back='<div class="pc-face pc-back"><h4 class="pc-name">'+esc(me.display_name)+'</h4><dl class="pc-rec">'
+    const back='<div class="pc-face pc-back"><h4 class="pc-title">'+esc(me.display_name)+'</h4><dl class="pc-rec">'
       +[["Matches",S.n],["Won",S.w],["Drawn",S.d],["Lost",S.l],["Goals for",S.gf],["Goals against",S.ga],["Clean sheets",S.cs],["Points",S.pts]].map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join("")+'</dl><small>'+(R.n<5?'Rated after 5 matches.':'Rated on all counted matches.')+'</small></div>';
     return '<section class="pf-card pf-wide"><h3>Player card <small>rated from counted matches</small></h3><div class="pc-wrap"><div class="pc tier-'+R.tier.k+(foil?' foil':'')+'" data-pc><div class="pc-flipper" aria-live="polite">'+front+back+'</div>'
       +'<button type="button" class="pc-flip" data-pc-flip aria-pressed="false">Flip card</button></div>'
