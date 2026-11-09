@@ -1,7 +1,7 @@
 // BPC service worker: keeps the app shell available offline. Pages and scripts are fetched
 // from the network first, so a new deploy always shows up; the cache is only the fallback.
 // Supabase and other cross-origin requests are never cached.
-const CACHE="bpc-shell-v9";
+const CACHE="bpc-shell-v10";
 const SHELL=["./","index.html","style.css","app.js","config.js","manifest.webmanifest","icons/icon-192.png"];
 self.addEventListener("install",e=>{
   e.waitUntil(caches.open(CACHE).then(c=>Promise.all(SHELL.map(u=>c.add(u).catch(()=>null)))).then(()=>self.skipWaiting()));

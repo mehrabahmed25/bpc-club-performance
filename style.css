@@ -1945,3 +1945,23 @@ body.tx-lock{overflow:hidden}
 .pc-how p{margin:0;color:var(--muted);font-size:13px}
 @media(prefers-reduced-motion:reduce){.pc-flipper{transition:none}.pc.foil .pc-front:after{animation:none}}
 @media(max-width:680px){.home-hero{padding:18px 20px 20px}.home-hero-copy p,.home-cta{display:none}.home-hero h1{margin:0}}
+
+/* Leaderboard: smaller type on phones */
+@media(max-width:680px){
+  #view-leaderboard .hero{padding:22px 18px}
+  #view-leaderboard .hero h1{font-size:clamp(24px,7.4vw,30px);line-height:1.12}
+  #view-leaderboard .hero-sub{font-size:14px;line-height:1.5;margin-top:10px}
+  #view-leaderboard .eyebrow{font-size:11px}
+  #view-leaderboard .hero-stat b{font-size:15px}
+  .lb-podium{padding-top:34px}
+  .lb-podium .pod-pts{font-size:21px;letter-spacing:-.5px}
+  .lb-podium .pod-pts small{font-size:10px}
+  .lb-podium .pod-name{font-size:12px}
+  #view-leaderboard .table-wrap th{font-size:10.5px;padding:9px 8px}
+  #view-leaderboard .table-wrap td{font-size:12.5px;padding:9px 8px}
+  #view-leaderboard td.rank-1,#view-leaderboard td.rank-2,#view-leaderboard td.rank-3{font-size:13px}
+  #view-leaderboard .pts-cell b{font-size:13px}
+  #view-leaderboard .pc-name b{font-size:12.5px}
+  #view-leaderboard .table-note{font-size:12px}
+  #view-leaderboard .toolbar label{font-size:12px}
+}
