@@ -39,6 +39,7 @@
       <div class="home-hero-copy"><h1>Brahmanbaria Pes Club</h1><p>Friendly leagues, monthly awards and club tournaments. Play, submit your score and climb the table.</p>
         <div class="home-cta"><button class="primary" data-view="leaderboard">See the leaderboard</button><button class="ghost" data-view="tournaments">Join a tournament</button></div></div>
     </div>
+    <section id="homeMatchday" class="md hidden" aria-label="Matchday"></section>
     <div id="homeTicker" class="home-ticker hidden" aria-label="Recent results"></div>
     <section id="uclPosterSection" class="poster-section hidden" aria-label="UCL finalists poster">
     <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">UCL Finalists</h2></div><span class="poster-badge">Featured</span></div>
@@ -350,6 +351,13 @@
 
   <footer class="footer"><span>Brahmanbaria Pes Club</span><span class="ft-dev">Developed by <a href="https://mehrabahmed25.github.io/portfolio/" target="_blank" rel="noopener">Mehrab Uddin Ahmed</a></span><button type="button" id="installBtn" class="ft-install hidden">Install app</button><a class="ft-fb" href="https://www.facebook.com/bpc.efootball" target="_blank" rel="noopener" aria-label="BPC on Facebook"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z"/></svg>Facebook</a></footer>
 </main>
+<nav id="tabbar" class="tabbar" aria-label="Main">
+  <button type="button" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+  <button type="button" data-tab="leaderboard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/></svg><span>Table</span></button>
+  <button type="button" data-tab="fab" class="tb-fab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg><span>Submit</span></button>
+  <button type="button" data-tab="tournaments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v3h3v3a4 4 0 0 1-4 4 5 5 0 0 1-3 2.6V18h3v3H8v-3h3v-2.4A5 5 0 0 1 8 13a4 4 0 0 1-4-4V6h3zM6 8v1a2 2 0 0 0 1 1.7V8zm12 0h-1v2.7A2 2 0 0 0 18 9z"/></svg><span>Cups</span></button>
+  <button type="button" data-tab="me"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm-8 9a8 8 0 0 1 16 0z"/></svg><span>Me</span></button>
+</nav>
 <div id="toast" class="toast" role="status"></div>
 <script src="app.js"></script>
 </body></html>

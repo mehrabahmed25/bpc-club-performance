@@ -82,7 +82,7 @@
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     $("nav").classList.remove("open");
-    if(name==="home"){loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeHouses();loadHomeStories();}
+    if(name==="home"){loadHomeMatchday();loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeHouses();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -97,8 +97,27 @@
     if(name==="funds")loadFundsPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
+    updateTabbar();
     window.scrollTo({top:0,behavior:"smooth"});
   }
+
+  // ---- Mobile tab bar ----
+  function updateTabbar(){
+    const tb=$("tabbar");if(!tb)return;
+    const signed=!!state.session;
+    const fab=tb.querySelector("[data-tab=fab]"),me=tb.querySelector("[data-tab=me]");
+    if(fab)fab.querySelector("span:last-child").textContent=signed?"Submit":"Sign in";
+    if(me)me.querySelector("span:last-child").textContent=signed?"Me":"Account";
+    const cur=document.querySelector(".view:not(.hidden)");const name=cur?cur.id.replace("view-",""):"home";
+    const map={home:"home",leaderboard:"leaderboard",tournaments:"tournaments",submit:"fab",profile:"me",account:"me"};
+    tb.querySelectorAll("button").forEach(b=>{const on=map[name]===b.dataset.tab;b.classList.toggle("on",on);if(on)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
+  }
+  const tabbarEl=$("tabbar");
+  if(tabbarEl)tabbarEl.addEventListener("click",e=>{
+    const b=e.target.closest("button[data-tab]");if(!b)return;
+    const t=b.dataset.tab;
+    showView(t==="fab"?(state.session?"submit":"account"):t==="me"?"account":t);
+  });
   document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
   $("menuBtn").addEventListener("click",()=>$("nav").classList.toggle("open"));
   $("monthPicker").addEventListener("change",loadLeaderboard);
@@ -261,6 +280,7 @@
   });
 
   function setAuthUI(){
+    setTimeout(()=>{if(typeof updateTabbar==="function")updateTabbar();const hv=$("view-home");if(hv&&!hv.classList.contains("hidden")&&typeof loadHomeMatchday==="function")loadHomeMatchday();},0);
     if(state.recoveryMode){
       $("accountNav").textContent="Reset password";
       document.querySelectorAll(".auth-only,.admin-only").forEach(x=>x.classList.add("hidden"));
@@ -2665,7 +2685,7 @@ $("playersBody").innerHTML = shown.map(p =>
           '<h3>Highlights</h3><div class="pf-hls">'+hl("Biggest win",bigWin,bigWin?bigWin.gf+" – "+bigWin.ga:"")+hl("Highest scoring",topScore,topScore?topScore.gf+" – "+topScore.ga:"")+'</div></section>'+
       '</div>'+
       (all.length>1?'<section class="pf-card pf-wide"><h3>Goals timeline <small>last '+Math.min(all.length,16)+' matches, oldest to newest</small></h3><div class="pf-tl">'+[...all.slice(0,16)].reverse().map(r=>'<div class="pf-tlc" title="'+esc(prettyDate(r.match_date))+' vs '+esc(r.opponent_name)+': '+r.gf+'–'+r.ga+'"><i class="up" style="height:'+Math.min(r.gf,10)*8+'px"></i><i class="dn" style="height:'+Math.min(r.ga,10)*8+'px"></i></div>').join("")+'</div><p class="pf-note">Green above the line is goals scored, red below is goals conceded.</p></section>':'')+
-      tierCardHtml(me,lbRow,st)+
+      playerCardHtml(me,lbRow,all,hmap,id)+
       '<section class="pf-card pf-wide"><h3>Badges <small>'+earned+' of '+bd.defs.length+' earned</small></h3><div class="pf-badges">'+badges+'</div></section>'+
       '<section class="pf-card pf-wide"><h3>Latest matches</h3><div class="pf-ms">'+recent+'</div></section>'+
       '<div id="pfSeries"></div>';
@@ -2675,6 +2695,7 @@ $("playersBody").innerHTML = shown.map(p =>
       el.innerHTML='<section class="pf-card pf-wide pf-series"><div class="pf-ser-band"><b>Team series</b><small>kept separate from friendly matches</small></div><div class="pf-tiles pf-tiles-sm">'+[["Games",m.played],["W · D · L",m.w+" · "+m.d+" · "+m.l],["Goals",m.gf+" – "+m.ga]].map(t=>'<div class="pf-tile"><b>'+t[1]+'</b><span>'+t[0]+'</span></div>').join("")+'</div>'+
         sd.series.map(x=>'<div class="pf-ser"><div class="pf-ser-h"><b>'+esc(x.name)+'</b><span class="pf-ser-team">Played for <em>'+esc(x.team)+'</em></span></div>'+x.games.map(g=>'<div class="pf-m r-'+(g.gf>g.ga?"w":g.gf<g.ga?"l":"d")+'"><span class="d">Round '+g.round+'</span><span class="o'+(g.opp_id?' link-player':'')+'"'+(g.opp_id?' data-player="'+esc(g.opp_id)+'"':'')+'>'+esc(g.opp)+'</span><span class="s">'+g.gf+' – '+g.ga+'</span></div>').join("")+'</div>').join("")+'</section>';
     });
+    bindPlayerCard(box);
     box.querySelectorAll("[data-pfs]").forEach(b=>b.addEventListener("click",()=>{pfScope.mode=b.dataset.pfs;renderPlayerPage();}));
     const pm=$("pfMonth");if(pm)pm.addEventListener("change",()=>{pfScope.month=pm.value||monthNow;renderPlayerPage();});
     $("pfShare").addEventListener("click",async e=>{
@@ -2722,6 +2743,52 @@ $("playersBody").innerHTML = shown.map(p =>
     grid.innerHTML=legendCard("goals","all",all.data,label)+legendCard("goals","month",mon.data,label)+legendCard("cs","all",all.data,label)+legendCard("cs","month",mon.data,label);
   }
   // ---- Home: scoreboard ticker + table podium ----
+
+  // ---- Home: Matchday board ----
+  async function loadHomeMatchday(){
+    const box=$("homeMatchday");if(!box||!client)return;
+    const signed=!!state.session;
+    box.classList.remove("hidden");
+    const who=signed?(((state.player&&state.player.display_name)||(state.profile&&state.profile.display_name)||"")+"").split(/\s+/)[0]:"";
+    box.innerHTML='<div class="md-in"><div class="md-col md-you"><h2>'+(signed?'Your matchday':'Join the club')+'</h2><div id="mdYou" class="md-body"><span class="md-dim">Loading…</span></div></div>'
+      +'<div class="md-col"><h2>Live tournaments</h2><div id="mdLive" class="md-body"><span class="md-dim">Loading…</span></div></div>'
+      +'<div class="md-col"><h2>This week</h2><div id="mdWeek" class="md-body"><span class="md-dim">Loading…</span></div></div></div>';
+    const you=$("mdYou"),live=$("mdLive"),week=$("mdWeek");
+    // you
+    (async()=>{
+      try{
+        if(!signed){you.innerHTML='<p>Sign in to see your fixtures, deadlines and what needs your score.</p><div class="md-act"><button type="button" class="primary" data-md-go="account">Sign in</button><button type="button" class="ghost" data-md-go="leaderboard">See the table</button></div>';return;}
+        const {data}=await client.rpc("tournament_my_matches");
+        const todo=(data||[]).filter(r=>!["approved","completed","bye"].includes(r.status)&&["scheduled","rejected"].includes(r.status)).sort((a,b)=>(a.deadline_at?new Date(a.deadline_at):Infinity)-(b.deadline_at?new Date(b.deadline_at):Infinity)).slice(0,3);
+        const rows=todo.map(r=>{const left=r.deadline_at?timeLeft(r.deadline_at):null;const when=!r.deadline_at?"No deadline":left?"Due in "+left:"Past deadline";return '<button type="button" class="md-fix'+(r.deadline_at&&!left?' late':'')+'" data-md-tour="'+esc(r.tournament_id)+'"><span><b>'+esc(r.my_name)+'</b> v <b>'+esc(r.opponent_name||"TBD")+'</b></span><small>'+esc(r.tournament_name)+' · '+esc(when)+'</small></button>';}).join("");
+        you.innerHTML='<p class="md-hi">Hi'+(who?' '+esc(who):'')+'.</p>'+(rows||'<p>No tournament fixtures waiting on you.</p>')+'<div class="md-act"><button type="button" class="primary" data-md-go="submit">Submit a result</button><button type="button" class="ghost" data-md-go="profile">My profile</button></div>';
+      }catch(e){you.innerHTML='<p class="md-dim">Fixtures are unavailable right now.</p>';}
+    })();
+    // live tournaments
+    (async()=>{
+      try{
+        const {data,error}=await client.from("tournament_tournaments").select("id,name,status,format,competition_type,rules_json,hidden_at").in("status",["in_progress","registration_open"]).order("created_at",{ascending:false}).limit(4);
+        if(error)throw error;
+        const rows=(data||[]).filter(t=>!t.hidden_at);
+        live.innerHTML=rows.length?rows.map(t=>{const trio=t.rules_json&&Number(t.rules_json.team_size)>1;return '<button type="button" class="md-t" data-md-tour="'+esc(t.id)+'"><span class="md-chip '+(t.status==="in_progress"?'on':'')+'">'+(t.status==="in_progress"?'Live':'Sign-ups open')+'</span><b>'+esc(t.name)+'</b><small>'+(trio?'3v3 teams · ':'')+esc(TN_FORMAT[t.format]||t.format)+'</small></button>';}).join(""):'<p class="md-dim">No tournament is running right now.</p>';
+      }catch(e){live.innerHTML='<p class="md-dim">Tournaments are unavailable right now.</p>';}
+    })();
+    // week
+    (async()=>{
+      try{
+        const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(bdToday()+"T12:00:00"),-6)),p_end:bdToday()});
+        const rows=(data||[]).filter(m=>m.a_name&&m.b_name);
+        const today=rows.filter(m=>String(m.match_date||"").slice(0,10)===bdToday()).length;
+        week.innerHTML='<div class="md-num"><b>'+rows.length+'</b><span>results in 7 days'+(today?' · '+today+' today':'')+'</span></div>'+rows.slice(0,3).map(m=>'<div class="md-res"><span>'+esc(m.a_name)+'</span><b>'+m.a_goals+' – '+m.b_goals+'</b><span>'+esc(m.b_name)+'</span></div>').join("")+(rows.length?'':'<p class="md-dim">No results yet this week.</p>');
+      }catch(e){week.innerHTML='<p class="md-dim">Results are unavailable right now.</p>';}
+    })();
+    box.onclick=e=>{
+      const g=e.target.closest("[data-md-go]"),t=e.target.closest("[data-md-tour]");
+      if(g){showView(g.dataset.mdGo);return;}
+      if(t){showView("tournaments");setTimeout(()=>openTournament(t.dataset.mdTour),80);}
+    };
+  }
+  setTimeout(loadHomeMatchday,0);
   async function loadHomeTicker(){
     const box=$("homeTicker");if(!box||!client)return;
     try{
@@ -2781,6 +2848,45 @@ $("playersBody").innerHTML = shown.map(p =>
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
+  }
+
+  // ---- Collectible player card ----
+  function pcRating(all){
+    const n=all.length,S=pfStats(all);
+    const cl=(v,a,b)=>Math.max(a,Math.min(b,Math.round(v)));
+    if(!n)return {n:0,S,ovr:0,tier:{k:"rookie",n:"Rookie"},a:[["ATT",0],["DEF",0],["WIN",0],["FRM",0],["EXP",0],["CLT",0]]};
+    const last=all.slice(0,10),fp=last.reduce((t,r)=>t+(pfRes(r)==="w"?3:pfRes(r)==="d"?1:0),0)/(last.length*3);
+    const one=all.filter(r=>Math.abs(r.gf-r.ga)===1),oneP=one.length>=3?one.reduce((t,r)=>t+(r.gf>r.ga?1:0),0)/one.length:0.5;
+    const ATT=cl(35+S.gf/n*22,30,99),DEF=cl(95-S.ga/n*22,30,99),WIN=cl(30+S.rate*0.69,30,99),FRM=cl(40+fp*59,30,99),EXP=cl(30+69*(1-Math.exp(-n/60)),30,99),CLT=cl(35+oneP*64,30,99);
+    const ovr=cl(ATT*.22+DEF*.18+WIN*.25+FRM*.15+EXP*.1+CLT*.1,1,99);
+    const tier=n<5?{k:"rookie",n:"Rookie"}:ovr>=80?{k:"icon",n:"Icon"}:ovr>=68?{k:"gold",n:"Gold"}:ovr>=55?{k:"silver",n:"Silver"}:{k:"bronze",n:"Bronze"};
+    return {n,S,ovr,tier,a:[["ATT",ATT],["DEF",DEF],["WIN",WIN],["FRM",FRM],["EXP",EXP],["CLT",CLT]]};
+  }
+  function playerCardHtml(me,lbRow,all,hmap,id){
+    const R=pcRating(all),S=R.S,h=hmap&&hmap[id];
+    const first=String(me.display_name).trim().split(/\s+/);
+    const foil=!!(lbRow&&lbRow.award_eligible);
+    const front='<div class="pc-face pc-front"><div class="pc-top"><div class="pc-ovr"><b>'+(R.n?R.ovr:"–")+'</b><span>OVR</span></div><div class="pc-tier"><em>'+R.tier.n+'</em><small>'+(lbRow?'Table #'+lbRow.rank:'BPC')+'</small></div></div>'
+      +avBig(me.display_name,me.id,"pc-av")
+      +'<h4 class="pc-name">'+esc(first.slice(0,2).join(" "))+'</h4>'
+      +'<ul class="pc-attrs">'+R.a.map(x=>'<li><b>'+(R.n?x[1]:"–")+'</b><span>'+x[0]+'</span></li>').join("")+'</ul>'
+      +'<div class="pc-foot">'+(h?'<i style="background:'+esc(h.color)+'"></i>'+esc(h.name):'Brahmanbaria Pes Club')+(foil?'<em>Award eligible</em>':'')+'</div></div>';
+    const back='<div class="pc-face pc-back"><h4 class="pc-name">'+esc(me.display_name)+'</h4><dl class="pc-rec">'
+      +[["Matches",S.n],["Won",S.w],["Drawn",S.d],["Lost",S.l],["Goals for",S.gf],["Goals against",S.ga],["Clean sheets",S.cs],["Points",S.pts]].map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join("")+'</dl><small>'+(R.n<5?'Rated after 5 matches.':'Rated on all counted matches.')+'</small></div>';
+    return '<section class="pf-card pf-wide"><h3>Player card <small>rated from counted matches</small></h3><div class="pc-wrap"><div class="pc tier-'+R.tier.k+(foil?' foil':'')+'" data-pc><div class="pc-flipper" aria-live="polite">'+front+back+'</div>'
+      +'<button type="button" class="pc-flip" data-pc-flip aria-pressed="false">Flip card</button></div>'
+      +'<div class="pc-how"><h4>How the card is rated</h4><ul><li><b>ATT</b> goals scored per match</li><li><b>DEF</b> goals conceded per match, fewer is better</li><li><b>WIN</b> win rate</li><li><b>FRM</b> points from the last 10 matches</li><li><b>EXP</b> matches played</li><li><b>CLT</b> results in one-goal matches</li></ul>'
+      +'<p>Bronze below 55, silver from 55, gold from 68, icon from 80. Rookies get a tier after 5 matches. Ratings move as matches are played.</p></div></div></section>';
+  }
+  function bindPlayerCard(root){
+    root.querySelectorAll("[data-pc]").forEach(c=>{
+      const btn=c.querySelector("[data-pc-flip]");
+      btn.addEventListener("click",()=>{const on=c.classList.toggle("flipped");btn.setAttribute("aria-pressed",on?"true":"false");btn.textContent=on?"Flip back":"Flip card";});
+      if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion:reduce)").matches)return;
+      const fl=c.querySelector(".pc-flipper");
+      c.addEventListener("pointermove",e=>{if(e.pointerType==="touch")return;const r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.setProperty("--rx",(-y*8).toFixed(2)+"deg");c.style.setProperty("--ry",(x*10).toFixed(2)+"deg");c.style.setProperty("--mx",((x+.5)*100).toFixed(0)+"%");});
+      c.addEventListener("pointerleave",()=>{c.style.setProperty("--rx","0deg");c.style.setProperty("--ry","0deg");});
+    });
   }
   function tierCardHtml(me,lbRow,st){
     const t=tierOf(lbRow&&lbRow.rank,lbRow&&lbRow.award_eligible);
