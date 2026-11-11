@@ -3152,14 +3152,151 @@ $("playersBody").innerHTML = shown.map(p =>
     const admin=f.admin&&!o.ended&&tied?'<div class="tn-actions"><span class="small">Level on games and goals. Pick the winner:</span><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.a.participant_id)+'">'+esc(o.a)+'</button><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.b.participant_id)+'">'+esc(o.b)+'</button></div>':'';
     const decidedNote=f.decided&&o.done?'<p class="small">Winner chosen by an admin after a level result.</p>':'';
     const none=f.boards.length?'':'<div class="tn-empty">Boards appear once both teams have a full squad.</div>';
-    return '<div class="tx-centre" data-centre="'+esc(m.id)+'" hidden>'+head+swap+none+(boards?'<ol class="tx-bds">'+boards+'</ol>':'')+decidedNote+admin+'</div>';
+    let cards='';
+    if(f.final){
+      const ws=f.winner_side,wname=ws==="a"?o.a:o.b;
+      const elig=f.boards.filter(b=>b.status==="approved"&&!b.wo_side).map(b=>({id:b[ws].id,name:b[ws].name,line:'Board '+b.board_no+': '+(ws==="a"?b.score_a+'–'+b.score_b:b.score_b+'–'+b.score_a)+' v '+(ws==="a"?b.b.name:b.a.name)}));
+      const until=f.motm_deadline?when(f.motm_deadline):'';
+      let mo;
+      if(f.motm)mo='<div class="tx-motm-set"><span class="tx-motm-star" aria-hidden="true">&#9733;</span><div><small>Man of the Match</small><b>'+esc(f.motm.name)+'</b><small>'+esc(wname)+(f.motm.by_admin?' · chosen by an admin':' · chosen by the captain')+'</small></div></div>';
+      else if(!elig.length)mo='<p class="small">No MOTM for this fixture: no '+esc(wname)+' player played a board.</p>';
+      else mo='<p class="small">'+(f.can_pick_motm&&!f.admin?'You won. Choose your Man of the Match from your players before '+esc(until)+'. The choice is final.':f.can_pick_motm?'Admins can choose or change the MOTM at any time.':'Waiting for the '+esc(wname)+' captain to choose the MOTM'+(until?' (until '+esc(until)+', then an admin chooses)':'')+'.')+'</p>';
+      if(f.can_pick_motm&&elig.length)mo+='<div class="tx-motm-pick" data-motm-form="'+esc(m.id)+'">'+elig.map((x,i)=>'<label class="tx-motm-opt"><input type="radio" name="motm-'+esc(m.id)+'" value="'+esc(x.id)+'"'+(f.motm&&f.motm.member_id===x.id?' checked':'')+'><span><b>'+esc(x.name)+'</b><small>'+esc(x.line)+'</small></span></label>').join("")+'<button type="button" class="primary" data-motm-go="'+esc(m.id)+'">'+(f.motm?'Change MOTM':'Confirm MOTM')+'</button></div>';
+      cards='<section class="tx-cards"><h4>Match cards</h4>'+mo+'<div class="tn-actions"><button type="button" class="secondary" data-card-result="'+esc(m.id)+'">Result card</button>'+(f.motm?'<button type="button" class="secondary" data-card-motm="'+esc(m.id)+'">MOTM card</button>':'')+'</div></section>';
+    }
+    return '<div class="tx-centre" data-centre="'+esc(m.id)+'" hidden>'+head+swap+none+(boards?'<ol class="tx-bds">'+boards+'</ol>':'')+decidedNote+cards+admin+'</div>';
   }
 
-  let tnTab=null,tnRoundSel=null,tnSheet=null;
+
+  // ---- Trio match cards (result + MOTM), drawn in the browser ----
+  function cardFit(c,txt,max,size,weight,fam){let fs=size;c.font=weight+" "+fs+"px "+fam;while(c.measureText(txt).width>max&&fs>22){fs-=2;c.font=weight+" "+fs+"px "+fam;}return fs;}
+  function cardBase(c,W,H){
+    c.fillStyle="#071026";c.fillRect(0,0,W,H);
+    let g=c.createRadialGradient(W*.5,-120,40,W*.5,-120,900);g.addColorStop(0,"rgba(246,183,60,.45)");g.addColorStop(1,"rgba(246,183,60,0)");c.fillStyle=g;c.fillRect(0,0,W,H);
+    g=c.createLinearGradient(0,H*.55,0,H);g.addColorStop(0,"rgba(36,89,232,0)");g.addColorStop(1,"rgba(36,89,232,.28)");c.fillStyle=g;c.fillRect(0,H*.5,W,H*.5);
+    c.strokeStyle="rgba(255,255,255,.06)";c.lineWidth=2;for(let x=-H;x<W;x+=46){c.beginPath();c.moveTo(x,0);c.lineTo(x+H,H);c.stroke();}
+    c.fillStyle="#f6b73c";c.fillRect(0,0,W,12);
+  }
+  function cardFooter(c,W,H,when){
+    const disp="'Bricolage Grotesque',Inter,system-ui,sans-serif",body="Inter,system-ui,sans-serif";
+    c.textAlign="center";c.fillStyle="#f6b73c";c.font="800 34px "+disp;c.fillText("Brahmanbaria Pes Club",W/2,H-86);
+    c.fillStyle="#8a9bc0";c.font="500 24px "+body;c.fillText((when?when+"  ·  ":"")+location.host+location.pathname.replace(/index\.html$/,""),W/2,H-46);
+  }
+  function cardMono(c,x,y,r,name){
+    c.save();c.shadowColor="rgba(0,0,0,.5)";c.shadowBlur=30;c.shadowOffsetY=12;c.beginPath();c.arc(x,y,r,0,7);c.fillStyle=tcol(name);c.fill();c.restore();
+    c.lineWidth=6;c.strokeStyle="rgba(255,255,255,.85)";c.beginPath();c.arc(x,y,r,0,7);c.stroke();
+    c.fillStyle="#fff";c.font="800 "+Math.round(r*.78)+"px 'Bricolage Grotesque',Inter,sans-serif";c.textAlign="center";c.textBaseline="middle";c.fillText(initials(name),x,y+4);c.textBaseline="alphabetic";
+  }
+  function drawTrioResult(D){
+    const W=1080,H=1350,cv=document.createElement("canvas");cv.width=W;cv.height=H;const c=cv.getContext("2d");
+    const disp="'Bricolage Grotesque',Inter,system-ui,sans-serif",body="Inter,system-ui,sans-serif";
+    cardBase(c,W,H);
+    c.textAlign="center";c.fillStyle="#f6b73c";c.font="800 38px "+disp;c.fillText(D.title,W/2,92);
+    c.fillStyle="#c9d4ec";c.font="600 28px "+body;c.fillText("Round "+D.round+"  ·  Full time",W/2,136);
+    // teams
+    const tx=[230,850];
+    [[D.a,true,D.aw],[D.b,false,D.bw]].forEach(([nm,home,won],i)=>{
+      cardMono(c,tx[i],300,108,nm);
+      c.fillStyle=won?"#fff":"#c3cde4";cardFit(c,nm,380,46,"800",disp);c.textAlign="center";c.fillText(nm,tx[i],470);
+      if(home){c.fillStyle="#f6b73c";rrect(c,tx[i]-56,492,112,40,20);c.fill();c.fillStyle="#1a1200";c.font="800 22px "+disp;c.textBaseline="middle";c.fillText("HOME",tx[i],513);c.textBaseline="alphabetic";}
+    });
+    c.fillStyle="#fff";c.font="800 170px "+disp;c.textAlign="center";c.fillText(D.ga+"–"+D.gb,W/2,360);
+    c.fillStyle="#9fb0d4";c.font="600 26px "+body;c.fillText("games",W/2,402);
+    // boards
+    const top=600,rowH=150;
+    c.fillStyle="rgba(255,255,255,.06)";rrect(c,60,top-30,W-120,rowH*D.boards.length+60,34);c.fill();
+    D.boards.forEach((b,i)=>{
+      const y=top+i*rowH+rowH/2;
+      if(i)c.fillStyle="rgba(255,255,255,.1)",c.fillRect(110,top+i*rowH,W-220,2);
+      c.fillStyle="#f6b73c";c.font="800 24px "+disp;c.textAlign="left";c.fillText("BOARD "+b.no,100,y-42);
+      const aw=b.sa>b.sb,bw=b.sb>b.sa;
+      c.textAlign="right";c.fillStyle=aw?"#fff":"#aebbd8";cardFit(c,b.an,330,40,aw?"800":"600",disp);c.fillText(b.an,430,y+14);
+      c.textAlign="left";c.fillStyle=bw?"#fff":"#aebbd8";cardFit(c,b.bn,330,40,bw?"800":"600",disp);c.fillText(b.bn,650,y+14);
+      c.fillStyle=b.wo?"#5b2330":"#0f1f45";rrect(c,456,y-40,168,80,18);c.fill();
+      c.textAlign="center";c.textBaseline="middle";c.fillStyle="#fff";
+      if(b.wo){c.font="800 34px "+disp;c.fillText(b.wo==="both"?"W.O.":(b.sa+"–"+b.sb),W/2,y-4);c.font="700 18px "+body;c.fillStyle="#ffb3b3";c.fillText("WALKOVER",W/2,y+28);}
+      else{c.font="800 50px "+disp;c.fillText(b.sa+"–"+b.sb,W/2,y+2);}
+      c.textBaseline="alphabetic";
+    });
+    if(D.swap){c.textAlign="center";c.fillStyle="#c9d4ec";c.font="600 26px "+body;c.fillText(D.a+" used the home swap (1st ⇄ 2nd pick)",W/2,top+rowH*D.boards.length+76);}
+    if(D.motm){c.textAlign="center";c.fillStyle="#f6b73c";c.font="800 30px "+disp;c.fillText("★ Man of the Match: "+D.motm,W/2,H-170);}
+    cardFooter(c,W,H,D.when);
+    return cv;
+  }
+  function drawTrioMotm(D,img){
+    const W=1080,H=1350,cv=document.createElement("canvas");cv.width=W;cv.height=H;const c=cv.getContext("2d");
+    const disp="'Bricolage Grotesque',Inter,system-ui,sans-serif",body="Inter,system-ui,sans-serif";
+    cardBase(c,W,H);
+    c.textAlign="center";c.fillStyle="#f6b73c";c.font="800 38px "+disp;c.fillText(D.title+"  ·  Round "+D.round,W/2,92);
+    c.fillStyle="#fff";c.font="800 92px "+disp;c.fillText("Man of the Match",W/2,206);
+    // portrait
+    const as=440,ax=W/2-as/2,ay=270;
+    c.save();c.shadowColor="rgba(246,183,60,.55)";c.shadowBlur=70;rrect(c,ax,ay,as,as,110);c.fillStyle="#10244a";c.fill();c.restore();
+    c.save();rrect(c,ax,ay,as,as,110);c.clip();
+    if(img){const r=Math.max(as/img.width,as/img.height),w=img.width*r,h=img.height*r;c.drawImage(img,ax+(as-w)/2,ay+(as-h)/2,w,h);}
+    else{const g=c.createLinearGradient(ax,ay,ax+as,ay+as);g.addColorStop(0,"#2a4fb8");g.addColorStop(1,"#0b1d5c");c.fillStyle=g;c.fillRect(ax,ay,as,as);c.fillStyle="#fff";c.font="800 190px "+disp;c.textBaseline="middle";c.fillText(initials(D.name),W/2,ay+as/2+10);c.textBaseline="alphabetic";}
+    c.restore();
+    c.lineWidth=10;c.strokeStyle="#f6b73c";rrect(c,ax,ay,as,as,110);c.stroke();
+    c.fillStyle="#f6b73c";c.beginPath();c.arc(ax+as-20,ay+30,52,0,7);c.fill();c.fillStyle="#1a1200";c.font="800 56px "+disp;c.textBaseline="middle";c.fillText("★",ax+as-20,ay+34);c.textBaseline="alphabetic";
+    c.fillStyle="#fff";cardFit(c,D.name,W-140,90,"800",disp);c.fillText(D.name,W/2,840);
+    c.fillStyle="#c9d4ec";c.font="600 34px "+body;c.fillText(D.team,W/2,892);
+    c.fillStyle="rgba(255,255,255,.07)";rrect(c,110,940,W-220,200,30);c.fill();
+    c.fillStyle="#f6b73c";c.font="800 24px "+disp;c.fillText("BOARD "+D.board,W/2,990);
+    c.fillStyle="#fff";cardFit(c,D.line,W-280,52,"800",disp);c.fillText(D.line,W/2,1054);
+    c.fillStyle="#9fb0d4";cardFit(c,D.fixture,W-280,28,"600",body);c.fillText(D.fixture,W/2,1104);
+    cardFooter(c,W,H,D.when);
+    return cv;
+  }
+  async function presentCard(cv,fname,alt,retry){
+    let blob=await new Promise(r=>{try{cv.toBlob(r,"image/png");}catch(e){r(null);}});
+    if(!blob&&retry){cv=retry();blob=await new Promise(r=>cv.toBlob(r,"image/png"));}
+    if(!blob){toast("Could not make the card.");return;}
+    const file=new File([blob],fname,{type:"image/png"});
+    const url=URL.createObjectURL(blob),can=!!(navigator.canShare&&navigator.canShare({files:[file]}));
+    const old=document.getElementById("shareModal");if(old)old.remove();
+    const m=document.createElement("div");m.id="shareModal";m.className="sh-modal";m.setAttribute("role","dialog");m.setAttribute("aria-label",alt);
+    m.innerHTML='<div class="sh-box"><img src="'+url+'" alt="'+esc(alt)+'"><div class="sh-act"><a class="primary" href="'+url+'" download="'+esc(fname)+'" id="shDl">Download image</a>'+(can?'<button type="button" class="secondary" id="shShare">Share</button>':'')+'<button type="button" class="ghost" id="shClose">Close</button></div></div>';
+    document.body.appendChild(m);
+    const close=()=>{m.remove();URL.revokeObjectURL(url);document.removeEventListener("keydown",k);};
+    const k=e=>{if(e.key==="Escape")close();};
+    document.addEventListener("keydown",k);
+    m.addEventListener("click",e=>{if(e.target===m)close();});
+    m.querySelector("#shClose").addEventListener("click",close);
+    m.querySelector("#shDl").addEventListener("click",()=>toast("Card saved."));
+    const sb=m.querySelector("#shShare");if(sb)sb.addEventListener("click",async()=>{try{await navigator.share({files:[file],title:alt});}catch(e){}});
+    m.querySelector("#shDl").focus();
+  }
+  async function trioCard(kind,mid,btn){
+    const ctx=tnCardCtx;if(!ctx)return;
+    const m=ctx.matches.find(x=>x.id===mid),f=ctx.fx[mid];if(!m||!f||!f.final)return;
+    if(btn)btn.disabled=true;
+    try{
+      try{if(document.fonts&&document.fonts.load){await document.fonts.load("800 40px 'Bricolage Grotesque'");await document.fonts.load("600 20px Inter");}}catch(e){}
+      const a=ctx.nameOf(m.participant_a_id),b=ctx.nameOf(m.participant_b_id);
+      const whenTxt=f.approved_at?new Date(f.approved_at).toLocaleDateString([], {day:"numeric",month:"short",year:"numeric"}):"";
+      const slug=s=>String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+      if(kind==="result"){
+        const D={title:ctx.t.name,round:m.round_number,a,b,ga:m.score_a??f.summary.a_games,gb:m.score_b??f.summary.b_games,aw:f.winner_side==="a",bw:f.winner_side==="b",swap:!!f.swap,motm:f.motm?f.motm.name:null,when:whenTxt,
+          boards:f.boards.map(x=>({no:x.board_no,an:x.a.name,bn:x.b.name,sa:x.score_a,sb:x.score_b,wo:x.wo_side}))};
+        await presentCard(drawTrioResult(D),"bpc-trio-r"+m.round_number+"-"+slug(a)+"-v-"+slug(b)+".png","Result card: "+a+" v "+b);
+      }else{
+        if(!f.motm)return;
+        const ws=f.winner_side,bd=f.boards.find(x=>x[ws].id===f.motm.member_id);
+        const opp=bd?(ws==="a"?bd.b.name:bd.a.name):"",my=bd?(ws==="a"?bd.score_a:bd.score_b):"",th=bd?(ws==="a"?bd.score_b:bd.score_a):"";
+        const D={title:ctx.t.name,round:m.round_number,name:f.motm.name,team:ws==="a"?a:b,board:bd?bd.board_no:"",line:bd?my+"–"+th+" v "+opp:"",fixture:a+" "+m.score_a+"–"+m.score_b+" "+b,when:whenTxt};
+        await ensureAvatars();
+        const u=f.motm.user_id?avUrl({uid:f.motm.user_id}):avUrl({name:f.motm.name});
+        const img=u?await loadImg(u+(u.includes("?")?"&":"?")+"cors=1"):null;
+        await presentCard(drawTrioMotm(D,img),"bpc-trio-motm-r"+m.round_number+"-"+slug(f.motm.name)+".png","MOTM card: "+f.motm.name,img?()=>drawTrioMotm(D,null):null);
+      }
+    }finally{if(btn)btn.disabled=false;}
+  }
+  let tnTab=null,tnRoundSel=null,tnSheet=null,tnCardCtx=null;
   function trioPage(c){
     const {t,id,matches,stages,fx,nameOf,myPartIds,ended,rosters,tGames,isTrio,facts,regBtn,adminBar,banner,checklist,queue,confirmHtml,peopleHtml,participants,state:st,dueCh,openStage}=c;
     const sz=Number(t.rules_json?.team_size)||tGames;
     const live=matches.filter(m=>m.participant_b_id);
+    tnCardCtx={t,fx,nameOf,matches:live};
     const cardOpts=m=>{const done=["approved","completed"].includes(m.status),open=["scheduled","rejected"].includes(m.status);
       const foot='<span class="tn-meta">Match '+m.match_number+'</span>'+(open&&ended?'<span class="tn-due none">Not played</span>':open?dueCh(m.deadline_at,false):'')+(m.status==="rejected"?'<span class="tn-due late">Last score rejected</span>':'')+(TN_MATCH[m.status]?'<span class="tn-due none">'+esc(TN_MATCH[m.status])+'</span>':'');
       return {a:nameOf(m.participant_a_id),b:nameOf(m.participant_b_id),done,foot,mineA:myPartIds.has(m.participant_a_id),mineB:myPartIds.has(m.participant_b_id),ended};};
@@ -3373,6 +3510,18 @@ $("playersBody").innerHTML = shown.map(p =>
       if(error){fail(error.message);return;}
       again(b.dataset.d==="approve"?"Game approved.":"Score rejected. Players can submit again.");
     }));
+    detail.querySelectorAll("[data-motm-go]").forEach(b=>b.addEventListener("click",async()=>{
+      const mid=b.dataset.motmGo,pick=detail.querySelector('input[name="motm-'+mid+'"]:checked');
+      if(!pick){fail("Choose a player first.");return;}
+      const nm=pick.closest("label").querySelector("b").textContent;
+      if(!confirm("Make "+nm+" the Man of the Match?"+(b.textContent.startsWith("Change")?"":" This is final.")))return;
+      b.disabled=true;
+      const {error}=await client.rpc("tournament_trio_set_motm",{p_match_id:mid,p_member_id:pick.value});
+      if(error){b.disabled=false;fail(error.message);return;}
+      tnSheet=mid;again("MOTM saved.");
+    }));
+    detail.querySelectorAll("[data-card-result]").forEach(b=>b.addEventListener("click",()=>trioCard("result",b.dataset.cardResult,b)));
+    detail.querySelectorAll("[data-card-motm]").forEach(b=>b.addEventListener("click",()=>trioCard("motm",b.dataset.cardMotm,b)));
     detail.querySelectorAll("[data-trio-decide]").forEach(b=>b.addEventListener("click",async()=>{
       if(!confirm("Give this fixture to "+b.textContent+"?"))return;
       const {error}=await client.rpc("tournament_trio_admin_decide",{p_match_id:b.dataset.trioDecide,p_winner:b.dataset.w,p_reason:"Level on games and goals"});

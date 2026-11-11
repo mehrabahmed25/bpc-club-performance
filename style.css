@@ -1987,3 +1987,20 @@ body.tx-lock{overflow:hidden}
 .tn-repl-form{flex-wrap:wrap}
 .tn-repl-form b{flex-basis:100%}
 .tn-repl-form[hidden]{display:none!important}
+
+/* Trio match cards + MOTM */
+.tx-cards{margin-top:16px;padding:14px;border-radius:12px;background:#0d1a36;color:#fff}
+.tx-cards h4{margin:0 0 8px;font:800 16px var(--display)}
+.tx-cards .small{color:#c3cde4}
+.tx-cards .tn-actions{margin-top:10px}
+.tx-cards .secondary{background:#fff;color:var(--ink)}
+.tx-motm-set{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:#ffffff12;border:1px solid #f6b73c88}
+.tx-motm-set b{display:block;font:800 18px var(--display)}
+.tx-motm-set small{display:block;color:#c3cde4;font-size:12px}
+.tx-motm-star{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--flood);color:#1a1200;font-size:20px;flex:none}
+.tx-motm-pick{display:grid;gap:8px;margin-top:8px}
+.tx-motm-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#ffffff0d;border:1px solid #ffffff26;cursor:pointer}
+.tx-motm-opt:has(input:checked){border-color:var(--flood);background:#f6b73c22}
+.tx-motm-opt input{accent-color:#f6b73c;width:18px;height:18px}
+.tx-motm-opt b{display:block}.tx-motm-opt small{display:block;color:#c3cde4;font-size:12px}
+.tx-motm-pick .primary{justify-self:start}
