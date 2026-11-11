@@ -3103,57 +3103,56 @@ $("playersBody").innerHTML = shown.map(p =>
   const TN_BOARD_ST={scheduled:"Not played",awaiting_opponent:"Waiting for opponent",pending:"Waiting for admin",approved:"Final",disputed:"Under review"};
   const tcol=n=>{let h=0;for(const c of String(n||"?"))h=(h*31+c.charCodeAt(0))%360;return "hsl("+h+" 58% 40%)";};
   const mono=(n,big)=>'<span class="tx-mono'+(big?' big':'')+'" style="--c:'+tcol(n)+'" aria-hidden="true">'+esc(initials(n))+'</span>';
-  function trioNeedsMe(f){return f.admin?f.boards.some(b=>["pending","disputed"].includes(b.status)):(f.a.can_lineup&&f.a.is_captain)||(f.b.can_lineup&&f.b.is_captain)||f.boards.some(b=>b.can_submit||b.can_confirm);}
-  function trioState(m,f,o){const sm=f.summary;return o.done?"Full time":sm.approved?"In play":(f.a.locked&&f.b.locked)?"Lineups locked":(f.a.locked||f.b.locked)?"One lineup in":"Awaiting lineups";}
+  function trioNeedsMe(f){return f.admin?f.boards.some(b=>["pending","disputed"].includes(b.status)||(b.reports||[]).length):f.boards.some(b=>b.can_submit||b.can_confirm);}
+  function trioState(m,f,o){const sm=f.summary;return o.done?"Full time":sm.approved?"In play":f.boards.length?"Ready to play":"Waiting for squads";}
+  const PICK=["1st pick","2nd pick","3rd pick","4th pick","5th pick"];
+  const homeTag='<em class="tx-home" title="Home team">Home</em>';
   function trioBar(f,games){return '<span class="tx-bar" aria-hidden="true">'+Array.from({length:games},(_,i)=>{const bd=f.boards[i];let c="";if(bd){if(bd.status==="approved")c=bd.score_a>bd.score_b?"a":bd.score_b>bd.score_a?"b":"d";else if(["awaiting_opponent","pending","disputed"].includes(bd.status))c="live";}return '<i class="'+c+'"></i>';}).join("")+'</span>';}
   function trioRow(m,f,o){
     const sm=f.summary,shown=o.done?[m.score_a,m.score_b]:sm.approved?[sm.a_games,sm.b_games]:null;
     const need=trioNeedsMe(f)&&!o.ended;
     return '<div class="tx-fix'+(o.mineA||o.mineB?' mine':'')+(o.done?' done':'')+'"><button type="button" class="tx-row" data-centre-open="'+esc(m.id)+'" aria-label="Open match centre: '+esc(o.a)+' versus '+esc(o.b)+'">'
-      +'<span class="tx-side a'+(o.done&&m.score_a>m.score_b?' win':'')+'">'+mono(o.a)+'<b>'+esc(o.a)+'</b></span>'
+      +'<span class="tx-side a'+(o.done&&m.score_a>m.score_b?' win':'')+'">'+mono(o.a)+'<b>'+esc(o.a)+'</b>'+homeTag+'</span>'
       +'<span class="tx-mid">'+(shown?'<b class="tx-sc">'+shown[0]+'<em>–</em>'+shown[1]+'</b>':'<b class="tx-sc dim">v</b>')+trioBar(f,f.games)+'<small>'+esc(trioState(m,f,o))+'</small></span>'
       +'<span class="tx-side b'+(o.done&&m.score_b>m.score_a?' win':'')+'"><b>'+esc(o.b)+'</b>'+mono(o.b)+'</span>'
       +(need?'<span class="tx-need">Your move</span>':'')+'</button><div class="tx-meta">'+(o.foot||"")+'</div></div>';
   }
   function trioCentre(m,f,o){
-    const games=f.games,sm=f.summary;
+    const games=f.games,sm=f.summary,open=!o.ended&&["scheduled","rejected"].includes(m.status);
     const tied=f.admin&&!o.ended&&sm.approved===games&&sm.a_games===sm.b_games&&sm.a_goals===sm.b_goals;
     const shown=o.done?[m.score_a,m.score_b]:sm.approved?[sm.a_games,sm.b_games]:null;
     const sumLine=sm.approved?'Games '+sm.a_games+'–'+sm.b_games+' · goals '+sm.a_goals+'–'+sm.b_goals:'No games played yet';
-    const head='<div class="tx-ch-head"><div class="tx-ch-team">'+mono(o.a,true)+'<b>'+esc(o.a)+'</b>'+(o.mineA?'<em class="tn-you">Your team</em>':'')+'</div><div class="tx-ch-score"><b>'+(shown?shown[0]+'<em>–</em>'+shown[1]:'<span>v</span>')+'</b><small>'+esc(trioState(m,f,o))+'</small></div><div class="tx-ch-team">'+mono(o.b,true)+'<b>'+esc(o.b)+'</b>'+(o.mineB?'<em class="tn-you">Your team</em>':'')+'</div></div>'
+    const head='<div class="tx-ch-head"><div class="tx-ch-team">'+mono(o.a,true)+'<b>'+esc(o.a)+'</b>'+homeTag+(o.mineA?'<em class="tn-you">Your team</em>':'')+'</div><div class="tx-ch-score"><b>'+(shown?shown[0]+'<em>–</em>'+shown[1]:'<span>v</span>')+'</b><small>'+esc(trioState(m,f,o))+'</small></div><div class="tx-ch-team">'+mono(o.b,true)+'<b>'+esc(o.b)+'</b>'+(o.mineB?'<em class="tn-you">Your team</em>':'')+'</div></div>'
       +'<p class="tx-ch-sub">Round '+m.round_number+' · Match '+m.match_number+' · '+esc(sumLine)+'</p><div class="tx-meta c">'+(o.foot||"")+'</div>';
-    const sideBlock=(s,name)=>{
-      const lbl='<b>'+esc(name)+'</b>';
-      if(s.can_lineup)return '<form class="tn-lineup" data-trio-lineup="'+esc(m.id)+'" data-part="'+esc(s.participant_id)+'">'+lbl+'<small>Choose who plays each board. Your opponent cannot see it until both captains lock.</small>'
-        +Array.from({length:games},(_,k)=>'<label>Board '+(k+1)+'<select data-slot required><option value="">Choose a player</option>'+s.roster.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join("")+'</select></label>').join("")
-        +'<button type="submit" class="primary">Lock lineup</button></form>';
-      if(s.locked)return '<div class="tn-lineup done">'+lbl+'<small>'+(s.slots?s.slots.map((x,i)=>(i+1)+'. '+esc(x.name)).join(' &nbsp; '):'Lineup locked. Hidden until both captains are ready.')+'</small></div>';
-      return '<div class="tn-lineup wait">'+lbl+'<small>'+(s.is_captain?'Set your lineup above.':'Waiting for the captain to set the lineup.')+'</small></div>';
-    };
-    const lineups=f.boards.length?'':'<div class="tn-lineups">'+sideBlock(f.a,o.a)+sideBlock(f.b,o.b)+'</div>';
-    const scoreForm=(b,kind)=>'<form class="tn-gform" data-trio-score="'+esc(b.id)+'" data-kind="'+kind+'" data-na="'+esc(b.a.name)+'" data-nb="'+esc(b.b.name)+'"><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.a.name)+' goals" value="'+(kind==="admin"&&b.score_a!=null?b.score_a:'')+'"><span>–</span><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.b.name)+' goals" value="'+(kind==="admin"&&b.score_b!=null?b.score_b:'')+'"><button type="submit" class="'+(kind==="admin"?'secondary':'primary')+'">'+(kind==="admin"?'Save as admin':'Submit')+'</button></form>';
+    const when=d=>new Date(d).toLocaleString([], {day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+    // home swap
+    let swap='';
+    if(f.boards.length){
+      const msg=f.swap?'<b>Home swap used</b><small>'+esc(o.a)+' switched their 1st and 2nd pick'+(f.swap.by_admin?' (recorded by an admin)':'')+' on '+esc(when(f.swap.at))+'. This is final.</small>'
+        :f.can_swap?'<b>Home swap available</b><small>'+esc(o.a)+' may switch their 1st and 2nd pick once, before the deadline and before boards 1 or 2 are played. The 3rd pick stays. '+esc(o.b)+' cannot counter-swap.</small>'
+        :'<b>Home swap not used</b><small>'+(open?'Only the '+esc(o.a)+' captain can swap, before the deadline and before boards 1 or 2 are played.':'The original lineup was played.')+'</small>';
+      swap='<div class="tx-swap'+(f.swap?' used':'')+'">'+msg+(f.can_swap?'<button type="button" class="'+(f.a.is_captain?'primary':'secondary')+'" data-trio-hswap="'+esc(m.id)+'">'+(f.a.is_captain?'Swap 1st and 2nd pick':'Record home swap')+'</button>':'')+'</div>';
+    }
+    const scoreForm=(b,kind)=>'<form class="tn-gform" data-trio-score="'+esc(b.id)+'" data-kind="'+kind+'" data-na="'+esc(b.a.name)+'" data-nb="'+esc(b.b.name)+'"><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.a.name)+' goals" value="'+(kind==="admin"&&b.score_a!=null&&!b.wo_side?b.score_a:'')+'"><span>–</span><input type="number" inputmode="numeric" min="0" max="99" required placeholder="0" aria-label="'+esc(b.b.name)+' goals" value="'+(kind==="admin"&&b.score_b!=null&&!b.wo_side?b.score_b:'')+'"><button type="submit" class="'+(kind==="admin"?'secondary':'primary')+'">'+(kind==="admin"?'Save as admin':'Submit')+'</button></form>';
+    const sideName=x=>x==="a"?o.a:o.b;
     const boards=f.boards.map(b=>{
       const has=b.score_a!=null;let act='';
+      const reps=b.reports||[];
+      if(reps.length)act+='<ul class="tx-wo-reps">'+reps.map(r=>'<li><span><b>'+esc(sideName(r.side))+'</b> reported '+esc(r.side==="a"?b.a.name:b.b.name)+' unavailable'+(r.reason?': '+esc(r.reason):'')+'.</span>'+(f.admin&&!o.ended?'<span class="tn-actions"><button type="button" class="primary" data-trio-wo-ok="'+esc(r.id)+'">Confirm walkover</button><button type="button" class="secondary" data-trio-wo-no="'+esc(r.id)+'">Reject</button></span>':'<span class="tn-chip warn">Waiting for admin</span>')+'</li>').join("")+'</ul>';
       if(b.can_submit)act+=scoreForm(b,"player");
       if(b.can_confirm)act+='<div class="tn-actions"><button type="button" class="primary" data-trio-confirm="'+esc(b.id)+'" data-v="1">Confirm score</button><button type="button" class="secondary" data-trio-confirm="'+esc(b.id)+'" data-v="0">Dispute</button></div>';
+      if(b.can_report)act+='<button type="button" class="tx-linkbtn" data-trio-report="'+esc(b.id)+'" data-who="'+esc(f.my_side==="a"?b.a.name:b.b.name)+'">Report '+esc(f.my_side==="a"?b.a.name:b.b.name)+' unavailable</button>';
       if(f.admin&&!o.ended&&["pending","disputed","awaiting_opponent"].includes(b.status))act+='<div class="tn-actions"><button type="button" class="primary" data-trio-review="'+esc(b.id)+'" data-d="approve">Approve</button><button type="button" class="secondary" data-trio-review="'+esc(b.id)+'" data-d="reject">Reject</button></div>';
       if(f.admin&&!o.ended&&!b.can_submit)act+=scoreForm(b,"admin");
+      if(f.admin&&!o.ended)act+='<div class="tx-wo-admin"><label>Walkover<select data-trio-wo-side="'+esc(b.id)+'"><option value="">Choose…</option><option value="a">'+esc(b.a.name)+' unavailable</option><option value="b">'+esc(b.b.name)+' unavailable</option><option value="both">Both unavailable</option>'+(b.wo_side?'<option value="clear">Clear walkover</option>':'')+'</select></label></div>';
       const win=b.status==="approved"?(b.score_a>b.score_b?"a":b.score_b>b.score_a?"b":"d"):"";
-      return '<li class="tx-bd st-'+esc(b.status)+' w-'+win+'"><span class="tx-bd-no">Board '+b.board_no+'</span><div class="tx-bd-row"><span class="tx-bd-p">'+esc(b.a.name)+'</span><b class="tx-bd-s">'+(has?b.score_a+'<em>–</em>'+b.score_b:'v')+'</b><span class="tx-bd-p r">'+esc(b.b.name)+'</span></div><span class="tx-bd-st">'+esc(TN_BOARD_ST[b.status]||b.status)+'</span>'+act+'</li>';
+      const stTxt=b.wo_side==="both"?"Double walkover":b.wo_side?"Walkover to "+(b.wo_side==="a"?o.b:o.a):(TN_BOARD_ST[b.status]||b.status);
+      return '<li class="tx-bd st-'+esc(b.status)+' w-'+win+(b.wo_side?' wo':'')+'"><span class="tx-bd-no">Board '+b.board_no+'</span><div class="tx-bd-row"><span class="tx-bd-p">'+esc(b.a.name)+'</span><b class="tx-bd-s">'+(has?b.score_a+'<em>–</em>'+b.score_b:'v')+'</b><span class="tx-bd-p r">'+esc(b.b.name)+'</span></div><span class="tx-bd-st">'+esc(stTxt)+'</span>'+act+'</li>';
     }).join("");
-    const swapBlock=(s,name)=>{
-      if(!f.boards.length||!(s.is_captain||f.admin))return '';
-      const open=f.boards.filter(b=>b.status==="scheduled"),side=s===f.a?"a":"b";
-      const used=s.swap?'Swap used (boards '+s.swap.boards.join(' and ')+').':'';
-      if(!s.can_swap)return '<div class="tx-swap"><b>'+esc(name)+'</b><small>'+(used||(o.ended?'':'Swap not available right now.'))+'</small></div>';
-      const opts=open.map(b=>'<option value="'+b.board_no+'">Board '+b.board_no+': '+esc(b[side].name)+'</option>').join("");
-      return '<form class="tx-swap" data-trio-swap="'+esc(m.id)+'" data-part="'+esc(s.participant_id)+'"><b>'+esc(name)+'</b><small>'+(f.admin&&s.swap?used+' Admins can still swap.':'One swap per fixture. Swap two of your players between boards that have not been played.')+'</small><div class="tx-swap-row"><select data-sw1 aria-label="First board">'+opts+'</select><span aria-hidden="true">⇄</span><select data-sw2 aria-label="Second board">'+opts.replace('<option value="'+(open[1]?open[1].board_no:'')+'"','<option selected value="'+(open[1]?open[1].board_no:'')+'"')+'</select><button type="submit" class="secondary">Swap players</button></div></form>';
-    };
-    const swaps=f.boards.length&&!o.ended&&f.a.locked&&f.b.locked?'<div class="tx-swaps">'+swapBlock(f.a,o.a)+swapBlock(f.b,o.b)+'</div>':'';
-    const admin=f.admin&&!o.ended?'<div class="tn-actions">'+(f.boards.length&&sm.approved===0?'<button type="button" class="secondary" data-trio-reset="'+esc(m.id)+'">Reset lineups</button>':'')
-      +(tied?'<span class="small">Level on games and goals. Pick the winner:</span><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.a.participant_id)+'">'+esc(o.a)+'</button><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.b.participant_id)+'">'+esc(o.b)+'</button>':'')+'</div>':'';
+    const admin=f.admin&&!o.ended&&tied?'<div class="tn-actions"><span class="small">Level on games and goals. Pick the winner:</span><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.a.participant_id)+'">'+esc(o.a)+'</button><button type="button" class="secondary" data-trio-decide="'+esc(m.id)+'" data-w="'+esc(f.b.participant_id)+'">'+esc(o.b)+'</button></div>':'';
     const decidedNote=f.decided&&o.done?'<p class="small">Winner chosen by an admin after a level result.</p>':'';
-    return '<div class="tx-centre" data-centre="'+esc(m.id)+'" hidden>'+head+lineups+(boards?'<ol class="tx-bds">'+boards+'</ol>':'')+swaps+decidedNote+admin+'</div>';
+    const none=f.boards.length?'':'<div class="tn-empty">Boards appear once both teams have a full squad.</div>';
+    return '<div class="tx-centre" data-centre="'+esc(m.id)+'" hidden>'+head+swap+none+(boards?'<ol class="tx-bds">'+boards+'</ol>':'')+decidedNote+admin+'</div>';
   }
 
   let tnTab=null,tnRoundSel=null,tnSheet=null;
@@ -3190,7 +3189,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const matchesPanel='<div class="tx-split"><div class="tx-main">'+confirmHtml+ticket+strip+(roundSecs||emptyMatches)+byes+'</div><aside class="tx-rail"><h3>League table</h3><div id="trioRail" class="tx-compact"></div><div id="trioRailMvp"></div></aside></div>';
     const stageAdmin=st.tnAdmin&&!ended?stages.map(s=>'<div class="tx-stage"><div><b>'+esc(s.name)+'</b><small>'+esc(s.stage_type.replaceAll("_"," "))+', '+esc(s.status)+'</small></div><div class="tn-actions"><button type="button" class="primary" data-generate-stage="'+esc(s.id)+'">Generate next round</button></div></div>').join(""):"";
     const manage=st.tnAdmin?'<div class="tx-manage">'+(checklist.includes("Everything is set up")?checklist:"")+adminBar+(stageAdmin?'<h3>Fixtures</h3>'+stageAdmin:'')+queue+'</div>':"";
-    const info='<div class="tx-info"><ol class="tx-how"><li><b>Lock</b><span>Each captain picks who plays Board 1, 2 and 3. Lineups stay hidden until both are locked.</span></li><li><b>Play</b><span>'+tGames+' separate 1v1 games, one per board.</span></li><li><b>Win</b><span>The team with more games takes 3 points. A draw is 1 point.</span></li></ol><ul class="tx-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'<li><span>Squad size</span><b>'+sz+' players</b></li></ul>'+(t.description?'<p class="tx-desc">'+esc(t.description)+'</p>':'')+peopleHtml+'</div>';
+    const info='<div class="tx-info"><ol class="tx-how"><li><b>Lineup</b><span>Each team has an original lineup: 1st, 2nd and 3rd pick. Board 1 is 1st pick v 1st pick, and so on.</span></li><li><b>Home swap</b><span>Each fixture has a home team. Only the home captain may switch their 1st and 2nd pick, once, before the deadline and before boards 1 or 2 are played. The 3rd pick stays, and there is no counter-swap.</span></li><li><b>Play</b><span>'+tGames+' separate 1v1 games, one per board. The team with more games takes 3 points, a draw is 1 point.</span></li><li><b>Walkover</b><span>If a player cannot play a round, their captain reports it and an admin confirms. That board goes 3–0 to the opponent. If both are missing, neither side gets the board.</span></li><li><b>Replacement</b><span>A player who leaves the tournament is replaced by the Management Committee in the same slot, before the round starts. Each team can make up to 2 replacements.</span></li></ol><ul class="tx-facts">'+facts.map(f=>'<li><span>'+esc(f[0])+'</span><b>'+esc(f[1])+'</b></li>').join("")+'<li><span>Squad size</span><b>'+sz+' players</b></li></ul>'+(t.description?'<p class="tx-desc">'+esc(t.description)+'</p>':'')+peopleHtml+'</div>';
     const hasMatches=matches.length>0;
     const tabs=[["matches","Matches",hasMatches?live.length:null],["table","Table",null],["teams","Teams",rosters.length],["players","Players",null],["info","Info",null]].concat(st.tnAdmin?[["manage","Manage",null]]:[]);
     const cur=tabs.some(x=>x[0]===tnTab)?tnTab:(hasMatches?"matches":"teams");
@@ -3216,24 +3215,58 @@ $("playersBody").innerHTML = shown.map(p =>
   function rosterSection(rosters,t,ended){
     const sz=Number(t.rules_json?.team_size)||0;
     const canAdd=state.tnAdmin&&!ended;
+    const anyFx=rosters.some(r=>(r.home_games||0)+(r.away_games||0)>0);
     const cards=rosters.map(r=>{
       const n=r.members.length,full=sz&&n>=sz,bad=sz&&n!==sz;
       const list=Array.from({length:Math.max(sz,n)},(_,i)=>{const mb=r.members[i];
-        return mb?'<li><span class="tn-jer">'+(i+1)+'</span><span class="tn-ros-n">'+esc(mb.name)+(mb.captain?' <em class="tn-you">Captain</em>':'')+'</span>'+(r.can_manage&&!mb.captain?'<button type="button" class="tn-x" data-roster-remove="'+esc(mb.id)+'" aria-label="Remove '+esc(mb.name)+'">&times;</button>':'')+'</li>'
-          :'<li class="open"><span class="tn-jer">'+(i+1)+'</span><span class="tn-ros-n">Open slot</span></li>';}).join("");
+        const mv=r.can_order&&n>1?'<span class="tn-ord"><button type="button" data-ros-up="'+esc(r.team_id)+'" data-i="'+i+'" aria-label="Move '+esc(mb?mb.name:'')+' up"'+(i===0?' disabled':'')+'>&#9650;</button><button type="button" data-ros-up="'+esc(r.team_id)+'" data-i="'+(i+1)+'" aria-label="Move '+esc(mb?mb.name:'')+' down"'+(i>=n-1?' disabled':'')+'>&#9660;</button></span>':'';
+        return mb?'<li><span class="tn-jer">'+(i+1)+'</span><span class="tn-ros-n">'+esc(mb.name)+(mb.captain?' <em class="tn-you">Captain</em>':'')+'<small>'+(PICK[i]||'')+'</small></span>'+mv
+            +(r.can_replace?'<button type="button" class="tn-repl" data-ros-repl="'+esc(mb.id)+'" data-team="'+esc(r.team_id)+'" data-name="'+esc(mb.name)+'" data-cap="'+(mb.captain?1:0)+'">Replace</button>':'')
+            +(r.can_manage&&!mb.captain?'<button type="button" class="tn-x" data-roster-remove="'+esc(mb.id)+'" aria-label="Remove '+esc(mb.name)+'">&times;</button>':'')+'</li>'
+          :'<li class="open"><span class="tn-jer">'+(i+1)+'</span><span class="tn-ros-n">Open slot<small>'+(PICK[i]||'')+'</small></span></li>';}).join("");
       const add=r.can_manage&&!full?'<div class="tn-ros-add"><select data-ros-pick="'+esc(r.team_id)+'"><option value="">Add a registered player</option></select><input type="text" maxlength="60" placeholder="or type a name" data-ros-name="'+esc(r.team_id)+'"><button type="button" class="secondary" data-roster-add="'+esc(r.team_id)+'">Add</button></div>':'';
-      return '<article class="tn-ros'+(bad&&!ended?' short':'')+'"><div class="tn-ros-head"><b>'+esc(r.team_name)+'</b>'+(sz?'<span class="tn-chip'+(bad?' warn':'')+'">'+n+' of '+sz+' players</span>':'')+(r.status!=="confirmed"?'<span class="tn-chip">'+esc(r.status)+'</span>':'')+'</div><ul>'+list+'</ul>'+add+'</article>';
+      const repl=r.can_replace?'<div class="tn-ros-add tn-repl-form" data-repl-form="'+esc(r.team_id)+'" hidden><b data-repl-title></b><select data-repl-pick><option value="">Choose a registered player</option></select><input type="text" maxlength="60" placeholder="or type a name" data-repl-name><input type="text" maxlength="120" placeholder="Reason (optional)" data-repl-why><button type="button" class="primary" data-repl-go>Replace player</button><button type="button" class="secondary" data-repl-cancel>Cancel</button></div>':'';
+      const chips=(sz?'<span class="tn-chip'+(bad?' warn':'')+'">'+n+' of '+sz+' players</span>':'')+(r.status!=="confirmed"?'<span class="tn-chip">'+esc(r.status)+'</span>':'')
+        +(anyFx?'<span class="tn-chip">'+(r.home_games||0)+' home · '+(r.away_games||0)+' away</span>':'')+(r.replacements?'<span class="tn-chip warn">'+r.replacements+' of 2 replacements used</span>':'');
+      return '<article class="tn-ros'+(bad&&!ended?' short':'')+'"><div class="tn-ros-head"><b>'+esc(r.team_name)+'</b>'+chips+'</div><ul>'+list+'</ul>'+add+repl+'</article>';
     }).join("");
-    const create=canAdd?'<div class="tn-ros-create"><b>Add a team</b><input type="text" id="rosNewName" maxlength="100" placeholder="Team name"><select id="rosNewCaptain"><option value="">Choose the captain</option></select><button type="button" class="secondary" id="rosCreate">Create team</button></div>':'';
-    return '<section class="tn-section"><div class="tn-section-head"><h3>Teams</h3><span class="tn-count">'+rosters.length+'</span></div>'+(sz?'<p class="small">Each team needs exactly '+sz+' players. Rosters lock when sign-ups close, and fixtures cannot be made until every team is complete.</p>':'')+(cards?'<div class="tn-ros-grid">'+cards+'</div>':'<div class="tn-empty">No teams yet.</div>')+create+'</section>';
+    const create=canAdd&&!anyFx?'<div class="tn-ros-create"><b>Add a team</b><input type="text" id="rosNewName" maxlength="100" placeholder="Team name"><select id="rosNewCaptain"><option value="">Choose the captain</option></select><button type="button" class="secondary" id="rosCreate">Create team</button></div>':'';
+    const note=sz?'<p class="small">Each team needs exactly '+sz+' players. The order is the original lineup: 1st, 2nd and 3rd pick. '+(anyFx?'Lineups are locked now that fixtures exist; only the Management Committee can change them or replace a player (up to 2 per team).':'Captains can set the order until fixtures are made.')+'</p>':'';
+    return '<section class="tn-section"><div class="tn-section-head"><h3>Teams</h3><span class="tn-count">'+rosters.length+'</span></div>'+note+(cards?'<div class="tn-ros-grid">'+cards+'</div>':'<div class="tn-empty">No teams yet.</div>')+create+'</section>';
   }
   async function bindRosters(detail,id,rosters,t){
-    const needPicker=rosters.some(r=>r.can_manage)||!!detail.querySelector("#rosNewCaptain");
+    const fail0=m=>{status("tournamentStatus",m,"error");toast(m);};
+    detail.querySelectorAll("[data-ros-up]").forEach(b=>b.addEventListener("click",async()=>{
+      const r=rosters.find(x=>x.team_id===b.dataset.rosUp),i=Number(b.dataset.i);if(!r||i<1||i>=r.members.length)return;
+      const ids=r.members.map(x=>x.id);[ids[i-1],ids[i]]=[ids[i],ids[i-1]];
+      b.disabled=true;
+      const {error}=await client.rpc("tournament_trio_set_order",{p_team_id:r.team_id,p_members:ids});
+      if(error){b.disabled=false;fail0(error.message);return;}
+      toast("Lineup order saved.");openTournament(id,{keep:true});
+    }));
+    const needPicker=rosters.some(r=>r.can_manage||r.can_replace)||!!detail.querySelector("#rosNewCaptain");
     if(!needPicker)return;
     const q=await client.from("players").select("user_id,display_name,active").not("user_id","is",null).eq("active",true).order("display_name");
     const used=new Set(rosters.flatMap(r=>r.members.map(x=>x.user_id).filter(Boolean)));
     const opts=(q.data||[]).filter(p=>!used.has(p.user_id)).map(p=>'<option value="'+esc(p.user_id)+'">'+esc(p.display_name||"Player")+'</option>').join("");
-    detail.querySelectorAll("[data-ros-pick]").forEach(sel=>sel.insertAdjacentHTML("beforeend",opts));
+    detail.querySelectorAll("[data-ros-pick],[data-repl-pick]").forEach(sel=>sel.insertAdjacentHTML("beforeend",opts));
+    detail.querySelectorAll("[data-ros-repl]").forEach(b=>b.addEventListener("click",()=>{
+      const form=detail.querySelector('[data-repl-form="'+b.dataset.team+'"]');if(!form)return;
+      form.hidden=false;form.dataset.member=b.dataset.rosRepl;form.dataset.cap=b.dataset.cap;
+      form.querySelector("[data-repl-title]").textContent="Replace "+b.dataset.name+(b.dataset.cap==="1"?" (captain: choose a registered player)":"");
+      form.querySelector("[data-repl-pick]").focus();
+    }));
+    detail.querySelectorAll("[data-repl-cancel]").forEach(b=>b.addEventListener("click",()=>{b.closest("[data-repl-form]").hidden=true;}));
+    detail.querySelectorAll("[data-repl-go]").forEach(b=>b.addEventListener("click",async()=>{
+      const form=b.closest("[data-repl-form]"),u=form.querySelector("[data-repl-pick]").value,nm=form.querySelector("[data-repl-name]").value.trim();
+      if(!u&&!nm){fail("Choose a registered player or type a name.");return;}
+      if(u&&nm){fail("Use either the list or a typed name, not both.");return;}
+      if(!confirm("Replace this player? The new player takes the same slot in every fixture not yet played. This uses one of the team's 2 replacements."))return;
+      b.disabled=true;
+      const {error}=await client.rpc("tournament_trio_replace_player",{p_member_id:form.dataset.member,p_user_id:u||null,p_name:u?null:nm,p_reason:form.querySelector("[data-repl-why]").value.trim()||null});
+      if(error){b.disabled=false;fail(error.message);return;}
+      toast("Player replaced.");openTournament(id,{keep:true});
+    }));
     detail.querySelector("#rosNewCaptain")?.insertAdjacentHTML("beforeend",opts);
     const fail=m=>{status("tournamentStatus",m,"error");toast(m);};
     detail.querySelectorAll("[data-roster-add]").forEach(b=>b.addEventListener("click",async()=>{
@@ -3286,25 +3319,36 @@ $("playersBody").innerHTML = shown.map(p =>
   function bindTrio(detail,id){
     const fail=m=>{status("tournamentStatus",m,"error");toast(m);};
     const again=msg=>{if(msg)toast(msg);openTournament(id,{keep:true});};
-    detail.querySelectorAll("form[data-trio-lineup]").forEach(f=>f.addEventListener("submit",async ev=>{
-      ev.preventDefault();
-      const slots=[...f.querySelectorAll("[data-slot]")].map(x=>x.value);
-      if(slots.some(x=>!x)||new Set(slots).size!==slots.length){fail("Pick a different player for each board.");return;}
-      if(!confirm("Lock this lineup? It cannot be changed afterwards."))return;
-      const b=f.querySelector("button");b.disabled=true;
-      const {error}=await client.rpc("tournament_trio_set_lineup",{p_match_id:f.dataset.trioLineup,p_participant_id:f.dataset.part,p_slots:slots});
+    detail.querySelectorAll("[data-trio-hswap]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Switch your 1st and 2nd pick for this fixture? The 3rd pick stays. This is your one swap and it is final."))return;
+      b.disabled=true;
+      const {error}=await client.rpc("tournament_trio_home_swap",{p_match_id:b.dataset.trioHswap});
       if(error){b.disabled=false;fail(error.message);return;}
-      tnSheet=f.dataset.trioLineup;again("Lineup locked.");
+      tnSheet=b.dataset.trioHswap;again("Swap made.");
     }));
-    detail.querySelectorAll("form[data-trio-swap]").forEach(f=>f.addEventListener("submit",async ev=>{
-      ev.preventDefault();
-      const a=Number(f.querySelector("[data-sw1]").value),c=Number(f.querySelector("[data-sw2]").value);
-      if(!a||!c||a===c){fail("Choose two different boards.");return;}
-      if(!confirm("Swap the players on board "+a+" and board "+c+"? Each team gets one swap per fixture."))return;
-      const b=f.querySelector("button");b.disabled=true;
-      const {error}=await client.rpc("tournament_trio_swap",{p_match_id:f.dataset.trioSwap,p_participant_id:f.dataset.part,p_board_a:a,p_board_b:c});
+    detail.querySelectorAll("[data-trio-report]").forEach(b=>b.addEventListener("click",async()=>{
+      const why=prompt("Report "+b.dataset.who+" as unavailable for this round? If an admin confirms, this board goes 3–0 to the opponent.\n\nReason (optional):","");
+      if(why===null)return;
+      b.disabled=true;
+      const {error}=await client.rpc("tournament_trio_report_unavailable",{p_board_id:b.dataset.trioReport,p_reason:why.trim()||null});
       if(error){b.disabled=false;fail(error.message);return;}
-      tnSheet=f.dataset.trioSwap;again("Players swapped.");
+      tnSheet=b.closest("[data-centre]")?.dataset.centre||tnSheet;again("Reported. An admin will confirm the walkover.");
+    }));
+    const woDecide=async(b,ok)=>{
+      if(!confirm(ok?"Confirm the walkover? The board goes 3–0 to the opponent.":"Reject this report?"))return;
+      const {error}=await client.rpc("tournament_trio_decide_unavailable",{p_report_id:ok?b.dataset.trioWoOk:b.dataset.trioWoNo,p_approve:ok});
+      if(error){fail(error.message);return;}
+      tnSheet=b.closest("[data-centre]")?.dataset.centre||tnSheet;again(ok?"Walkover confirmed.":"Report rejected.");
+    };
+    detail.querySelectorAll("[data-trio-wo-ok]").forEach(b=>b.addEventListener("click",()=>woDecide(b,true)));
+    detail.querySelectorAll("[data-trio-wo-no]").forEach(b=>b.addEventListener("click",()=>woDecide(b,false)));
+    detail.querySelectorAll("[data-trio-wo-side]").forEach(sel=>sel.addEventListener("change",async()=>{
+      const v=sel.value;if(!v)return;
+      const txt={a:"Give this board 3–0 to the away side?",b:"Give this board 3–0 to the home side?",both:"Record a double walkover (0–0, neither side gets the board)?",clear:"Clear the walkover and reopen this board?"}[v];
+      if(!confirm(txt)){sel.value="";return;}
+      const {error}=await client.rpc("tournament_trio_admin_walkover",{p_board_id:sel.dataset.trioWoSide,p_side:v,p_reason:null});
+      if(error){sel.value="";fail(error.message);return;}
+      tnSheet=sel.closest("[data-centre]")?.dataset.centre||tnSheet;again(v==="clear"?"Walkover cleared.":"Walkover saved.");
     }));
     detail.querySelectorAll("form[data-trio-score]").forEach(f=>f.addEventListener("submit",async ev=>{
       ev.preventDefault();
@@ -3328,12 +3372,6 @@ $("playersBody").innerHTML = shown.map(p =>
       const {error}=await client.rpc("tournament_trio_review_game",{p_board_id:b.dataset.trioReview,p_decision:b.dataset.d,p_reason:null});
       if(error){fail(error.message);return;}
       again(b.dataset.d==="approve"?"Game approved.":"Score rejected. Players can submit again.");
-    }));
-    detail.querySelectorAll("[data-trio-reset]").forEach(b=>b.addEventListener("click",async()=>{
-      if(!confirm("Reset both lineups for this fixture? Captains will choose again."))return;
-      const {error}=await client.rpc("tournament_trio_admin_reset_lineup",{p_match_id:b.dataset.trioReset,p_reason:"Admin reset"});
-      if(error){fail(error.message);return;}
-      again("Lineups reset.");
     }));
     detail.querySelectorAll("[data-trio-decide]").forEach(b=>b.addEventListener("click",async()=>{
       if(!confirm("Give this fixture to "+b.textContent+"?"))return;
