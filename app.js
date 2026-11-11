@@ -3231,7 +3231,7 @@ $("playersBody").innerHTML = shown.map(p =>
       return '<article class="tn-ros'+(bad&&!ended?' short':'')+'"><div class="tn-ros-head"><b>'+esc(r.team_name)+'</b>'+chips+'</div><ul>'+list+'</ul>'+add+repl+'</article>';
     }).join("");
     const create=canAdd&&!anyFx?'<div class="tn-ros-create"><b>Add a team</b><input type="text" id="rosNewName" maxlength="100" placeholder="Team name"><select id="rosNewCaptain"><option value="">Choose the captain</option></select><button type="button" class="secondary" id="rosCreate">Create team</button></div>':'';
-    const note=sz?'<p class="small">Each team needs exactly '+sz+' players. The order is the original lineup: 1st, 2nd and 3rd pick. '+(anyFx?'Lineups are locked now that fixtures exist; only the Management Committee can change them or replace a player (up to 2 per team).':'Captains can set the order until fixtures are made.')+'</p>':'';
+    const note=sz?'<p class="small">Each team needs exactly '+sz+' players. The order is the original lineup: 1st, 2nd and 3rd pick. '+(anyFx?'Only the Management Committee can change it or replace a player (up to 2 per team).':'This is the final lineup for every round. Only the Management Committee can change it.')+'</p>':'';
     return '<section class="tn-section"><div class="tn-section-head"><h3>Teams</h3><span class="tn-count">'+rosters.length+'</span></div>'+note+(cards?'<div class="tn-ros-grid">'+cards+'</div>':'<div class="tn-empty">No teams yet.</div>')+create+'</section>';
   }
   async function bindRosters(detail,id,rosters,t){

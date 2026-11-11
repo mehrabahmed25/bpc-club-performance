@@ -1,6 +1,6 @@
 -- BPC Trio rules (Nov 2026)
 -- 1. Original lineup: each team has a fixed order (1st, 2nd, 3rd pick). Board k = home pick k v away pick k.
---    Captains can reorder until fixtures exist; admins can always reorder.
+--    The lineup is fixed for every round. Only admins can change the order (captains cannot).
 -- 2. Home team = participant_a. Round-robin home games are balanced (equal, or one apart).
 -- 3. Home swap: the home captain may swap their 1st and 2nd pick once per fixture, before the deadline,
 --    and only while boards 1 and 2 are unplayed. The 3rd pick never moves. No counter-swap.
@@ -137,10 +137,7 @@ begin
   if not found then raise exception 'Team not found'; end if;
   select * into t from tournament_tournaments where id = tt.tournament_id;
   if t.status in ('completed','archived','cancelled') then raise exception 'This tournament has ended'; end if;
-  if not adm then
-    if tt.captain_user_id is distinct from auth.uid() then raise exception 'Only the captain or an administrator can set the lineup'; end if;
-    if exists(select 1 from tournament_matches where tournament_id = t.id) then raise exception 'The lineup is locked because fixtures have been made. Please contact an administrator.'; end if;
-  end if;
+  if not adm then raise exception 'Only an administrator can change the lineup'; end if;
   select array_agg(id order by id) into act from tournament_team_members where team_id = tt.id and status = 'active';
   if p_members is null or cardinality(p_members) <> coalesce(cardinality(act), 0)
      or (select array_agg(x order by x) from unnest(p_members) x) is distinct from act then
@@ -341,7 +338,7 @@ begin
       'team_id', tt.id, 'participant_id', tt.participant_id, 'team_name', tt.team_name, 'status', p.status,
       'is_captain', uid is not null and tt.captain_user_id = uid,
       'can_manage', not ended and (adm or (uid is not null and tt.captain_user_id = uid and open_reg and not has_fx)),
-      'can_order', not ended and (adm or (uid is not null and tt.captain_user_id = uid and not has_fx)),
+      'can_order', not ended and adm,
       'can_replace', not ended and adm and has_fx,
       'size', sz,
       'home_games', (select count(*) from tournament_matches m where m.participant_a_id = tt.participant_id and m.participant_b_id is not null),
