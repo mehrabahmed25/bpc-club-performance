@@ -3291,18 +3291,61 @@ $("playersBody").innerHTML = shown.map(p =>
     const t=!r?{k:"none",n:"Unranked"}:r<=3?{k:"gold",n:"Gold"}:r<=10?{k:"silver",n:"Silver"}:{k:"bronze",n:"Bronze"};
     return Object.assign({foil:!!elig},t);
   }
-  const TM_SLOTS=[[50,13],[17,19],[83,19],[19,42],[50,45],[81,42],[14,69],[37,71],[63,71],[86,69],[50,89]];
+  // ---- Home: Team of the Month (broadcast team sheet, 4-3-3) ----
+  // Flat pitch coords (0..100) with attack at the top; projected into a perspective pitch.
+  const TM_SLOTS=[[50,14],[20,20],[80,20],[28,43],[50,47],[72,43],[14,68],[37,72],[63,72],[86,68],[50,90]];
+  const TM_POS=["FW","FW","FW","MF","MF","MF","DF","DF","DF","DF","GK"];
+  function tmProj(x,y){const t=y/100,hw=318+182*t;return [500+(x-50)/50*hw,34+632*t,0.74+0.26*t];}
+  function tmPitchSvg(){
+    const P=(x,y)=>{const p=tmProj(x,y);return p[0].toFixed(1)+","+p[1].toFixed(1);};
+    const poly=pts=>pts.map(q=>P(q[0],q[1])).join(" ");
+    let st="";for(let k=0;k<10;k++){if(k%2)continue;st+='<polygon points="'+poly([[0,k*10],[100,k*10],[100,k*10+10],[0,k*10+10]])+'" fill="#ffffff" fill-opacity=".045"/>';}
+    const line=pts=>'<polyline points="'+poly(pts)+'"/>';
+    const circ=(cx,cy,r,a0,a1)=>{const pts=[];for(let a=a0;a<=a1;a+=6){const rad=a*Math.PI/180;pts.push([cx+r*Math.cos(rad)*0.78,cy+r*Math.sin(rad)]);}return '<polyline points="'+poly(pts)+'"/>';};
+    return '<svg class="tm2-svg" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">'
+      +'<defs><linearGradient id="tmG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c5a3c"/><stop offset="1" stop-color="#14935f"/></linearGradient>'
+      +'<radialGradient id="tmL" cx="50%" cy="0%" r="75%"><stop offset="0" stop-color="#fff6d8" stop-opacity=".35"/><stop offset="1" stop-color="#fff6d8" stop-opacity="0"/></radialGradient></defs>'
+      +'<polygon points="'+poly([[-4,-3],[104,-3],[104,103],[-4,103]])+'" fill="url(#tmG)"/>'+st
+      +'<polygon points="'+poly([[-4,-3],[104,-3],[104,103],[-4,103]])+'" fill="url(#tmL)"/>'
+      +'<g fill="none" stroke="#fff" stroke-opacity=".62" stroke-width="2.4" stroke-linejoin="round">'
+      +line([[0,0],[100,0],[100,100],[0,100],[0,0]])+line([[0,50],[100,50]])
+      +line([[22,0],[22,17],[78,17],[78,0]])+line([[37,0],[37,6],[63,6],[63,0]])
+      +line([[22,100],[22,83],[78,83],[78,100]])+line([[37,100],[37,94],[63,94],[63,100]])
+      +circ(50,50,13,0,360)+circ(50,17,8,35,145)+circ(50,83,8,215,325)+'</g>'
+      +'<circle cx="'+tmProj(50,50)[0]+'" cy="'+tmProj(50,50)[1]+'" r="5" fill="#fff" fill-opacity=".7"/></svg>';
+  }
   async function loadHomeTeam(){
     const box=$("homeTeam");if(!box||!client)return;
     try{
       const [r]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
       const top=(r.data||[]).filter(x=>Number(x.matches_played)>0).sort((a,b)=>Number(a.rank)-Number(b.rank)).slice(0,11);
       if(top.length<4){box.classList.add("hidden");return;}
-      const cards=top.map((p,i)=>{const t=tierOf(p.rank,p.award_eligible),s=TM_SLOTS[i];
-        return '<button type="button" class="tm-p tier-'+t.k+(t.foil?' foil':'')+'" data-player="'+esc(p.player_id)+'" style="left:'+s[0]+'%;top:'+s[1]+'%;--k:'+i+'" aria-label="'+esc(p.player_name)+', rank '+p.rank+', '+p.points+' points"><span class="tm-c">'+avBig(p.player_name,p.player_id,"tm-av")+'<b>'+esc(String(p.player_name).split(/\s+/)[0])+'</b><i>'+p.points+'</i></span><span class="tm-r">#'+p.rank+'</span></button>';}).join("");
-      box.innerHTML='<div class="hl-head"><h2>Team of the month</h2><span class="hl-links"><button type="button" class="hl-link" data-view="leaderboard">Full leaderboard</button></span></div><div class="tm-pitch"><span class="tm-box"></span>'+cards+'</div><p class="tm-note">The top '+top.length+' players by points this month. The top three lead the attack and the rest follow the table, so positions are not real roles. Gold frame: top 3. Silver: 4 to 10. Bronze: 11 and below.</p>';
+      const monthLabel=new Date(monthNow+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
+      const first=n=>String(n).trim().split(/\s+/)[0];
+      const maxPts=Math.max(1,...top.map(p=>Number(p.points)||0));
+      const tokens=top.map((p,i)=>{
+        const t=tierOf(p.rank,p.award_eligible),[x,y,sc]=tmProj(TM_SLOTS[i][0],TM_SLOTS[i][1]);
+        return '<button type="button" class="tm2-p tier-'+t.k+(i===0?' cap':'')+'" data-player="'+esc(p.player_id)+'" style="left:'+(x/10).toFixed(2)+'%;top:'+(y/7).toFixed(2)+'%;--s:'+sc.toFixed(3)+';--k:'+i+'" aria-label="'+esc(p.player_name)+', rank '+p.rank+', '+p.points+' points">'
+          +'<span class="tm2-ring">'+avBig(p.player_name,p.player_id,"tm2-av")+(i===0?'<em class="tm2-arm" aria-hidden="true">C</em>':'')+'<span class="tm2-rk">'+p.rank+'</span></span>'
+          +'<span class="tm2-tag"><b>'+esc(first(p.player_name))+'</b><i>'+p.points+'<small> pts</small></i></span></button>';
+      }).join("");
+      const sheet=top.map((p,i)=>{const t=tierOf(p.rank,p.award_eligible);
+        return '<li class="tm2-row tier-'+t.k+' link-player" data-player="'+esc(p.player_id)+'"><span class="tm2-pos">'+TM_POS[i]+'</span>'+avBig(p.player_name,p.player_id,"tm2-mini")
+          +'<span class="tm2-nm"><b>'+esc(p.player_name)+(i===0?' <em class="tm2-c">Captain</em>':'')+'</b><small>'+p.matches_played+' played · '+p.wins+'W '+p.draws+'D '+p.losses+'L · GD '+(Number(p.goal_difference)>0?'+':'')+p.goal_difference+'</small><span class="tm2-bar"><i style="width:'+Math.round((Number(p.points)||0)/maxPts*100)+'%"></i></span></span>'
+          +'<b class="tm2-pts">'+p.points+'</b></li>';}).join("");
+      const sum=k=>top.reduce((t,p)=>t+(Number(p[k])||0),0);
+      const best=top.slice().sort((a,b)=>Number(b.goals_for)-Number(a.goals_for))[0];
+      box.innerHTML='<div class="tm2">'
+        +'<header class="tm2-head"><div><h2>Team of the Month</h2><p>'+esc(monthLabel)+' · the top '+top.length+' by points</p></div><div class="tm2-meta"><span class="tm2-form">4-3-3</span><button type="button" class="tm2-link" data-view="leaderboard">Full table</button></div></header>'
+        +'<div class="tm2-body"><div class="tm2-stage"><div class="tm2-pitch">'+tmPitchSvg()+tokens+'</div></div>'
+        +'<div class="tm2-side"><ol class="tm2-sheet">'+sheet+'</ol>'
+        +'<dl class="tm2-stats"><div><dt>XI points</dt><dd>'+sum("points")+'</dd></div><div><dt>Matches</dt><dd>'+sum("matches_played")+'</dd></div><div><dt>Goals</dt><dd>'+sum("goals_for")+'</dd></div><div><dt>Most goals</dt><dd>'+esc(first(best.player_name))+' <small>'+best.goals_for+'</small></dd></div></dl></div></div>'
+        +'<p class="tm2-note">Ranked by points this month. Gold ring: top 3. Silver: 4 to 10. Bronze: 11. The captain is the month’s leader.</p></div>';
       box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+      box.querySelectorAll(".tm2-p[data-player]").forEach(b=>b.addEventListener("click",()=>openPlayer(b.dataset.player)));
       box.classList.remove("hidden");
+      const st=box.querySelector(".tm2");
+      if("IntersectionObserver" in window){const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){st.classList.add("in");io.disconnect();}},{threshold:.25});io.observe(st);}else st.classList.add("in");
     }catch(e){console.warn(e);}
   }
 
