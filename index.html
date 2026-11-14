@@ -274,13 +274,17 @@
   </section>
 
   <section id="view-admin" class="view hidden">
-    <div class="section-head"><p class="eyebrow">ADMIN CONSOLE</p><h2>Review submissions</h2><p>Approve valid results or reject submissions that need correction.</p></div>
+    <div class="section-head"><p class="eyebrow">ADMIN CONSOLE</p><h2>Admin console</h2><p>Your inbox first, then every club tool. Use the jump links to move between sections.</p></div>
     <div id="adminDenied" class="panel soft">This section is only available to administrators.</div>
     <div id="adminContent" class="hidden">
+      <section id="adminInbox" class="ai" aria-label="Admin inbox"></section>
+      <nav id="adminJump" class="ai-jump" aria-label="Admin sections"></nav>
+      <div class="section-head compact" id="adm-results"><h2>Results to approve</h2><p>Friendly matches waiting for a decision.</p></div>
       <div class="toolbar"><button class="secondary" id="refreshPending">↻ Refresh pending</button><span id="pendingCount" class="pill">0 pending</span></div>
       <div id="adminStatus" class="status"></div>
       <div id="pendingList" class="pending-list"></div>
-      <div class="section-head compact"><h2>All match history</h2><p>View every submitted result, including approved, pending, and rejected matches.</p></div>
+      <div class="section-head compact"><h2>All match history</h2><p>View every submitted result, including approved, pending, and rejected matches. Delete a wrong entry from here; the month is recounted automatically.</p></div>
+      <div class="panel ai-recount"><div><b>Recount a month</b><p class="small">Re-applies the counting rules (5 per pair, 80 per player) to every approved match of the month, in the order they were approved. Check first to see what would change.</p></div><div class="ai-recount-row"><label>Month<input type="month" id="recountMonth"></label><button type="button" class="secondary" id="recountCheck">Check</button><button type="button" class="primary hidden" id="recountApply">Apply changes</button></div><div id="recountStatus" class="status"></div></div>
       <div class="toolbar"><button type="button" class="secondary" id="toggleAllMatchHistory">Show all match history</button><button type="button" class="secondary" id="refreshAllMatchHistory">↻ Refresh all matches</button></div>
       <div id="allMatchHistoryPanel" class="hidden">
         <div class="panel" id="headToHeadSearchPanel">

@@ -230,6 +230,62 @@
     document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.session)loadBell();});
   }
 
+
+  // ================= Admin inbox, jump links and recount =================
+  async function loadAdminInbox(){
+    const box=$("adminInbox");if(!box||!client||!state.isAdmin)return;
+    const {data:d,error}=await client.rpc("get_admin_inbox");
+    if(error||!d){box.innerHTML='<div class="status error">'+esc(error?.message||"Inbox unavailable.")+'</div>';return;}
+    const sum=a=>(a||[]).reduce((t,x)=>t+Number(x.n||0),0);
+    const when=t=>new Date(t).toLocaleString([], {day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+    const tile=(n,label,hint,items,kind,go)=>'<article class="ai-tile'+(n?' on k-'+kind:'')+'"><div class="ai-n">'+n+'</div><div class="ai-body"><b>'+label+'</b><small>'+(n?hint:"All clear")+'</small>'
+      +(n&&items&&items.length?'<div class="ai-links">'+items.map(x=>'<button type="button" class="ai-link" data-ai-tour="'+esc(x.id)+'">'+esc(x.name)+(items.length>1||x.n>1?' · '+x.n:'')+'</button>').join("")+'</div>':'')
+      +(n&&go?'<button type="button" class="ai-link" data-ai-go="'+go+'">Open</button>':'')+'</div></article>';
+    const logTxt=l=>{const x=l.details||{};
+      if(l.action==="delete_match")return 'Deleted '+esc(x.player||"")+' '+esc(x.score||"")+' '+esc(x.opponent||"")+' ('+esc(x.date||"")+')'+(x.reason?': '+esc(x.reason):'');
+      if(l.action==="recount_month")return 'Recounted '+esc(x.month||"")+': '+esc(x.changed)+' match'+(x.changed==1?'':'es')+' changed';
+      return esc(l.action);};
+    const total=Number(d.pending_results||0)+sum(d.trio_review)+sum(d.walkovers)+sum(d.motm_missing)+sum(d.overdue);
+    box.innerHTML='<div class="ai-head"><div><h2>Inbox</h2><p>'+(total?total+' thing'+(total===1?'':'s')+' need'+(total===1?'s':'')+' a decision.':'Nothing is waiting on you.')+'</p></div><button type="button" class="secondary" id="aiRefresh">Refresh</button></div>'
+      +'<div class="ai-grid">'
+      +tile(Number(d.pending_results||0),"Results to approve","Friendly matches from members.",null,"warn","results")
+      +tile(sum(d.trio_review),"Trio games to review","Scores pending or disputed.",d.trio_review,"warn")
+      +tile(sum(d.walkovers),"Walkover reports","Captains reported a missing player.",d.walkovers,"warn")
+      +tile(sum(d.motm_missing),"MOTM to choose","Captains did not pick in 24 hours.",d.motm_missing,"warn")
+      +tile(sum(d.overdue),"Overdue fixtures","Deadline passed without a result. Extend it or award a walkover.",d.overdue,"bad")
+      +tile(sum(d.due_soon),"Due in 48 hours","Fixtures with a deadline coming up.",d.due_soon,"info")
+      +'</div>'
+      +'<details class="ai-log"'+((d.log||[]).length?'':' hidden')+'><summary>Recent admin changes</summary><ul>'+(d.log||[]).map(l=>'<li><span>'+logTxt(l)+'</span><small>'+esc(l.actor)+' · '+esc(when(l.created_at))+'</small></li>').join("")+'</ul></details>';
+    $("aiRefresh").addEventListener("click",loadAdminInbox);
+    box.querySelectorAll("[data-ai-tour]").forEach(b=>b.addEventListener("click",()=>{try{history.pushState(null,"","#/tournaments/"+b.dataset.aiTour);}catch(e){}routeFromHash();}));
+    box.querySelectorAll("[data-ai-go]").forEach(b=>b.addEventListener("click",()=>{const t=$("adm-"+b.dataset.aiGo);if(t)t.scrollIntoView({behavior:"smooth",block:"start"});}));
+  }
+  function buildAdminJump(){
+    const nav=$("adminJump");if(!nav||nav.dataset.built)return;
+    const heads=[...document.querySelectorAll("#adminContent .section-head.compact")].filter(hd=>hd.querySelector("h2")&&!hd.closest(".hidden:not(#adminContent)"));
+    nav.innerHTML='<b>Jump to</b>'+heads.map((hd,i)=>{if(!hd.id)hd.id="adm-s"+i;return '<a href="#'+hd.id+'" data-jump="'+hd.id+'">'+esc(hd.querySelector("h2").textContent)+'</a>';}).join("");
+    nav.addEventListener("click",e=>{const a=e.target.closest("[data-jump]");if(!a)return;e.preventDefault();const t=$(a.dataset.jump);if(t)t.scrollIntoView({behavior:"smooth",block:"start"});});
+    nav.dataset.built="1";
+  }
+  if($("recountCheck")){
+    $("recountMonth").value=monthNow;
+    const run=async apply=>{
+      const mv=$("recountMonth").value;if(!mv){status("recountStatus","Choose a month.","error");return;}
+      if(apply&&!confirm("Apply the recount for this month? Counted flags change exactly as listed."))return;
+      status("recountStatus",apply?"Applying…":"Checking…");
+      const {data,error}=await client.rpc("admin_recount_month",{p_month:mv+"-01",p_apply:apply});
+      if(error){status("recountStatus",error.message,"error");return;}
+      const rows=(data.rows||[]).slice(0,12).map(r=>esc(r.player)+' '+esc(r.score)+' '+esc(r.opponent)+' ('+esc(r.date)+') → '+(r.counted?'counts':'does not count')).join("<br>");
+      if(!data.changed){$("recountApply").classList.add("hidden");status("recountStatus",data.month+": everything already follows the rules. Nothing to change.","success");return;}
+      if(apply){$("recountApply").classList.add("hidden");$("recountStatus").innerHTML='<span class="ok">'+data.changed+' match'+(data.changed===1?'':'es')+' updated for '+esc(data.month)+'.</span>';$("recountStatus").className="status success";loadAdminInbox();return;}
+      $("recountStatus").className="status";$("recountStatus").innerHTML=data.changed+' match'+(data.changed===1?'':'es')+' would change in '+esc(data.month)+':<br>'+rows+(data.changed>12?'<br>…and '+(data.changed-12)+' more':'');
+      $("recountApply").classList.remove("hidden");
+    };
+    $("recountCheck").addEventListener("click",()=>run(false));
+    $("recountApply").addEventListener("click",()=>run(true));
+    $("recountMonth").addEventListener("change",()=>{$("recountApply").classList.add("hidden");status("recountStatus","");});
+  }
+
   // ---- Mobile tab bar ----
   function updateTabbar(){
     const tb=$("tabbar");if(!tb)return;
@@ -1103,6 +1159,7 @@ async function loadHistory(){
     $("adminDenied").classList.toggle("hidden",state.isAdmin);
     $("adminContent").classList.toggle("hidden",!state.isAdmin);
     if(!state.isAdmin)return;
+    loadAdminInbox();buildAdminJump();
     loadArticleAdmin();
     loadHousesAdmin();
     await loadPosterAdmin();
@@ -1277,14 +1334,25 @@ $("playersBody").innerHTML = shown.map(p =>
             '<td><span class="pill '+(m.status==="approved"?"good":m.status==="rejected"?"bad":"pending")+'">'+esc(m.status||"unknown")+'</span></td>'+
             '<td><span class="pill '+(official?"good":"")+'">'+(official?"Yes":"No")+'</span></td>'+
             '<td>'+esc(m.exclusion_reason||"—")+'</td>'+
-            '<td>'+esc(m.submitted_at?new Date(m.submitted_at).toLocaleString():"—")+'</td></tr>';
+            '<td>'+esc(m.submitted_at?new Date(m.submitted_at).toLocaleString():"—")+'</td>'+
+            '<td><button type="button" class="reject-btn ai-del" data-del-match="'+esc(m.id)+'" data-desc="'+esc(submittedBy+' '+m.player_goals+'–'+m.opponent_goals+' '+opponent+', '+prettyDate(m.match_date))+'">Delete</button></td></tr>';
         }).join("");
         return '<details class="panel month-history-group" open><summary><b>'+esc(monthLabel(month))+'</b><span class="muted">'+groups[month].length+' submissions</span></summary>'+
-          '<div class="table-wrap"><table><thead><tr><th>Match date</th><th>Submitted by</th><th>Complete lineup</th><th>Score</th><th>Lineup sequence</th><th>Result</th><th>Status</th><th>Officially counted</th><th>Exclusion reason</th><th>Submitted at</th></tr></thead><tbody>'+rows+'</tbody></table></div></details>';
+          '<div class="table-wrap"><table><thead><tr><th>Match date</th><th>Submitted by</th><th>Complete lineup</th><th>Score</th><th>Lineup sequence</th><th>Result</th><th>Status</th><th>Officially counted</th><th>Exclusion reason</th><th>Submitted at</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>'+rows+'</tbody></table></div></details>';
       };
       $("allMatchHistoryGroups").innerHTML=months.length
         ?months.map(renderMonth).join("")
         :'<div class="panel soft">No match records found.</div>';
+      $("allMatchHistoryGroups").querySelectorAll("[data-del-match]").forEach(b=>b.addEventListener("click",async()=>{
+        const why=prompt("Delete this match for good?\n\n"+b.dataset.desc+"\n\nThe month is recounted afterwards, so another match may start counting. Reason (optional):","");
+        if(why===null)return;
+        b.disabled=true;
+        const {data,error}=await client.rpc("admin_delete_match",{p_match_id:b.dataset.delMatch,p_reason:why.trim()||null});
+        if(error){b.disabled=false;status("allMatchHistoryStatus",error.message,"error");return;}
+        const ch=data?.recount?.changed||0;
+        toast("Match deleted."+(ch?" "+ch+" other match"+(ch===1?"":"es")+" changed counting.":""));
+        loadAllMatchHistory();loadAdminInbox();
+      }));
       status("allMatchHistoryStatus",headToHeadFilter.a&&headToHeadFilter.b?filteredMatches.length+" matching submissions between "+(names[headToHeadFilter.a]||"Player A")+" and "+(names[headToHeadFilter.b]||"Player B")+". Includes both directions and all statuses.":"Showing all "+matches.length+" submissions across "+months.length+" match month(s). Each lineup is counted in both directions together. Only approved results advance the lineup sequence; pending and rejected submissions remain visible but do not count. “Officially counted” means approved and counted. Monthly groups are based on match date.");
     }catch(err){
       status("allMatchHistoryStatus",err.message||"Could not load all match history.","error");
