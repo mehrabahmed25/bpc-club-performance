@@ -3398,7 +3398,22 @@ $("playersBody").innerHTML = shown.map(p =>
       toast("On iPhone: tap the Share button, then Add to Home Screen.");
     });
   })();
-  if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+  if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))window.addEventListener("load",()=>{
+    const hadController=!!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("sw.js").then(reg=>{
+      setInterval(()=>reg.update().catch(()=>{}),30*60*1000);
+      document.addEventListener("visibilitychange",()=>{if(!document.hidden)reg.update().catch(()=>{});});
+    }).catch(()=>{});
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadController)showUpdateBar();});
+  });
+  function showUpdateBar(){
+    if(document.getElementById("updBar"))return;
+    const b=document.createElement("div");b.id="updBar";b.className="upd-bar";b.setAttribute("role","status");
+    b.innerHTML='<span><b>A new version of the site is ready.</b> Refresh to get the latest.</span><button type="button" class="upd-go">Refresh</button><button type="button" class="upd-x" aria-label="Dismiss">&times;</button>';
+    document.body.appendChild(b);
+    b.querySelector(".upd-go").addEventListener("click",()=>location.reload());
+    b.querySelector(".upd-x").addEventListener("click",()=>b.remove());
+  }
   function initials(n){return String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase()||"?";}
   function tnGlyph(format){
     const g={
