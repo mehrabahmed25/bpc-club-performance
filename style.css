@@ -2194,3 +2194,29 @@ body.tx-lock{overflow:hidden}
 .ab-edit{margin-top:18px}
 .ab-edit textarea{width:100%}
 @media(max-width:820px){.ab-grid{grid-template-columns:1fr}.ab-intro{grid-row:auto;grid-template-columns:1fr}.ab-crest{width:72px;height:72px}}
+
+
+/* ===== Brand system: one action colour, line icons, empty states ===== */
+/* Actions: navy on light surfaces, amber on dark surfaces. Blue is kept for links and data only. */
+.primary{background:var(--night);color:#fff;box-shadow:0 8px 18px #09122633}
+.primary:hover{background:#1b2d58}
+.primary:focus-visible{outline:3px solid var(--flood);outline-offset:2px}
+.md .primary,.tx-cards .primary,.home-hero .primary,.ab-intro .primary,.site-ft .primary,.tn-masthead .primary,.tx-hero .primary,.hero .primary,.clips .primary,.tn-mgr-list .primary,.db-hero .primary{background:var(--flood);color:#1a1200;box-shadow:0 8px 20px #f6b73c40}
+.md .primary:hover,.tx-cards .primary:hover,.home-hero .primary:hover,.ab-intro .primary:hover,.site-ft .primary:hover,.tn-masthead .primary:hover,.tx-hero .primary:hover,.hero .primary:hover,.clips .primary:hover,.tn-mgr-list .primary:hover,.db-hero .primary:hover{background:#ffc75a}
+/* line icons */
+.ic{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.2em;flex:none}
+.ic-xl{width:30px;height:30px}
+.hero-stat .trophy{display:inline-grid;place-items:center;width:46px;height:46px;border-radius:14px;background:#f6b73c22;color:var(--flood);font-size:0}
+.pf-badge .g{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#eef2f9;color:var(--night);font-size:0}
+.pf-badge .g .ic{width:24px;height:24px}
+.pf-badge.is-on .g{background:var(--night);color:var(--flood)}
+.lg-badge{color:#1a1200;font-size:0}
+.lg-badge .ic{width:19px;height:19px;stroke-width:2}
+/* crest as the brand mark */
+.brand-logo.is-crest{border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px #f6b73c88;background:#000}
+/* empty states: a small drawn whistle above the message */
+.tn-empty,.h2h-empty{position:relative;padding-top:64px}
+.tn-empty:before,.h2h-empty:before{content:"";position:absolute;left:50%;top:18px;width:34px;height:34px;transform:translateX(-50%);opacity:.5;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d6b82' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='14' r='5'/%3E%3Cpath d='M13 11h8v4h-4M9 9V5M6.5 9.5L5 7M11.5 9.5L13 7'/%3E%3C/svg%3E")}
+.tn-mgr-list .tn-empty:before{filter:invert(1);opacity:.4}
+.tn-empty.tiny,.tn-empty.no-art{padding-top:26px}.tn-empty.tiny:before,.tn-empty.no-art:before{display:none}
+.lg-none{grid-column:1/-1}

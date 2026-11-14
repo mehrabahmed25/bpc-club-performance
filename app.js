@@ -23,9 +23,11 @@
     $("siteBrandSubtitle").textContent=siteBranding.subtitle||BRAND_DEFAULTS.subtitle;
     const logo=$("siteLogo"),fallback=$("siteLogoFallback");
     if(siteBranding.logo_path&&client){
+      logo.onerror=()=>{logo.onerror=null;logo.src="icons/icon-192.png";logo.classList.add("is-crest");};
       logo.src=client.storage.from("bpc-posters").getPublicUrl(siteBranding.logo_path).data.publicUrl;
       logo.classList.remove("hidden");fallback.classList.add("hidden");
-    }else{logo.removeAttribute("src");logo.classList.add("hidden");fallback.classList.remove("hidden");}
+      logo.classList.remove("is-crest");
+    }else{logo.src="icons/icon-192.png";logo.classList.add("is-crest");logo.classList.remove("hidden");fallback.classList.add("hidden");}
   }
   async function loadBranding(){
     renderBranding();
@@ -2719,14 +2721,14 @@ $("playersBody").innerHTML = shown.map(p =>
     const opps=new Set(all.map(r=>(r.opponent_id||r.opponent_name))).size;
     const st=pfStats(all);
     const defs=[
-      ["⚽","Hat-trick hero","Score 3+ goals in a match",Math.max(0,...all.map(r=>r.gf)),3],
-      ["💥","Goal machine","Score 5+ goals in a match",Math.max(0,...all.map(r=>r.gf)),5],
-      ["🧤","Brick wall","Keep 5 clean sheets",st.cs,5],
-      ["🔥","On fire","Win 5 matches in a row",bestW,5],
-      ["🛡️","Unbeaten","Go 8 matches without a loss",bestU,8],
-      ["🤝","Social player","Play 10 different opponents",opps,10],
-      ["📅","Busy month","Play 40 matches in a month",maxMonth,40],
-      ["💯","Century club","Play 100 matches",st.n,100]
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-ball\x22/></svg>","Hat-trick hero","Score 3+ goals in a match",Math.max(0,...all.map(r=>r.gf)),3],
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-boot\x22/></svg>","Goal machine","Score 5+ goals in a match",Math.max(0,...all.map(r=>r.gf)),5],
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-glove\x22/></svg>","Brick wall","Keep 5 clean sheets",st.cs,5],
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-flame\x22/></svg>","On fire","Win 5 matches in a row",bestW,5],
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-shield\x22/></svg>","Unbeaten","Go 8 matches without a loss",bestU,8],
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-people\x22/></svg>","Social player","Play 10 different opponents",opps,10],
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-calendar\x22/></svg>","Busy month","Play 40 matches in a month",maxMonth,40],
+      ["<svg class=\x22ic\x22 viewBox=\x220 0 24 24\x22 aria-hidden=\x22true\x22><use href=\x22#i-hundred\x22/></svg>","Century club","Play 100 matches",st.n,100]
     ];
     return {defs,bestW,bestU};
   }
@@ -2911,7 +2913,7 @@ $("playersBody").innerHTML = shown.map(p =>
                  :'in '+w.matches_played+' matches · '+Math.round(Number(w.clean_sheets)/Math.max(1,Number(w.matches_played))*100)+'% kept clean';
     const rest=list.slice(1,5).map((r,i)=>'<li class="link-player" data-player="'+esc(r.player_id)+'">'+avBig(r.player_name,r.player_id,"lg-mini")+'<span class="lg-rn">'+esc(r.player_name)+'</span><b>'+r[key]+'</b><em>'+(i+2)+'</em></li>').join("");
     return '<article class="lg-card"><p class="lg-title">'+esc(title)+'</p>'+
-      '<div class="lg-top link-player" data-player="'+esc(w.player_id)+'"><div class="lg-crown">'+avBig(w.player_name,w.player_id,"lg-av")+'<span class="lg-badge">'+(isG?"⚽":"🧤")+'</span></div>'+
+      '<div class="lg-top link-player" data-player="'+esc(w.player_id)+'"><div class="lg-crown">'+avBig(w.player_name,w.player_id,"lg-av")+'<span class="lg-badge">'+(isG?'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-ball"/></svg>':'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-glove"/></svg>')+'</span></div>'+
       '<div class="lg-who"><b class="lg-name">'+esc(w.player_name)+'</b><span class="lg-num">'+w[key]+'<small>'+(isG?" goals":" clean sheets")+'</small></span><span class="lg-sub">'+esc(sub)+'</span></div></div>'+
       (rest?'<ol class="lg-rest">'+rest+'</ol>':'')+'</article>';
   }
@@ -2922,6 +2924,8 @@ $("playersBody").innerHTML = shown.map(p =>
     grid.innerHTML='<div class="lg-empty">Loading…</div>';
     const [all,mon]=await Promise.all([client.rpc("get_top_performers",{p_month:null}),client.rpc("get_top_performers",{p_month:monthDate(mv)}),ensureAvatars()]);
     if(all.error||mon.error){grid.innerHTML='<div class="lg-empty">Could not load the stats.</div>';return;}
+    const any=d=>(d||[]).some(r=>Number(r.goals_for)>0||Number(r.clean_sheets)>0);
+    if(!any(all.data)&&!any(mon.data)){grid.innerHTML='<div class="tn-empty lg-none"><b>No stars yet.</b><br>Top scorers and clean-sheet leaders appear here once matches are approved.</div>';return;}
     grid.innerHTML=legendCard("goals","all",all.data,label)+legendCard("goals","month",mon.data,label)+legendCard("cs","all",all.data,label)+legendCard("cs","month",mon.data,label);
   }
   // ---- Home: scoreboard ticker + table podium ----

@@ -31,6 +31,18 @@
 <script src="config.js"></script>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 13v4M8 21h8M9 17h6v4H9z"/></symbol>
+<symbol id="i-ball" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5l3.8 2.8-1.5 4.4H9.7l-1.5-4.4zM12 3v4.5M15.8 10.3l4.6-1.4M14.3 14.7l2.8 3.9M9.7 14.7l-2.8 3.9M8.2 10.3L3.6 8.9"/></symbol>
+<symbol id="i-boot" viewBox="0 0 24 24"><path d="M5 4h6v6l7 3a3 3 0 0 1 2 3v1H4z"/><path d="M4 20h16M8 17v3M12 17v3M16 17v3"/></symbol>
+<symbol id="i-glove" viewBox="0 0 24 24"><path d="M7 21v-6L4 11a1.5 1.5 0 0 1 2.2-2L8 10.5V5a1.5 1.5 0 0 1 3 0v5V3.5a1.5 1.5 0 0 1 3 0V10V5a1.5 1.5 0 0 1 3 0v6a8 8 0 0 1-2 5v5z"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 0 2 1 3 2 3 0-4-1-6.5.5-9z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+<symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="9" r="2.6"/><path d="M3 20a6 6 0 0 1 12 0M14.5 15.2A5 5 0 0 1 21 20"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M12 14h2M16 14h.5M8 17h2M12 17h2"/></symbol>
+<symbol id="i-hundred" viewBox="0 0 24 24"><path d="M4 8l2-1.5V17"/><rect x="9" y="6.5" width="5" height="10.5" rx="2.5"/><rect x="16" y="6.5" width="5" height="10.5" rx="2.5"/></symbol>
+<symbol id="i-whistle" viewBox="0 0 24 24"><circle cx="9" cy="14" r="5"/><path d="M13 11h8v4h-4M9 9V5M6.5 9.5L5 7M11.5 9.5L13 7"/></symbol>
+</defs></svg>
 <svg class="sbg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
 <defs><marker id="sbgAh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#13a46b" fill-opacity=".6"/></marker></defs>
 <text class="sbg-num" x="120" y="330" style="font-size:230px" transform="rotate(-8 120 330)">10</text><text class="sbg-num" x="1010" y="930" style="font-size:210px" transform="rotate(6 1010 930)">7</text><text class="sbg-num" x="560" y="960" style="font-size:170px" transform="rotate(-4 560 960)">9</text><text class="sbg-num" x="330" y="170" style="font-size:120px" transform="rotate(5 330 170)">14</text>
@@ -45,7 +57,7 @@
 
 
 <header class="topbar">
-  <a class="brand" href="#" data-view="home"><img id="siteLogo" class="brand-logo hidden" alt="Brahmanbaria Pes Club logo"><span id="siteLogoFallback" class="brand-mark">BPC</span><span><b id="siteBrandName">Brahmanbaria Pes Club</b><small id="siteBrandSubtitle">Official Website</small></span></a>
+  <a class="brand" href="#" data-view="home"><img id="siteLogo" class="brand-logo is-crest" src="icons/icon-192.png" alt="Brahmanbaria Pes Club logo"><span id="siteLogoFallback" class="brand-mark hidden">BPC</span><span><b id="siteBrandName">Brahmanbaria Pes Club</b><small id="siteBrandSubtitle">Official Website</small></span></a>
   <button id="menuBtn" class="mobile-menu" aria-label="Open menu">☰</button>
   <nav id="nav">
     <button data-view="home" class="navlink active">Home</button>
@@ -117,13 +129,12 @@
     <section id="homeTeam" class="home-team hidden" aria-label="Team of the month"></section>
     <section id="homeStories" class="home-stories hidden" aria-label="Latest stories"></section>
     <section id="homeLegends" class="home-legends hidden" aria-label="This month's stars"></section>
-    <div class="home-news-intro"><h2>Club announcements &amp; news</h2><p>Stay updated with the latest from BPC.</p></div>
   </section>
 
   <section id="view-leaderboard" class="view hidden">
     <div class="hero">
       <div><p class="eyebrow">BPC SEASON · MONTHLY RANKINGS</p><h1>Every match counts.<br><span>Every point matters.</span></h1><p class="hero-sub">Follow the leaderboard, compare performance, and track the road to monthly awards.</p></div>
-      <div class="hero-stat"><span class="trophy">🏆</span><b id="leaderboardMonthLabel">Monthly leaderboard</b><small>Updated from approved results</small></div>
+      <div class="hero-stat"><span class="trophy"><svg class="ic ic-xl" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trophy"/></svg></span><b id="leaderboardMonthLabel">Monthly leaderboard</b><small>Updated from approved results</small></div>
     </div>
     <div id="lbPodium" class="lb-podium hidden" aria-label="Top three players"></div>
     <div class="toolbar"><div><label for="monthPicker">Competition month</label><input id="monthPicker" type="month"></div><button class="secondary" id="refreshLeaderboard">↻ Refresh</button></div>
