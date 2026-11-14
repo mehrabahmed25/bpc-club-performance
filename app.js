@@ -83,7 +83,8 @@
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
     document.querySelectorAll(".navgroup").forEach(g=>{g.classList.remove("open");const b=g.querySelector(".navgroup-btn");b.setAttribute("aria-expanded","false");b.classList.toggle("active",!!g.querySelector(".navlink.active"));});
     $("nav").classList.remove("open");
-    if(name==="home"){loadHomeMatchday();loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeHouses();loadHomeStories();}
+    if(name!=="home")clipsPause();
+    if(name==="home"){loadHomeClips();loadHomeMatchday();loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeHouses();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -210,6 +211,126 @@
   $("bannerDestination").addEventListener("change",()=>{$("bannerCustomUrlLabel").classList.toggle("hidden",$("bannerDestination").value!=="custom");});
   $("homeBannerImage").addEventListener("click",openBannerDestination);
   $("homeBannerImage").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openBannerDestination();}});
+
+
+  // ================= Highlight clips banner =================
+  const CLIP_KIND={goal:"Goal",pass:"Pass",save:"Save",skill:"Skill"};
+  const clipUrl=p=>client.storage.from("bpc-clips").getPublicUrl(p).data.publicUrl;
+  const cl={list:[],i:0,muted:true,paused:false,obs:null,sig:""};
+  function clipsPause(){const v=document.querySelector("#homeClips video");if(v)v.pause();}
+  async function loadHomeClips(){
+    const box=$("homeClips");if(!box||!client)return;
+    const {data,error}=await client.from("site_clips").select("id,title,player_name,kind,video_path,created_at").eq("is_active",true).order("created_at",{ascending:false}).limit(12);
+    if(error||!data||!data.length){cl.list=[];cl.sig="";box.classList.add("hidden");box.innerHTML="";return;}
+    const sig=data.map(x=>x.id).join();
+    if(sig===cl.sig&&box.innerHTML){box.classList.remove("hidden");clipPlay();return;}
+    cl.list=data;cl.sig=sig;cl.i=0;
+    const still=window.matchMedia&&window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+    cl.paused=!!still;
+    box.innerHTML='<div class="clips-stage"><video class="clips-video" playsinline muted preload="metadata" aria-describedby="clipCap"></video>'
+      +'<div class="clips-bars" aria-hidden="true">'+data.map(()=>'<span><i></i></span>').join("")+'</div>'
+      +'<div class="clips-top"><span class="clips-tag">Highlights</span><span class="clips-count" aria-live="polite"></span></div>'
+      +'<div class="clips-ctrl">'
+        +(data.length>1?'<button type="button" class="clips-btn" data-clip="prev" aria-label="Previous clip"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>':'')
+        +'<button type="button" class="clips-btn" data-clip="play" aria-label="Pause"><svg viewBox="0 0 24 24" class="ic-pause"><path d="M8 5v14M16 5v14"/></svg><svg viewBox="0 0 24 24" class="ic-play"><path d="M7 4l13 8-13 8z"/></svg></button>'
+        +'<button type="button" class="clips-btn" data-clip="sound" aria-label="Turn sound on"><svg viewBox="0 0 24 24" class="ic-mute"><path d="M4 9h4l5-4v14l-5-4H4zM17 9l5 6M22 9l-5 6"/></svg><svg viewBox="0 0 24 24" class="ic-sound"><path d="M4 9h4l5-4v14l-5-4H4zM17 8a5 5 0 0 1 0 8M19.5 5.5a8.5 8.5 0 0 1 0 13"/></svg></button>'
+        +(data.length>1?'<button type="button" class="clips-btn" data-clip="next" aria-label="Next clip"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>':'')
+      +'</div></div>'
+      +'<div class="clips-cap" id="clipCap"><span class="clips-kind"></span><b class="clips-title"></b><small class="clips-player"></small></div>';
+    box.classList.remove("hidden");
+    const v=box.querySelector("video");
+    v.addEventListener("ended",()=>{if(cl.list.length>1){cl.i=(cl.i+1)%cl.list.length;clipShow();}else{v.currentTime=0;clipPlay();}});
+    v.addEventListener("timeupdate",()=>{const b=box.querySelectorAll(".clips-bars i")[cl.i];if(b&&v.duration)b.style.width=(v.currentTime/v.duration*100)+"%";});
+    v.addEventListener("click",()=>{cl.paused=!cl.paused;cl.paused?v.pause():clipPlay();clipSync();});
+    box.querySelectorAll("[data-clip]").forEach(b=>b.addEventListener("click",()=>{
+      const k=b.dataset.clip;
+      if(k==="next"){cl.i=(cl.i+1)%cl.list.length;cl.paused=false;clipShow();}
+      else if(k==="prev"){cl.i=(cl.i-1+cl.list.length)%cl.list.length;cl.paused=false;clipShow();}
+      else if(k==="play"){cl.paused=!cl.paused;cl.paused?v.pause():clipPlay();clipSync();}
+      else if(k==="sound"){cl.muted=!cl.muted;v.muted=cl.muted;if(!cl.muted&&cl.paused){cl.paused=false;clipPlay();}clipSync();}
+    }));
+    box.onkeydown=e=>{if(e.key==="ArrowRight"&&cl.list.length>1){cl.i=(cl.i+1)%cl.list.length;clipShow();}if(e.key==="ArrowLeft"&&cl.list.length>1){cl.i=(cl.i-1+cl.list.length)%cl.list.length;clipShow();}};
+    if(cl.obs)cl.obs.disconnect();
+    if("IntersectionObserver" in window){cl.obs=new IntersectionObserver(es=>es.forEach(en=>{if(en.isIntersecting)clipPlay();else v.pause();}),{threshold:.35});cl.obs.observe(box);}
+    clipShow();
+  }
+  function clipShow(){
+    const box=$("homeClips"),c=cl.list[cl.i];if(!box||!c)return;
+    const v=box.querySelector("video");
+    v.src=clipUrl(c.video_path)+"#t=0.1";v.muted=cl.muted;
+    box.querySelector(".clips-kind").textContent=CLIP_KIND[c.kind]||"Clip";
+    box.querySelector(".clips-kind").dataset.kind=c.kind;
+    box.querySelector(".clips-title").textContent=c.title;
+    box.querySelector(".clips-player").textContent=c.player_name||"";
+    box.querySelector(".clips-count").textContent=cl.list.length>1?(cl.i+1)+" of "+cl.list.length:"";
+    box.querySelectorAll(".clips-bars span").forEach((sp,k)=>{sp.classList.toggle("done",k<cl.i);const i=sp.querySelector("i");i.style.width=k<cl.i?"100%":"0%";});
+    const cap=box.querySelector(".clips-cap");cap.classList.remove("in");void cap.offsetWidth;cap.classList.add("in");
+    clipPlay();clipSync();
+    const nx=cl.list[(cl.i+1)%cl.list.length];
+    if(nx&&cl.list.length>1){const l=document.createElement("link");l.rel="preload";l.as="fetch";l.href=clipUrl(nx.video_path);document.head.appendChild(l);setTimeout(()=>l.remove(),20000);}
+  }
+  function clipPlay(){
+    const box=$("homeClips"),v=box&&box.querySelector("video");if(!v||cl.paused)return;
+    const hv=$("view-home");if(!hv||hv.classList.contains("hidden")||document.hidden)return;
+    const p=v.play();if(p&&p.catch)p.catch(()=>{cl.paused=true;clipSync();});
+  }
+  function clipSync(){
+    const box=$("homeClips");if(!box)return;
+    box.classList.toggle("is-paused",cl.paused);box.classList.toggle("is-muted",cl.muted);
+    const pb=box.querySelector('[data-clip="play"]');if(pb)pb.setAttribute("aria-label",cl.paused?"Play":"Pause");
+    const sb=box.querySelector('[data-clip="sound"]');if(sb)sb.setAttribute("aria-label",cl.muted?"Turn sound on":"Turn sound off");
+  }
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)clipsPause();else clipPlay();});
+
+  async function loadClipAdmin(){
+    const box=$("clipAdminList");if(!box||!client||!state.isAdmin)return;
+    const {data,error}=await client.from("site_clips").select("id,title,player_name,kind,video_path,is_active,created_at").order("created_at",{ascending:false}).limit(40);
+    if(error){status("clipAdminStatus",error.message,"error");return;}
+    if(!data||!data.length){box.innerHTML='<div class="panel soft">No clips uploaded yet.</div>';return;}
+    box.innerHTML=data.map(c=>'<article class="poster-admin-item clip-admin-item"><video src="'+esc(clipUrl(c.video_path))+'#t=0.1" preload="metadata" muted playsinline aria-label="Preview of '+esc(c.title)+'"></video><div><b>'+esc(c.title)+'</b><p class="small">'+esc(CLIP_KIND[c.kind]||c.kind)+(c.player_name?' · '+esc(c.player_name):'')+' · '+(c.is_active?'Showing on Home':'Hidden')+' · '+new Date(c.created_at).toLocaleDateString()+'</p></div>'
+      +'<div class="clip-admin-act"><button type="button" class="secondary" data-clip-toggle="'+esc(c.id)+'" data-on="'+(c.is_active?1:0)+'">'+(c.is_active?'Hide':'Show')+'</button><button type="button" class="reject-btn" data-clip-del="'+esc(c.id)+'" data-path="'+esc(c.video_path)+'">Delete</button></div></article>').join("");
+    box.querySelectorAll("[data-clip-toggle]").forEach(b=>b.addEventListener("click",async()=>{
+      b.disabled=true;
+      const {error}=await client.from("site_clips").update({is_active:b.dataset.on!=="1"}).eq("id",b.dataset.clipToggle);
+      if(error){b.disabled=false;status("clipAdminStatus",error.message,"error");return;}
+      status("clipAdminStatus",b.dataset.on==="1"?"Clip hidden from the Home page.":"Clip is showing on the Home page.","success");
+      loadClipAdmin();cl.sig="";loadHomeClips();
+    }));
+    box.querySelectorAll("[data-clip-del]").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Delete this clip for good? The video file is removed too."))return;
+      b.disabled=true;
+      const {error}=await client.from("site_clips").delete().eq("id",b.dataset.clipDel);
+      if(error){b.disabled=false;status("clipAdminStatus",error.message,"error");return;}
+      await client.storage.from("bpc-clips").remove([b.dataset.path]);
+      status("clipAdminStatus","Clip deleted.","success");
+      loadClipAdmin();cl.sig="";loadHomeClips();
+    }));
+  }
+  function clipDuration(file){return new Promise(res=>{const v=document.createElement("video");v.preload="metadata";const u=URL.createObjectURL(file);const done=d=>{URL.revokeObjectURL(u);res(d);};v.onloadedmetadata=()=>done(v.duration);v.onerror=()=>done(null);setTimeout(()=>done(null),8000);v.src=u;});}
+  if($("clipForm"))$("clipForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    if(!state.isAdmin||!state.session)return;
+    const file=$("clipFile").files?.[0],title=$("clipTitle").value.trim();
+    if(!title){status("clipAdminStatus","Give the clip a title.","error");return;}
+    if(!file){status("clipAdminStatus","Choose a video first.","error");return;}
+    if(!["video/mp4","video/webm","video/quicktime"].includes(file.type)){status("clipAdminStatus","Please choose an MP4, WEBM or MOV video.","error");return;}
+    if(file.size>30*1024*1024){status("clipAdminStatus","The video must be 30 MB or smaller. Trim it or export it at a lower quality.","error");return;}
+    const dur=await clipDuration(file);
+    if(dur&&dur>61){status("clipAdminStatus","The video must be 60 seconds or shorter. This one is "+Math.round(dur)+" seconds.","error");return;}
+    const btn=$("publishClipBtn");btn.disabled=true;status("clipAdminStatus","Uploading clip…");
+    const ext=(file.name.split(".").pop()||"mp4").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const path="clips/"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"."+ext;
+    try{
+      const up=await client.storage.from("bpc-clips").upload(path,file,{contentType:file.type,upsert:false,cacheControl:"604800"});
+      if(up.error)throw up.error;
+      const {error}=await client.from("site_clips").insert({title,player_name:$("clipPlayer").value.trim()||null,kind:$("clipKind").value,video_path:path,created_by:state.session.user.id});
+      if(error){await client.storage.from("bpc-clips").remove([path]);throw error;}
+      $("clipForm").reset();
+      status("clipAdminStatus","Clip uploaded. It now plays first in the Home page banner.","success");
+      loadClipAdmin();cl.sig="";loadHomeClips();
+    }catch(err){status("clipAdminStatus",err.message||"Could not upload the clip.","error");}
+    finally{btn.disabled=false;}
+  });
 
   async function loadHomeBanner(){
     if(!client)return;
@@ -856,6 +977,7 @@ async function loadHistory(){
     loadArticleAdmin();
     loadHousesAdmin();
     await loadPosterAdmin();
+    loadClipAdmin();
     await loadFundsAccessAdmin();
     status("adminStatus","Loading pending submissions…");
     const {data,error}=await client.from("matches").select("id,player_id,opponent_name,match_date,player_goals,opponent_goals,result,points,notes,submitted_at").eq("status","pending").order("submitted_at",{ascending:true}).limit(100);
@@ -4021,7 +4143,7 @@ $("playersBody").innerHTML = shown.map(p =>
         showView("account");
       }
     }
-    await loadMembers();await loadPublicPoster();await loadHomeBanner();
+    await loadMembers();await loadPublicPoster();await loadHomeBanner();loadHomeClips();
   }
   boot();
 })();

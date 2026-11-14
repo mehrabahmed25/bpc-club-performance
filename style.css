@@ -2091,3 +2091,50 @@ body.tx-lock{overflow:hidden}
 @media(max-width:680px){.sbg-stand{height:96px}.sbg-stand svg{width:1456px;height:96px}}
 @media(prefers-reduced-motion:reduce){.sbg *,.sbg-stand *{animation:none!important}.sbg-ball{offset-distance:70%}.sbg-run,.sbg-route{stroke-dashoffset:0}}
 @media print{.sbg,.sbg-stand{display:none}}
+
+
+/* ===== Highlight clips banner (Home) ===== */
+.clips{position:relative;margin:0 0 18px;border-radius:22px;overflow:hidden;background:#04070f;box-shadow:0 18px 40px #0a183a40;outline:2px solid #f6b73c55;outline-offset:-2px}
+.clips-stage{position:relative;aspect-ratio:16/9;max-height:min(62vh,600px);width:100%}
+.clips-video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#04070f;cursor:pointer}
+.clips-stage:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,#000a 0%,transparent 22%,transparent 58%,#000c 100%)}
+.clips-bars{position:absolute;z-index:2;top:12px;left:14px;right:14px;display:flex;gap:5px}
+.clips-bars span{flex:1;height:4px;border-radius:4px;background:#ffffff40;overflow:hidden}
+.clips-bars i{display:block;height:100%;width:0;background:var(--flood)}
+.clips-top{position:absolute;z-index:2;top:26px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:center;color:#fff}
+.clips-tag{display:inline-flex;align-items:center;gap:7px;font:800 12px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--flood)}
+.clips-tag:before{content:"";width:8px;height:8px;border-radius:50%;background:#ff4d5e;box-shadow:0 0 0 0 #ff4d5e99;animation:clip-live 1.6s ease-out infinite}
+@keyframes clip-live{70%{box-shadow:0 0 0 8px #ff4d5e00}}
+.clips-count{font:700 12px var(--display);color:#d7def0}
+.clips-cap{position:absolute;z-index:2;left:18px;right:150px;bottom:16px;color:#fff;display:grid;gap:4px;justify-items:start}
+.clips-cap.in{animation:clip-cap .5s cubic-bezier(.2,.7,.2,1) both}
+@keyframes clip-cap{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.clips-kind{font:800 11.5px var(--display);text-transform:uppercase;letter-spacing:.06em;padding:3px 10px;border-radius:99px;background:var(--flood);color:#1a1200}
+.clips-kind[data-kind=save]{background:#2f8cff;color:#fff}
+.clips-kind[data-kind=pass]{background:#13a46b;color:#fff}
+.clips-kind[data-kind=skill]{background:#b26bff;color:#fff}
+.clips-title{font:800 clamp(18px,2.6vw,28px)/1.15 var(--display);text-shadow:0 2px 12px #000a;overflow-wrap:anywhere}
+.clips-player{font-size:14px;color:#dbe3f5;text-shadow:0 1px 8px #000a}
+.clips-ctrl{position:absolute;z-index:2;right:14px;bottom:14px;display:flex;gap:8px}
+.clips-btn{width:42px;height:42px;border-radius:50%;border:1px solid #ffffff40;background:#0b1430b3;backdrop-filter:blur(4px);display:grid;place-items:center;padding:0;color:#fff}
+.clips-btn:hover{background:#f6b73c;color:#1a1200;border-color:#f6b73c}
+.clips-btn:focus-visible{outline:2px solid var(--flood);outline-offset:2px}
+.clips-btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.clips-btn .ic-play path{fill:currentColor;stroke:none}
+.clips .clips-btn svg.ic-play,.clips .clips-btn svg.ic-sound{display:none}
+.clips.is-paused .clips-btn svg.ic-play{display:block}.clips.is-paused .clips-btn svg.ic-pause{display:none}
+.clips:not(.is-muted) .clips-btn svg.ic-sound{display:block}.clips:not(.is-muted) .clips-btn svg.ic-mute{display:none}
+@media(max-width:680px){
+  .clips{border-radius:18px;margin-bottom:14px}
+  .clips-cap{position:static;padding:12px 16px 14px;background:#04070f;border-top:1px solid #ffffff14}
+  .clips-title{font-size:18px;text-shadow:none}
+  .clips-player{text-shadow:none}
+  .clips-ctrl{right:10px;bottom:10px;gap:6px}
+  .clips-btn{width:38px;height:38px}
+  .clips-stage:after{background:linear-gradient(180deg,#000a 0%,transparent 30%,transparent 70%,#0008 100%)}
+}
+@media(prefers-reduced-motion:reduce){.clips-tag:before,.clips-cap.in{animation:none}}
+.clip-admin-item{display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:center}
+.clip-admin-item video{width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:#0b1430}
+.clip-admin-act{display:flex;gap:6px;flex-wrap:wrap}
+@media(max-width:560px){.clip-admin-item{grid-template-columns:90px 1fr}.clip-admin-item video{width:90px}.clip-admin-act{grid-column:1/-1}}

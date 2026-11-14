@@ -53,6 +53,7 @@
 </header>
 <main>
   <section id="view-home" class="view">
+    <section id="homeClips" class="clips hidden" aria-roledescription="carousel" aria-label="Highlight clips"></section>
     <section id="homeBannerSection" class="home-banner-section hidden" aria-label="Club performance banner"><img id="homeBannerImage" class="home-banner-image" alt="BPC club performance banner"></section>
     <div class="home-hero sdm-hero">
       <svg class="sdm-art" viewBox="0 0 1200 340" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
@@ -244,6 +245,19 @@
         <div id="bannerAdminStatus" class="status"></div>
       </form>
       <div id="bannerAdminCurrent" class="poster-admin-list"></div>
+      <div class="section-head compact"><h2>Highlight clips</h2><p>Short clips of great passes, goals and saves play in a banner at the top of the Home page, newest first.</p></div>
+      <form id="clipForm" class="panel poster-admin-form">
+        <label>Clip title<input id="clipTitle" maxlength="80" required placeholder="e.g. Solo run from halfway"></label>
+        <label>Player<input id="clipPlayer" maxlength="60" placeholder="Who made it (optional)"></label>
+        <label>Type
+          <select id="clipKind"><option value="goal">Goal</option><option value="pass">Pass</option><option value="save">Save</option><option value="skill">Skill</option></select>
+        </label>
+        <label>Choose video<input id="clipFile" type="file" accept="video/mp4,video/webm,video/quicktime" required></label>
+        <p class="small">MP4 works on every phone. WEBM and MOV are accepted, but some iPhone MOV clips will not play on Android. Up to 30 MB and 60 seconds; 10 to 30 seconds loads fastest.</p>
+        <button class="primary" id="publishClipBtn" type="submit">Upload clip</button>
+        <div id="clipAdminStatus" class="status"></div>
+      </form>
+      <div id="clipAdminList" class="poster-admin-list"></div>
       <div class="section-head compact"><h2>UCL finalists poster</h2><p>Upload an announcement image to show it at the top of the Leaderboard. It stays visible until you remove it manually.</p></div>
       <form id="posterForm" class="panel poster-admin-form">
         <label>Poster title<input id="posterUploadTitle" maxlength="120" value="UCL Finalists" required></label>
