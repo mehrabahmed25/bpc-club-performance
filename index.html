@@ -8,6 +8,22 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="BPC"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Brahmanbaria Pes Club — Official Website</title>
+<meta name="description" content="Official website of Brahmanbaria Pes Club (BPC), an eFootball club in Bangladesh: monthly leaderboard, player profiles, tournaments, the BPC Trio and match highlights.">
+<link rel="canonical" href="https://mehrabahmed25.github.io/bpc-club-performance/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Brahmanbaria Pes Club">
+<meta property="og:title" content="Brahmanbaria Pes Club — Official Website">
+<meta property="og:description" content="eFootball leagues, monthly awards, tournaments and the BPC Trio. Play, submit your score and climb the table.">
+<meta property="og:url" content="https://mehrabahmed25.github.io/bpc-club-performance/">
+<meta property="og:image" content="https://mehrabahmed25.github.io/bpc-club-performance/icons/og-image.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Brahmanbaria Pes Club crest on a floodlit pitch">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Brahmanbaria Pes Club — Official Website">
+<meta name="twitter:description" content="eFootball leagues, monthly awards, tournaments and the BPC Trio.">
+<meta name="twitter:image" content="https://mehrabahmed25.github.io/bpc-club-performance/icons/og-image.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SportsOrganization","name":"Brahmanbaria Pes Club","alternateName":"BPC","sport":"eFootball","url":"https://mehrabahmed25.github.io/bpc-club-performance/","logo":"https://mehrabahmed25.github.io/bpc-club-performance/icons/icon-512.png","sameAs":["https://www.facebook.com/bpc.efootball"],"location":{"@type":"Place","name":"Brahmanbaria, Bangladesh"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap">
 <link rel="stylesheet" href="style.css">
@@ -44,6 +60,8 @@
       </div></div>
     <div class="navgroup"><button type="button" class="navgroup-btn" aria-expanded="false" aria-haspopup="true">Club</button>
       <div class="navmenu">
+        <button data-view="about" class="navlink">About BPC</button>
+        <button data-view="rules" class="navlink">Rules</button>
         <button data-view="stories" class="navlink">Stories</button>
         <button data-view="funds" id="fundsNav" class="navlink hidden">BPC Funds</button>
       </div></div>
@@ -172,7 +190,7 @@
         <label>Notes (optional)<textarea id="matchNotes" maxlength="500" rows="3" placeholder="Any useful context"></textarea></label>
         <button class="primary" type="submit" id="matchSubmit">Submit result</button><div id="matchMessage" class="status"></div>
       </form>
-      <aside class="panel soft"><h3>Monthly rules</h3><ul><li>Maximum 80 counted matches per month.</li><li>Maximum 5 counted matches against the same opponent per month.</li><li>At least 40 counted matches for award eligibility.</li><li>At least 5 different COBEG XI opponents, within the 80-match limit.</li></ul><p class="small">Submitting a result does not count it automatically. It must be approved.</p></aside>
+      <aside class="panel soft"><h3>Monthly rules</h3><ul><li>Maximum 80 counted matches per month.</li><li>Maximum 5 counted matches against the same opponent per month.</li><li>Monthly award: at least 40 counted matches, including 25 against COBEG XI players, covering at least 5 different COBEG XI players.</li></ul><p class="small">Submitting a result does not count it automatically. It must be approved. <a href="#/rules" data-view="rules">All rules</a></p></aside>
     </div>
   </section>
 
@@ -184,6 +202,61 @@
       <div id="historyStatus" class="status"></div>
       <div class="table-wrap"><table><thead><tr><th>Date</th><th>Submitted By</th><th>Complete Lineup</th><th>Score</th><th>Result</th><th>Pts</th><th>Lineup Sequence</th><th>Status</th><th>Counted</th></tr></thead><tbody id="historyBody"><tr><td colspan="9" class="empty">Sign in to load your history.</td></tr></tbody></table></div>
     </div>
+  </section>
+
+  <section id="view-rules" class="view hidden">
+    <div class="section-head"><p class="eyebrow">CLUB RULES</p><h2>Rules</h2><p>How matches count, how the monthly award works, and how BPC competitions are run.</p></div>
+    <div class="rl-layout">
+      <nav class="rl-toc" aria-label="On this page"><b>On this page</b><a href="#rl-league">Monthly league</a><a href="#rl-award">Monthly award</a><a href="#rl-results">Submitting results</a><a href="#rl-trio">BPC Trio</a><a href="#rl-tourn">Other tournaments</a><a href="#rl-conduct">Fair play</a></nav>
+      <div class="rl-body">
+        <section class="rl-sec" id="rl-league"><span class="rl-no">1</span><div><h3>Monthly league</h3><ul>
+          <li>Every approved and counted friendly match earns points: 3 for a win, 1 for a draw, 0 for a loss.</li>
+          <li>At most <b>80 counted matches</b> per player each month.</li>
+          <li>At most <b>5 counted matches</b> between the same two players each month. This includes matches either of you submitted.</li>
+          <li>Matches over these limits are still approved and kept in your history, but they do not count for the table.</li>
+          <li>The table is ordered by points, then goal difference, then wins, then head-to-head points.</li></ul></div></section>
+        <section class="rl-sec" id="rl-award"><span class="rl-no">2</span><div><h3>Monthly award</h3><p>To be eligible for the monthly award, a player needs, within the same month:</p><ul>
+          <li>at least <b>40 counted matches</b>,</li><li>of which at least <b>25 against COBEG XI players</b>,</li><li>covering at least <b>5 different COBEG XI players</b>.</li></ul>
+          <p class="small">The award ring on the leaderboard and the tracker on your dashboard show your progress.</p></div></section>
+        <section class="rl-sec" id="rl-results"><span class="rl-no">3</span><div><h3>Submitting results</h3><ul>
+          <li>Enter the final score exactly as played, with the correct opponent and date.</li>
+          <li>A result counts only after an admin approves it. Pending or rejected results do not affect the table.</li>
+          <li>An admin may reject a result that is wrong, duplicated or cannot be confirmed.</li></ul></div></section>
+        <section class="rl-sec" id="rl-trio"><span class="rl-no">4</span><div><h3>BPC Trio</h3><ul>
+          <li><b>Teams.</b> Each team has 3 players in a fixed original lineup: 1st, 2nd and 3rd pick. Only the Management Committee can change it.</li>
+          <li><b>Fixtures.</b> Each fixture is three 1v1 games: 1st pick v 1st pick, 2nd v 2nd, 3rd v 3rd. The team that wins more games takes 3 points; a draw is 1 point.</li>
+          <li><b>Home and swap.</b> Every fixture has a home team, and home games are shared out evenly. Only the home captain may switch their 1st and 2nd pick, once per fixture, before the deadline and before boards 1 or 2 are played. The 3rd pick stays, and there is no counter-swap.</li>
+          <li><b>Walkover.</b> If a player cannot play a round, their captain reports it and an admin confirms. That board goes 3–0 to the opponent. If both players are missing, neither team gets the board.</li>
+          <li><b>Replacement.</b> A player who leaves the tournament is replaced by the Management Committee in the same slot, before the round starts. Each team has up to 2 replacements.</li>
+          <li><b>Man of the Match.</b> The winning captain chooses the MOTM from their own players who played, within 24 hours. After that, an admin chooses.</li></ul></div></section>
+        <section class="rl-sec" id="rl-tourn"><span class="rl-no">5</span><div><h3>Other tournaments</h3><p>Every tournament lists its own format, deadlines and scoring on its Info tab. Where a tournament's own rules differ from this page, the tournament's rules apply.</p><p><a class="secondary rl-btn" href="#/tournaments" data-view="tournaments">See tournaments</a></p></div></section>
+        <section class="rl-sec" id="rl-conduct"><span class="rl-no">6</span><div><h3>Fair play</h3><ul>
+          <li>Play your own matches on your own account, and report scores honestly.</li>
+          <li>Treat opponents and admins with respect, in games and in the club group.</li>
+          <li>The Management Committee has the final say on disputes and on anything these rules do not cover.</li></ul></div></section>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-about" class="view hidden">
+    <div class="section-head"><p class="eyebrow">THE CLUB</p><h2>About BPC</h2><p>Brahmanbaria Pes Club: who we are and how the club is run.</p></div>
+    <div class="ab-grid">
+      <article class="ab-card ab-intro"><img src="icons/icon-192.png" alt="Brahmanbaria Pes Club crest" class="ab-crest" width="96" height="96"><div><h3>Brahmanbaria Pes Club</h3><div id="aboutIntro" class="ab-text"></div></div></article>
+      <article class="ab-card"><h3>What we run</h3><ul class="ab-list">
+        <li><b>Monthly league</b><span>Friendly matches counted toward a monthly table and award.</span></li>
+        <li><b>Tournaments</b><span>Club cups, the BPC Trio team league and special events.</span></li>
+        <li><b>Bid Cup</b><span>A live player auction run inside the club.</span></li>
+        <li><b>House Cup and team series</b><span>Club-wide competitions between houses and teams.</span></li></ul></article>
+      <article class="ab-card"><h3>Management Committee</h3><div id="aboutCommittee"></div></article>
+      <article class="ab-card"><h3>Contact</h3><p>For questions, results or disputes, message the Management Committee on Facebook.</p><p><a class="ft-fb" href="https://www.facebook.com/bpc.efootball" target="_blank" rel="noopener">BPC on Facebook</a></p><p class="small"><a href="#/rules" data-view="rules">Read the club rules</a></p></article>
+    </div>
+    <form id="aboutEdit" class="panel ab-edit hidden">
+      <h3>Edit About page</h3>
+      <label>About the club<textarea id="aboutIntroInput" rows="5" maxlength="1500" placeholder="A short history of the club: when and where it started, and what it stands for."></textarea></label>
+      <label>Management Committee<textarea id="aboutCommitteeInput" rows="5" maxlength="1500" placeholder="One person per line, as Name, Role&#10;e.g. Mehrab Ahmed Apu, President"></textarea></label>
+      <p class="small">Leave a blank line between paragraphs. Committee: one person per line, name and role separated by a comma.</p>
+      <button class="primary" type="submit">Save About page</button><div id="aboutStatus" class="status"></div>
+    </form>
   </section>
 
   <section id="view-admin" class="view hidden">
@@ -404,7 +477,17 @@
   </section>
 
 <div class="sbg-stand" aria-hidden="true"><svg viewBox="0 0 1820 120" focusable="false"><g class="sbg-fan" style="animation-delay:0.00s"><circle cx="14" cy="40" r="10"/><rect x="3" y="51" width="22" height="60" rx="10"/><circle cx="144" cy="46" r="10"/><rect x="133" y="57" width="22" height="60" rx="10"/><circle cx="274" cy="40" r="10"/><rect x="263" y="51" width="22" height="60" rx="10"/><circle cx="404" cy="46" r="10"/><rect x="393" y="57" width="22" height="60" rx="10"/><circle cx="534" cy="40" r="10"/><rect x="523" y="51" width="22" height="60" rx="10"/><circle cx="664" cy="46" r="10"/><rect x="653" y="57" width="22" height="60" rx="10"/><circle cx="794" cy="40" r="10"/><rect x="783" y="51" width="22" height="60" rx="10"/><circle cx="924" cy="46" r="10"/><rect x="913" y="57" width="22" height="60" rx="10"/><circle cx="1054" cy="40" r="10"/><rect x="1043" y="51" width="22" height="60" rx="10"/><circle cx="1184" cy="46" r="10"/><rect x="1173" y="57" width="22" height="60" rx="10"/><circle cx="1314" cy="40" r="10"/><rect x="1303" y="51" width="22" height="60" rx="10"/><circle cx="1444" cy="46" r="10"/><rect x="1433" y="57" width="22" height="60" rx="10"/><circle cx="1574" cy="40" r="10"/><rect x="1563" y="51" width="22" height="60" rx="10"/><circle cx="1704" cy="46" r="10"/><rect x="1693" y="57" width="22" height="60" rx="10"/></g><g class="sbg-fan" style="animation-delay:0.18s"><circle cx="40" cy="46" r="10"/><rect x="29" y="57" width="22" height="60" rx="10"/><circle cx="170" cy="40" r="10"/><rect x="159" y="51" width="22" height="60" rx="10"/><circle cx="300" cy="46" r="10"/><rect x="289" y="57" width="22" height="60" rx="10"/><circle cx="430" cy="40" r="10"/><rect x="419" y="51" width="22" height="60" rx="10"/><circle cx="560" cy="46" r="10"/><rect x="549" y="57" width="22" height="60" rx="10"/><circle cx="690" cy="40" r="10"/><rect x="679" y="51" width="22" height="60" rx="10"/><circle cx="820" cy="46" r="10"/><rect x="809" y="57" width="22" height="60" rx="10"/><circle cx="950" cy="40" r="10"/><rect x="939" y="51" width="22" height="60" rx="10"/><circle cx="1080" cy="46" r="10"/><rect x="1069" y="57" width="22" height="60" rx="10"/><circle cx="1210" cy="40" r="10"/><rect x="1199" y="51" width="22" height="60" rx="10"/><circle cx="1340" cy="46" r="10"/><rect x="1329" y="57" width="22" height="60" rx="10"/><circle cx="1470" cy="40" r="10"/><rect x="1459" y="51" width="22" height="60" rx="10"/><circle cx="1600" cy="46" r="10"/><rect x="1589" y="57" width="22" height="60" rx="10"/><circle cx="1730" cy="40" r="10"/><rect x="1719" y="51" width="22" height="60" rx="10"/></g><g class="sbg-fan" style="animation-delay:0.36s"><circle cx="66" cy="40" r="10"/><rect x="55" y="51" width="22" height="60" rx="10"/><circle cx="196" cy="46" r="10"/><rect x="185" y="57" width="22" height="60" rx="10"/><circle cx="326" cy="40" r="10"/><rect x="315" y="51" width="22" height="60" rx="10"/><circle cx="456" cy="46" r="10"/><rect x="445" y="57" width="22" height="60" rx="10"/><circle cx="586" cy="40" r="10"/><rect x="575" y="51" width="22" height="60" rx="10"/><circle cx="716" cy="46" r="10"/><rect x="705" y="57" width="22" height="60" rx="10"/><circle cx="846" cy="40" r="10"/><rect x="835" y="51" width="22" height="60" rx="10"/><circle cx="976" cy="46" r="10"/><rect x="965" y="57" width="22" height="60" rx="10"/><circle cx="1106" cy="40" r="10"/><rect x="1095" y="51" width="22" height="60" rx="10"/><circle cx="1236" cy="46" r="10"/><rect x="1225" y="57" width="22" height="60" rx="10"/><circle cx="1366" cy="40" r="10"/><rect x="1355" y="51" width="22" height="60" rx="10"/><circle cx="1496" cy="46" r="10"/><rect x="1485" y="57" width="22" height="60" rx="10"/><circle cx="1626" cy="40" r="10"/><rect x="1615" y="51" width="22" height="60" rx="10"/><circle cx="1756" cy="46" r="10"/><rect x="1745" y="57" width="22" height="60" rx="10"/></g><g class="sbg-fan" style="animation-delay:0.54s"><circle cx="92" cy="46" r="10"/><rect x="81" y="57" width="22" height="60" rx="10"/><circle cx="222" cy="40" r="10"/><rect x="211" y="51" width="22" height="60" rx="10"/><circle cx="352" cy="46" r="10"/><rect x="341" y="57" width="22" height="60" rx="10"/><circle cx="482" cy="40" r="10"/><rect x="471" y="51" width="22" height="60" rx="10"/><circle cx="612" cy="46" r="10"/><rect x="601" y="57" width="22" height="60" rx="10"/><circle cx="742" cy="40" r="10"/><rect x="731" y="51" width="22" height="60" rx="10"/><circle cx="872" cy="46" r="10"/><rect x="861" y="57" width="22" height="60" rx="10"/><circle cx="1002" cy="40" r="10"/><rect x="991" y="51" width="22" height="60" rx="10"/><circle cx="1132" cy="46" r="10"/><rect x="1121" y="57" width="22" height="60" rx="10"/><circle cx="1262" cy="40" r="10"/><rect x="1251" y="51" width="22" height="60" rx="10"/><circle cx="1392" cy="46" r="10"/><rect x="1381" y="57" width="22" height="60" rx="10"/><circle cx="1522" cy="40" r="10"/><rect x="1511" y="51" width="22" height="60" rx="10"/><circle cx="1652" cy="46" r="10"/><rect x="1641" y="57" width="22" height="60" rx="10"/><circle cx="1782" cy="40" r="10"/><rect x="1771" y="51" width="22" height="60" rx="10"/></g><g class="sbg-fan" style="animation-delay:0.72s"><circle cx="118" cy="40" r="10"/><rect x="107" y="51" width="22" height="60" rx="10"/><circle cx="248" cy="46" r="10"/><rect x="237" y="57" width="22" height="60" rx="10"/><circle cx="378" cy="40" r="10"/><rect x="367" y="51" width="22" height="60" rx="10"/><circle cx="508" cy="46" r="10"/><rect x="497" y="57" width="22" height="60" rx="10"/><circle cx="638" cy="40" r="10"/><rect x="627" y="51" width="22" height="60" rx="10"/><circle cx="768" cy="46" r="10"/><rect x="757" y="57" width="22" height="60" rx="10"/><circle cx="898" cy="40" r="10"/><rect x="887" y="51" width="22" height="60" rx="10"/><circle cx="1028" cy="46" r="10"/><rect x="1017" y="57" width="22" height="60" rx="10"/><circle cx="1158" cy="40" r="10"/><rect x="1147" y="51" width="22" height="60" rx="10"/><circle cx="1288" cy="46" r="10"/><rect x="1277" y="57" width="22" height="60" rx="10"/><circle cx="1418" cy="40" r="10"/><rect x="1407" y="51" width="22" height="60" rx="10"/><circle cx="1548" cy="46" r="10"/><rect x="1537" y="57" width="22" height="60" rx="10"/><circle cx="1678" cy="40" r="10"/><rect x="1667" y="51" width="22" height="60" rx="10"/><circle cx="1808" cy="46" r="10"/><rect x="1797" y="57" width="22" height="60" rx="10"/></g><g transform="translate(90 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:0.0s" d="M1 4h36l-9 11 9 11H1z" fill="#e39a12" fill-opacity=".5"/></g><g transform="translate(300 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:0.3s" d="M1 4h36l-9 11 9 11H1z" fill="#2459e8" fill-opacity=".5"/></g><g transform="translate(510 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:0.6s" d="M1 4h36l-9 11 9 11H1z" fill="#e39a12" fill-opacity=".5"/></g><g transform="translate(720 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:0.9s" d="M1 4h36l-9 11 9 11H1z" fill="#2459e8" fill-opacity=".5"/></g><g transform="translate(930 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:1.2s" d="M1 4h36l-9 11 9 11H1z" fill="#e39a12" fill-opacity=".5"/></g><g transform="translate(1140 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:1.5s" d="M1 4h36l-9 11 9 11H1z" fill="#2459e8" fill-opacity=".5"/></g><g transform="translate(1350 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:1.8s" d="M1 4h36l-9 11 9 11H1z" fill="#e39a12" fill-opacity=".5"/></g><g transform="translate(1560 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:2.1s" d="M1 4h36l-9 11 9 11H1z" fill="#2459e8" fill-opacity=".5"/></g><g transform="translate(1770 0)"><path d="M0 46V4" stroke="#0d1a36" stroke-opacity=".3" stroke-width="3"/><path class="sbg-flag" style="animation-delay:2.4s" d="M1 4h36l-9 11 9 11H1z" fill="#e39a12" fill-opacity=".5"/></g></svg></div>
-  <footer class="footer"><span>Brahmanbaria Pes Club</span><span class="ft-dev">Developed by <a href="https://mehrabahmed25.github.io/portfolio/" target="_blank" rel="noopener">Mehrab Uddin Ahmed</a></span><button type="button" id="installBtn" class="ft-install hidden">Install app</button><a class="ft-fb" href="https://www.facebook.com/bpc.efootball" target="_blank" rel="noopener" aria-label="BPC on Facebook"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z"/></svg>Facebook</a></footer>
+  <footer class="footer site-ft">
+    <div class="ft-top">
+      <div class="ft-club"><img src="icons/icon-192.png" alt="" width="56" height="56" class="ft-crest"><div><b>Brahmanbaria Pes Club</b><span>eFootball club from Brahmanbaria, Bangladesh</span><span class="ft-season" id="ftSeason"></span></div></div>
+      <nav class="ft-links" aria-label="Footer">
+        <div><b>Compete</b><a href="#/leaderboard" data-view="leaderboard">Leaderboard</a><a href="#/tournaments" data-view="tournaments">Tournaments</a><a href="#/h2h" data-view="h2h">Head to Head</a></div>
+        <div><b>Club</b><a href="#/about" data-view="about">About BPC</a><a href="#/rules" data-view="rules">Rules</a><a href="#/stories" data-view="stories">Stories</a></div>
+        <div><b>Follow</b><a class="ft-fb" href="https://www.facebook.com/bpc.efootball" target="_blank" rel="noopener" aria-label="BPC on Facebook"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z"/></svg>Facebook</a><button type="button" id="installBtn" class="ft-install hidden">Install app</button></div>
+      </nav>
+    </div>
+    <div class="ft-bottom"><span>© <span id="ftYear">2026</span> Brahmanbaria Pes Club. All rights reserved.</span><span class="ft-dev">Developed by <a href="https://mehrabahmed25.github.io/portfolio/" target="_blank" rel="noopener">Mehrab Uddin Ahmed</a></span></div>
+  </footer>
 </main>
 
 <nav id="tabbar" class="tabbar" aria-label="Main">

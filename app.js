@@ -74,7 +74,7 @@
   function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
   function monthDate(v){return v ? v+"-01" : bdToday();}
   function prettyDate(v){if(!v)return "—";const d=new Date(v+"T12:00:00");return d.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"});}
-  function showView(name){
+  function showView(name,opts){
     if(name==="account"&&state.session&&!state.recoveryMode)name="profile";
     if(name==="funds"&&!state.canAccessFunds){toast("BPC Funds is restricted to authorized accounts.");name="home";}
     if(name==="player"){const cur=document.querySelector(".view:not(.hidden)");if(cur&&cur.id!=="view-player")state.pfFrom=cur.id.replace("view-","");}
@@ -99,9 +99,62 @@
     if(name==="funds")loadFundsPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
+    if(name==="about")loadAbout();
+    if(!(opts&&opts.fromRoute))setRoute(name==="player"&&state.viewPlayerId?"player/"+state.viewPlayerId:name);
+    if(name!=="player")document.title=(VIEW_TITLES[name]?VIEW_TITLES[name]+" · ":"")+SITE_TITLE;
     updateTabbar();
     window.scrollTo({top:0,behavior:"smooth"});
   }
+
+
+  // ---- Page addresses (#/page) and titles ----
+  const SITE_TITLE="Brahmanbaria Pes Club";
+  const VIEW_TITLES={leaderboard:"Leaderboard",h2h:"Head to Head",player:"Player",stories:"Stories",account:"Sign in",submit:"Submit result",history:"Match history",admin:"Admin",funds:"BPC Funds",profile:"My dashboard",houses:"House Cup",series:"Team series",auction:"Bid Cup",tournaments:"Tournaments",official:"Official matches",rules:"Rules",about:"About BPC"};
+  function setRoute(path,replace){
+    const want="#/"+path;
+    if(path==="home"&&(!location.hash||location.hash==="#/"||location.hash==="#/home")){if(location.hash==="#/home")history.replaceState(null,"",location.pathname+location.search);return;}
+    if(location.hash===want)return;
+    try{if(replace)history.replaceState(null,"",want);else history.pushState(null,"",want);}catch(e){}
+  }
+  function isAuthHash(){return /access_token=|type=recovery|error_description=/.test(location.hash);}
+  function routeFromHash(){
+    if(isAuthHash())return false;
+    const m=location.hash.match(/^#\/([a-z0-9-]+)(?:\/([A-Za-z0-9-]+))?/);
+    if(!m){if(!location.hash||location.hash==="#/"){showView("home",{fromRoute:true});return true;}return false;}
+    const [,page,arg]=m;
+    if(page==="player"&&arg){state.viewPlayerId=arg;pfScope={mode:"all",month:monthNow};showView("player",{fromRoute:true});return true;}
+    if(page==="tournaments"&&arg){showView("tournaments",{fromRoute:true});setTimeout(()=>openTournament(arg,{fromRoute:true}),60);return true;}
+    if(page==="home"||$("view-"+page)){showView(page,{fromRoute:true});return true;}
+    return false;
+  }
+  window.addEventListener("popstate",()=>{routeFromHash();});
+  document.addEventListener("click",e=>{const a=e.target.closest('a[href^="#rl-"]');if(!a)return;e.preventDefault();const t=document.getElementById(a.getAttribute("href").slice(1));if(t){t.scrollIntoView({behavior:"smooth",block:"start"});t.setAttribute("tabindex","-1");t.focus({preventScroll:true});}});
+  document.addEventListener("click",e=>{const a=e.target.closest('a[data-view][href^="#/"]');if(a)e.preventDefault();},true);
+
+  // ---- About page ----
+  let aboutData=null;
+  const ABOUT_DEFAULT="Brahmanbaria Pes Club (BPC) is an eFootball club from Brahmanbaria, Bangladesh. Members play friendly matches through the month, compete for the monthly award, and take part in club tournaments, the BPC Trio and the Bid Cup.";
+  function paraHtml(t){return String(t||"").split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean).map(p=>'<p>'+esc(p).replace(/\n/g,"<br>")+'</p>').join("");}
+  async function loadAbout(){
+    if(!client)return;
+    if(!aboutData){const {data}=await client.from("site_content").select("value").eq("key","about").maybeSingle();aboutData=(data&&data.value)||{};}
+    $("aboutIntro").innerHTML=paraHtml(aboutData.intro||ABOUT_DEFAULT);
+    const com=Array.isArray(aboutData.committee)?aboutData.committee:[];
+    $("aboutCommittee").innerHTML=com.length?'<ul class="ab-com">'+com.map(c=>'<li><span class="ab-av" aria-hidden="true"'+av(c.name)+'>'+esc(initials(c.name))+'</span><div><b>'+esc(c.name)+'</b><small>'+esc(c.role||"")+'</small></div></li>').join("")+'</ul>':'<p class="small">The committee list will appear here soon.</p>';
+    const ed=$("aboutEdit");ed.classList.toggle("hidden",!state.isAdmin);
+    if(state.isAdmin&&!ed.dataset.filled){ed.dataset.filled="1";$("aboutIntroInput").value=aboutData.intro||"";$("aboutCommitteeInput").value=com.map(c=>c.name+(c.role?", "+c.role:"")).join("\n");}
+  }
+  if($("aboutEdit"))$("aboutEdit").addEventListener("submit",async e=>{
+    e.preventDefault();if(!state.isAdmin||!state.session)return;
+    const committee=$("aboutCommitteeInput").value.split("\n").map(l=>l.trim()).filter(Boolean).slice(0,30).map(l=>{const k=l.indexOf(",");return k<0?{name:l.slice(0,60),role:""}:{name:l.slice(0,k).trim().slice(0,60),role:l.slice(k+1).trim().slice(0,60)};}).filter(c=>c.name);
+    const value={intro:$("aboutIntroInput").value.trim(),committee};
+    const btn=e.target.querySelector("button[type=submit]");btn.disabled=true;
+    const {error}=await client.from("site_content").upsert({key:"about",value,updated_at:new Date().toISOString(),updated_by:state.session.user.id});
+    btn.disabled=false;
+    if(error){status("aboutStatus",error.message,"error");return;}
+    aboutData=value;status("aboutStatus","About page saved.","success");loadAbout();
+  });
+  (function(){const y=new Date().getFullYear(),m=new Date().getMonth();const fy=$("ftYear");if(fy)fy.textContent=y;const fs=$("ftSeason");if(fs)fs.textContent="Season "+(m>=6?y+"–"+String(y+1).slice(2):(y-1)+"–"+String(y).slice(2));})();
 
   // ---- Mobile tab bar ----
   function updateTabbar(){
@@ -726,7 +779,7 @@ $("matchForm").addEventListener("submit", async e => {
     if(!data.length){body.innerHTML='<tr><td colspan="13" class="empty">No counted matches this month yet. Players appear here after their first approved result.</td></tr>';return;}
     body.innerHTML=data.map(r=>{
       const total=cobegByPlayer[r.player_id]||0;
-      const eligible=!!r.award_eligible;
+      const eligible=!!r.award_eligible&&total>=25;
       const fm=(formBy[r.player_id]||"").split("").map(c=>'<i class="fd '+c.toLowerCase()+'" title="'+({W:"Win",D:"Draw",L:"Loss"})[c]+'"></i>').join("");
       const pct=Math.round((Math.min(Number(r.matches_played)||0,40)/40+Math.min(total,25)/25+Math.min(Number(r.cobeg_opponents)||0,5)/5)/3*100);
       const ring='<span class="aw-ring'+(eligible?' ok':'')+'" style="--p:'+(eligible?100:pct)+'" title="'+(eligible?"Award eligible":"Award progress "+pct+"%")+'"><b>'+(eligible?"✓":pct+"%")+'</b></span>';
@@ -2754,7 +2807,8 @@ $("playersBody").innerHTML = shown.map(p =>
     const [mres,dir,lb]=await Promise.all([client.rpc("get_player_matches",{p_player:id}),client.from("active_player_directory").select("id,display_name").eq("id",id).maybeSingle(),client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
     const me=dir.data;
     const hmap=await houseMap().catch(()=>null);
-    if(!me||mres.error){box.innerHTML='<div class="h2h-empty"><b>Player not found.</b><span>This profile is not available.</span></div>';return;}
+    if(!me||mres.error){box.innerHTML='<div class="h2h-empty"><b>Player not found.</b><span>This profile is not available.</span></div>';document.title="Player not found · "+SITE_TITLE;return;}
+    document.title=me.display_name+" · "+SITE_TITLE;
     const all=(mres.data||[]).map(r=>({...r,gf:Number(r.gf),ga:Number(r.ga)}));
     const rows=pfScope.mode==="month"?all.filter(r=>r.match_date.slice(0,7)===pfScope.month):all;
     const st=pfStats(rows);
@@ -3814,6 +3868,8 @@ $("playersBody").innerHTML = shown.map(p =>
       return '<div class="tn-person'+(p.status==="withdrawn"?' is-out':'')+'"><span class="tn-av" aria-hidden="true"'+av(nm,{uid:p.user_id})+'>'+esc(initials(nm))+'</span><div class="tn-person-main"><b>'+esc(nm)+(p.user_id===uid?'<em class="tn-you">You</em>':'')+'</b>'+(p.seed?'<span class="small">Seed '+esc(p.seed)+'</span>':'')+'</div>'+(groupOf[p.id]?'<span class="tn-gchip">Group '+esc(groupOf[p.id])+'</span>':'')+pill+act+'</div>';
     }).join("")+'</div>':'<div class="tn-empty">No participants yet.</div>')+'</section>';
     tnOpen=id;
+    if(!(opts&&opts.keep)&&!(opts&&opts.fromRoute))setRoute("tournaments/"+id);
+    document.title=t.name+" · "+SITE_TITLE;
     const detail=$("tournamentDetail");
     const rosterHtml=t.competition_type==="team"?rosterSection(rosters,t,ended):"";
     const perfHtml=isTrio?'<section class="tn-section tn-arena-sec"><div class="tn-section-head"><h3>Top performers</h3><span class="small">Best records across all board games</span></div><div id="trioPerf"><div class="tn-empty">Loading…</div></div></section>':"";
@@ -3912,7 +3968,7 @@ $("playersBody").innerHTML = shown.map(p =>
       if(error){status("tournamentStatus",error.message,"error");return;}await openTournament(id);toast(deadline?"Deadline saved.":"Deadline removed.");
     }));
     bindScoreForms(detail,kind=>{openTournament(id);toast(kind==="admin"?"Result saved and approved.":t.score_workflow==="participant_opponent_admin"?"Score submitted. Your opponent needs to confirm it.":"Score submitted. An admin will review it.");},msg=>{status("tournamentStatus",msg,"error");toast(msg);});
-    $("tnBack")?.addEventListener("click",()=>{tnOpen=null;applyTnVisibility();loadTournaments();window.scrollTo({top:0,behavior:"smooth"});});
+    $("tnBack")?.addEventListener("click",()=>{tnOpen=null;setRoute("tournaments");document.title="Tournaments · "+SITE_TITLE;applyTnVisibility();loadTournaments();window.scrollTo({top:0,behavior:"smooth"});});
     $("tnEnd")?.addEventListener("click",()=>tnLifecycle(t,"completed"));
     $("tnArchive")?.addEventListener("click",()=>tnLifecycle(t,"archived"));
     $("tnRestore")?.addEventListener("click",()=>tnLifecycle(t,"completed"));
@@ -4143,6 +4199,7 @@ $("playersBody").innerHTML = shown.map(p =>
         showView("account");
       }
     }
+    if(!state.recoveryMode&&!(recoveryHash&&!state.session))routeFromHash();
     await loadMembers();await loadPublicPoster();await loadHomeBanner();loadHomeClips();
   }
   boot();
