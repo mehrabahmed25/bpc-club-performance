@@ -81,6 +81,7 @@
     document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
     const target=$("view-"+name);if(target)target.classList.remove("hidden");
     document.querySelectorAll(".navlink").forEach(b=>b.classList.toggle("active",b.dataset.view===name));
+    document.querySelectorAll(".navgroup").forEach(g=>{g.classList.remove("open");const b=g.querySelector(".navgroup-btn");b.setAttribute("aria-expanded","false");b.classList.toggle("active",!!g.querySelector(".navlink.active"));});
     $("nav").classList.remove("open");
     if(name==="home"){loadHomeMatchday();loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeHouses();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
@@ -120,6 +121,11 @@
   });
   document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
   $("menuBtn").addEventListener("click",()=>$("nav").classList.toggle("open"));
+  // grouped navigation menus
+  const closeNavGroups=except=>document.querySelectorAll(".navgroup.open").forEach(g=>{if(g!==except){g.classList.remove("open");g.querySelector(".navgroup-btn").setAttribute("aria-expanded","false");}});
+  document.querySelectorAll(".navgroup-btn").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();const g=b.parentElement;closeNavGroups(g);const on=g.classList.toggle("open");b.setAttribute("aria-expanded",on?"true":"false");}));
+  document.addEventListener("click",e=>{if(!e.target.closest(".navgroup"))closeNavGroups();});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"){const g=document.querySelector(".navgroup.open");if(g){closeNavGroups();g.querySelector(".navgroup-btn").focus();}}});
   $("monthPicker").addEventListener("change",loadLeaderboard);
   $("refreshLeaderboard").addEventListener("click",loadLeaderboard);
   $("historyMonth").addEventListener("change",loadHistory);
@@ -2744,6 +2750,26 @@ $("playersBody").innerHTML = shown.map(p =>
   }
   // ---- Home: scoreboard ticker + table podium ----
 
+
+  // ---- Home hero scoreboard ----
+  const hb={parts:{},i:0,timer:null};
+  function heroBoardRender(){
+    const main=$("hbMain");if(!main)return;
+    const all=[].concat(hb.parts.you||[],hb.parts.week||[]);
+    if(!all.length)return;
+    hb.i=hb.i%all.length;const sl=all[hb.i];
+    $("hbLabel").textContent=sl.label;
+    main.innerHTML=sl.score!=null?'<span class="hb-n">'+esc(sl.a)+'</span><b class="hb-s">'+esc(sl.score)+'</b><span class="hb-n r">'+esc(sl.b)+'</span>':'<b class="hb-s wide">'+esc(sl.big())+'</b>';
+    $("hbFoot").textContent=sl.foot||"";
+    $("hbDots").innerHTML=all.length>1?all.map((_,k)=>'<i class="'+(k===hb.i?'on':'')+'"></i>').join(""):"";
+    main.classList.remove("flip");void main.offsetWidth;main.classList.add("flip");
+  }
+  function heroBoard(key,slides){
+    hb.parts[key]=slides;hb.i=0;heroBoardRender();
+    clearInterval(hb.timer);
+    const still=window.matchMedia&&window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+    if(!still)hb.timer=setInterval(()=>{const hv=$("view-home");if(!hv||hv.classList.contains("hidden")||document.hidden)return;hb.i++;heroBoardRender();},4500);
+  }
   // ---- Home: Matchday board ----
   async function loadHomeMatchday(){
     const box=$("homeMatchday");if(!box||!client)return;
@@ -2757,9 +2783,10 @@ $("playersBody").innerHTML = shown.map(p =>
     // you
     (async()=>{
       try{
-        if(!signed){you.innerHTML='<p>Sign in to see your fixtures, deadlines and what needs your score.</p><div class="md-act"><button type="button" class="primary" data-md-go="account">Sign in</button><button type="button" class="ghost" data-md-go="leaderboard">See the table</button></div>';return;}
+        if(!signed){heroBoard("you",[]);you.innerHTML='<p>Sign in to see your fixtures, deadlines and what needs your score.</p><div class="md-act"><button type="button" class="primary" data-md-go="account">Sign in</button><button type="button" class="ghost" data-md-go="leaderboard">See the table</button></div>';return;}
         const {data}=await client.rpc("tournament_my_matches");
         const todo=(data||[]).filter(r=>!["approved","completed","bye"].includes(r.status)&&["scheduled","rejected"].includes(r.status)).sort((a,b)=>(a.deadline_at?new Date(a.deadline_at):Infinity)-(b.deadline_at?new Date(b.deadline_at):Infinity)).slice(0,3);
+        heroBoard("you",todo.filter(r=>r.deadline_at).slice(0,1).map(r=>({label:"Your next deadline",big:()=>timeLeft(r.deadline_at)||"Past deadline",foot:r.my_name+" v "+(r.opponent_name||"TBD")+" · "+r.tournament_name})));
         const rows=todo.map(r=>{const left=r.deadline_at?timeLeft(r.deadline_at):null;const when=!r.deadline_at?"No deadline":left?"Due in "+left:"Past deadline";return '<button type="button" class="md-fix'+(r.deadline_at&&!left?' late':'')+'" data-md-tour="'+esc(r.tournament_id)+'"><span><b>'+esc(r.my_name)+'</b> v <b>'+esc(r.opponent_name||"TBD")+'</b></span><small>'+esc(r.tournament_name)+' · '+esc(when)+'</small></button>';}).join("");
         you.innerHTML='<p class="md-hi">Hi'+(who?' '+esc(who):'')+'.</p>'+(rows||'<p>No tournament fixtures waiting on you.</p>')+'<div class="md-act"><button type="button" class="primary" data-md-go="submit">Submit a result</button><button type="button" class="ghost" data-md-go="profile">My profile</button></div>';
       }catch(e){you.innerHTML='<p class="md-dim">Fixtures are unavailable right now.</p>';}
@@ -2779,6 +2806,7 @@ $("playersBody").innerHTML = shown.map(p =>
         const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(bdToday()+"T12:00:00"),-6)),p_end:bdToday()});
         const rows=(data||[]).filter(m=>m.a_name&&m.b_name);
         const today=rows.filter(m=>String(m.match_date||"").slice(0,10)===bdToday()).length;
+        heroBoard("week",rows.slice(0,4).map(m=>({label:"Latest result",a:m.a_name,b:m.b_name,score:m.a_goals+"–"+m.b_goals,foot:m.match_date?new Date(String(m.match_date).slice(0,10)+"T12:00:00").toLocaleDateString([], {weekday:"short",day:"numeric",month:"short"}):""})));
         week.innerHTML='<div class="md-num"><b>'+rows.length+'</b><span>results in 7 days'+(today?' · '+today+' today':'')+'</span></div>'+rows.slice(0,3).map(m=>'<div class="md-res"><span>'+esc(m.a_name)+'</span><b>'+m.a_goals+' – '+m.b_goals+'</b><span>'+esc(m.b_name)+'</span></div>').join("")+(rows.length?'':'<p class="md-dim">No results yet this week.</p>');
       }catch(e){week.innerHTML='<p class="md-dim">Results are unavailable right now.</p>';}
     })();
