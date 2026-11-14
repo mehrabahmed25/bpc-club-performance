@@ -158,6 +158,78 @@
   });
   (function(){const y=new Date().getFullYear(),m=new Date().getMonth();const fy=$("ftYear");if(fy)fy.textContent=y;const fs=$("ftSeason");if(fs)fs.textContent="Season "+(m>=6?y+"–"+String(y+1).slice(2):(y-1)+"–"+String(y).slice(2));})();
 
+
+  // ================= Submit form: limits up front =================
+  let limSeq=0;
+  async function refreshSubmitLimits(){
+    const box=$("submitLimits");if(!box||!client||!state.session)return;
+    const type=$("opponentType").value,member=state.members.find(m=>m.id===$("cobegOpponent").value);
+    const opp=type==="cobeg"?(member?.name||""):$("otherOpponent").value;
+    const date=$("matchDate").value;
+    if(!opp||!date){box.classList.add("hidden");return;}
+    const seq=++limSeq;
+    const {data,error}=await client.rpc("get_submit_limits",{p_opponent_name:opp,p_date:date});
+    if(seq!==limSeq)return;
+    if(error||!data){box.classList.add("hidden");return;}
+    const meter=(label,used,pend,max,warnTxt)=>{
+      const full=used>=max,near=!full&&used+pend>=max;
+      const pct=Math.min(100,Math.round(used/max*100));
+      return '<div class="lim-row'+(full?' full':near?' near':'')+'"><div class="lim-top"><span>'+label+'</span><b>'+used+' of '+max+'</b></div><div class="lim-bar"><i style="width:'+pct+'%"></i></div>'
+        +(pend?'<small>'+pend+' more waiting for approval.</small>':'')+(full?'<small class="lim-warn">'+warnTxt+'</small>':near?'<small class="lim-warn">Your pending results will reach the limit if approved.</small>':'')+'</div>';
+    };
+    box.innerHTML=meter('Counted v '+esc(opp)+' in '+esc(data.month),data.pair_total,data.pair_pending,data.pair_max,'Limit reached. Another match v '+esc(opp)+' this month will be approved but not counted.')
+      +meter('Your counted matches in '+esc(data.month),data.month_total,data.month_pending,data.month_max,'Monthly limit reached. More matches this month will not count.');
+    box.classList.remove("hidden");
+  }
+  ["opponentType","cobegOpponent","otherOpponent","matchDate"].forEach(id=>{const el=$(id);if(el)el.addEventListener("change",refreshSubmitLimits);});
+
+  // ================= Notification bell =================
+  const bell={items:[],timer:null,open:false};
+  const BELL_KEY="bpc-bell-seen";
+  function bellSeen(){try{return new Set(JSON.parse(localStorage.getItem(BELL_KEY)||"[]"));}catch(e){return new Set();}}
+  function bellMarkSeen(ids){try{const s=bellSeen();ids.forEach(i=>s.add(i));localStorage.setItem(BELL_KEY,JSON.stringify([...s].slice(-300)));}catch(e){}}
+  function bellAgo(t){if(!t)return "";const d=(Date.now()-new Date(t))/60000;if(d<0){const h=Math.round(-d/60);return h<1?"within the hour":"in "+(h<48?h+"h":Math.round(h/24)+"d");}if(d<1)return "just now";if(d<60)return Math.round(d)+"m ago";if(d<1440)return Math.round(d/60)+"h ago";return Math.round(d/1440)+"d ago";}
+  async function loadBell(){
+    const btn=$("bellBtn");if(!btn||!client)return;
+    if(!state.session){btn.classList.add("hidden");bell.items=[];return;}
+    btn.classList.remove("hidden");
+    const {data,error}=await client.rpc("get_my_notifications");
+    if(error||!Array.isArray(data))return;
+    let items=data.slice();
+    const logged=items.filter(x=>x.title==="Match logged against you");
+    if(logged.length>1){
+      items=items.filter(x=>x.title!=="Match logged against you");
+      logged.sort((a,b)=>new Date(b.at)-new Date(a.at));
+      items.push({id:"og-"+logged.map(x=>x.id).join("").length+"-"+logged[0].id,kind:"info",title:logged.length+" matches logged against you",body:"Latest: "+logged[0].body,at:logged[0].at,link:"history"});
+    }
+    const rank={admin:0,bad:1,warn:2,info:3,good:4};
+    items.sort((a,b)=>(rank[a.kind]??5)-(rank[b.kind]??5)||new Date(b.at||0)-new Date(a.at||0));
+    bell.items=items;bellRender();
+  }
+  function bellRender(){
+    const seen=bellSeen(),n=bell.items.filter(x=>!seen.has(x.id)).length;
+    const c=$("bellCount");c.textContent=n>9?"9+":String(n);c.classList.toggle("hidden",!n);
+    $("bellBtn").setAttribute("aria-label",n?"Notifications, "+n+" new":"Notifications");
+    const list=$("bellList");
+    if(!bell.items.length){list.innerHTML='<div class="bell-empty"><b>You are all caught up.</b><span>Deadlines, results and captain tasks show up here.</span></div>';return;}
+    list.innerHTML=bell.items.map(x=>'<button type="button" class="bell-it k-'+esc(x.kind||"info")+(seen.has(x.id)?'':' new')+'" data-link="'+esc(x.link||"")+'"><i aria-hidden="true"></i><span><b>'+esc(x.title)+'</b><small>'+esc(x.body||"")+'</small><em>'+esc(x.due?"Due "+bellAgo(x.due):bellAgo(x.at))+'</em></span></button>').join("");
+  }
+  function bellToggle(open){
+    const p=$("bellPanel"),b=$("bellBtn");bell.open=open===undefined?!bell.open:open;
+    p.classList.toggle("hidden",!bell.open);b.setAttribute("aria-expanded",bell.open?"true":"false");
+    if(bell.open){bellRender();setTimeout(()=>{bellMarkSeen(bell.items.map(x=>x.id));const c=$("bellCount");c.classList.add("hidden");},1200);const f=p.querySelector(".bell-it,.bell-x");if(f)f.focus();}
+    else bellRender();
+  }
+  if($("bellBtn")){
+    $("bellBtn").addEventListener("click",e=>{e.stopPropagation();bellToggle();if(bell.open)loadBell();});
+    $("bellClose").addEventListener("click",()=>{bellToggle(false);$("bellBtn").focus();});
+    $("bellList").addEventListener("click",e=>{const it=e.target.closest(".bell-it");if(!it)return;bellToggle(false);const l=it.dataset.link;if(!l)return;try{history.pushState(null,"","#/"+l);}catch(_){}routeFromHash();});
+    document.addEventListener("click",e=>{if(bell.open&&!e.target.closest("#bellPanel,#bellBtn"))bellToggle(false);});
+    document.addEventListener("keydown",e=>{if(e.key==="Escape"&&bell.open){bellToggle(false);$("bellBtn").focus();}});
+    bell.timer=setInterval(()=>{if(!document.hidden&&state.session)loadBell();},120000);
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.session)loadBell();});
+  }
+
   // ---- Mobile tab bar ----
   function updateTabbar(){
     const tb=$("tabbar");if(!tb)return;
@@ -462,6 +534,7 @@
   });
 
   function setAuthUI(){
+    setTimeout(()=>{if(typeof loadBell==="function")loadBell();},0);
     setTimeout(()=>{if(typeof updateTabbar==="function")updateTabbar();const hv=$("view-home");if(hv&&!hv.classList.contains("hidden")&&typeof loadHomeMatchday==="function")loadHomeMatchday();},0);
     if(state.recoveryMode){
       $("accountNav").textContent="Reset password";
@@ -731,6 +804,7 @@ $("matchForm").addEventListener("submit", async e => {
 
     $("matchForm").reset();
     $("matchDate").value = new Date().toISOString().slice(0, 10);
+    $("submitLimits").classList.add("hidden");loadBell();
 
     $("opponentType").dispatchEvent(
       new Event("change", { bubbles: true })
