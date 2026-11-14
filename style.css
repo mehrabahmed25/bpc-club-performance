@@ -2062,3 +2062,32 @@ body.tx-lock{overflow:hidden}
   .navmenu .navlink.active{background:transparent}
   .navmenu .navlink.active:after{display:block}
 }
+
+
+/* ===== Site background: animated tactics board ===== */
+.sbg{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.sbg text{font:600 11px Inter,system-ui,sans-serif;fill:#1c3f96;fill-opacity:.42}
+.sbg text.sbg-cap{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;fill-opacity:.35}
+.sbg text.sbg-num{font-family:var(--display),"Arial Black",sans-serif;font-weight:800;fill:none;stroke:#1c3f96;stroke-opacity:.09;stroke-width:3}
+.sbg-ball{offset-path:path("M150 880C380 520 760 360 1160 200");offset-rotate:0deg;animation:sbg-fly 9s cubic-bezier(.3,.1,.3,1) infinite}
+.sbg-ball>g{animation:sbg-spin 1.6s linear infinite;transform-box:fill-box;transform-origin:center}
+@keyframes sbg-fly{0%{offset-distance:0%;opacity:0}8%{opacity:1}82%{offset-distance:100%;opacity:1}92%,100%{offset-distance:100%;opacity:0}}
+@keyframes sbg-spin{to{transform:rotate(360deg)}}
+.sbg-run{stroke-dasharray:100;stroke-dashoffset:100;animation:sbg-draw 7s ease-in-out infinite}
+.sbg-run.sbg-r2{animation-delay:2.2s}
+@keyframes sbg-draw{0%{stroke-dashoffset:100;opacity:0}10%{opacity:1}45%,80%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.sbg-mk{transform-box:fill-box;transform-origin:center;animation:sbg-pulse 3.6s ease-in-out infinite}
+@keyframes sbg-pulse{50%{transform:scale(1.25);stroke-opacity:.45}}
+.sbg-city{transform-box:fill-box;transform-origin:center;opacity:.5;animation:sbg-tw 5.2s ease-in-out infinite}
+@keyframes sbg-tw{0%,70%,100%{opacity:.45;transform:scale(1)}80%{opacity:1;transform:scale(1.9)}}
+.sbg-route{stroke-dasharray:100;animation:sbg-route 10s linear infinite}
+@keyframes sbg-route{0%{stroke-dashoffset:100}45%,100%{stroke-dashoffset:0}}
+.sbg-stand{position:relative;height:120px;overflow:hidden;margin:26px 0 -1px;pointer-events:none}
+.sbg-stand svg{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:1820px;height:120px}
+.sbg-fan{fill:#0d1a36;fill-opacity:.16;animation:sbg-bob 1.4s ease-in-out infinite}
+@keyframes sbg-bob{50%{transform:translateY(-4px)}}
+.sbg-flag{transform-box:fill-box;transform-origin:left center;animation:sbg-wave 1.8s ease-in-out infinite}
+@keyframes sbg-wave{50%{transform:skewY(-9deg) scaleX(.9)}}
+@media(max-width:680px){.sbg-stand{height:96px}.sbg-stand svg{width:1456px;height:96px}}
+@media(prefers-reduced-motion:reduce){.sbg *,.sbg-stand *{animation:none!important}.sbg-ball{offset-distance:70%}.sbg-run,.sbg-route{stroke-dashoffset:0}}
+@media print{.sbg,.sbg-stand{display:none}}
