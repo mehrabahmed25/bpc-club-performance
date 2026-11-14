@@ -2389,3 +2389,6 @@ body.tx-lock{overflow:hidden}
   .tm2-stats{grid-template-columns:repeat(2,1fr)}
 }
 @media(prefers-reduced-motion:reduce){.tm2 .tm2-p{opacity:1}.tm2.in .tm2-p{animation:none}}
+
+/* keep absolutely positioned bits (e.g. sr-only labels) inside the scroll box */
+.table-wrap{position:relative}
