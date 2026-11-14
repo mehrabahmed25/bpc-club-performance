@@ -2306,3 +2306,8 @@ body.tx-lock{overflow:hidden}
 @media(max-width:680px){.upd-bar{bottom:calc(86px + env(safe-area-inset-bottom))}}
 @media(prefers-reduced-motion:reduce){.upd-bar{animation:none}}
 @media(max-width:420px){.topbar .brand small{display:none}.topbar .brand b{white-space:normal;overflow:visible;line-height:1.12;font-size:16px}}
+
+.ab-edit fieldset{border:1px solid var(--line);border-radius:12px;padding:12px 14px 6px;margin:0 0 12px;display:grid;gap:10px}
+.ab-edit legend{font:800 14px var(--display);padding:0 6px;color:var(--ink)}
+.ab-edit input,.ab-edit textarea{width:100%}
+.ab-edit-act{display:flex;flex-wrap:wrap;gap:10px}

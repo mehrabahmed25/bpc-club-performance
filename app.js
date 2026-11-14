@@ -133,29 +133,60 @@
   document.addEventListener("click",e=>{const a=e.target.closest('a[href^="#rl-"]');if(!a)return;e.preventDefault();const t=document.getElementById(a.getAttribute("href").slice(1));if(t){t.scrollIntoView({behavior:"smooth",block:"start"});t.setAttribute("tabindex","-1");t.focus({preventScroll:true});}});
   document.addEventListener("click",e=>{const a=e.target.closest('a[data-view][href^="#/"]');if(a)e.preventDefault();},true);
 
-  // ---- About page ----
+  // ---- About page (every text editable by admins) ----
   let aboutData=null;
-  const ABOUT_DEFAULT="Brahmanbaria Pes Club (BPC) is an eFootball club from Brahmanbaria, Bangladesh. Members play friendly matches through the month, compete for the monthly award, and take part in club tournaments, the BPC Trio and the Bid Cup.";
+  const ABOUT_DEF={
+    title:"About BPC",subtitle:"Brahmanbaria Pes Club: who we are and how the club is run.",
+    intro_title:"Brahmanbaria Pes Club",
+    intro:"Brahmanbaria Pes Club (BPC) is an eFootball club from Brahmanbaria, Bangladesh. Members play friendly matches through the month, compete for the monthly award, and take part in club tournaments, the BPC Trio and the Bid Cup.",
+    run_title:"What we run",
+    run:[{title:"Monthly league",desc:"Friendly matches counted toward a monthly table and award."},{title:"Tournaments",desc:"Club cups, the BPC Trio team league and special events."},{title:"Bid Cup",desc:"A live player auction run inside the club."},{title:"House Cup and team series",desc:"Club-wide competitions between houses and teams."}],
+    committee_title:"Management Committee",
+    contact_title:"Contact",contact:"For questions, results or disputes, message the Management Committee on Facebook."
+  };
+  const abVal=k=>{const v=aboutData&&aboutData[k];return (Array.isArray(v)?v.length:String(v||"").trim())?v:ABOUT_DEF[k];};
   function paraHtml(t){return String(t||"").split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean).map(p=>'<p>'+esc(p).replace(/\n/g,"<br>")+'</p>').join("");}
+  function aboutFillForm(){
+    const d=aboutData||{};
+    const set=(id,v)=>{const el=$(id);if(el)el.value=v||"";};
+    set("abTitleIn",d.title);set("abSubtitleIn",d.subtitle);set("abIntroTitleIn",d.intro_title);set("aboutIntroInput",d.intro);
+    set("abRunTitleIn",d.run_title);set("abRunIn",(Array.isArray(d.run)?d.run:[]).map(r=>r.title+(r.desc?": "+r.desc:"")).join("\n"));
+    set("abComTitleIn",d.committee_title);set("aboutCommitteeInput",(Array.isArray(d.committee)?d.committee:[]).map(c=>c.name+(c.role?", "+c.role:"")).join("\n"));
+    set("abContactTitleIn",d.contact_title);set("abContactIn",d.contact);
+    if(!(Array.isArray(d.run)&&d.run.length))set("abRunIn",ABOUT_DEF.run.map(r=>r.title+": "+r.desc).join("\n"));
+  }
   async function loadAbout(){
     if(!client)return;
     if(!aboutData){const {data}=await client.from("site_content").select("value").eq("key","about").maybeSingle();aboutData=(data&&data.value)||{};}
-    $("aboutIntro").innerHTML=paraHtml(aboutData.intro||ABOUT_DEFAULT);
+    $("aboutTitle").textContent=abVal("title");$("aboutSubtitle").textContent=abVal("subtitle");
+    $("aboutIntroTitle").textContent=abVal("intro_title");$("aboutIntro").innerHTML=paraHtml(abVal("intro"));
+    $("aboutRunTitle").textContent=abVal("run_title");
+    $("aboutRun").innerHTML=abVal("run").map(r=>'<li><b>'+esc(r.title)+'</b>'+(r.desc?'<span>'+esc(r.desc)+'</span>':'')+'</li>').join("");
+    $("aboutComTitle").textContent=abVal("committee_title");
     const com=Array.isArray(aboutData.committee)?aboutData.committee:[];
     $("aboutCommittee").innerHTML=com.length?'<ul class="ab-com">'+com.map(c=>'<li><span class="ab-av" aria-hidden="true"'+av(c.name)+'>'+esc(initials(c.name))+'</span><div><b>'+esc(c.name)+'</b><small>'+esc(c.role||"")+'</small></div></li>').join("")+'</ul>':'<p class="small">The committee list will appear here soon.</p>';
+    $("aboutContactTitle").textContent=abVal("contact_title");$("aboutContact").innerHTML=paraHtml(abVal("contact"));
+    document.title=abVal("title")+" · "+SITE_TITLE;
     const ed=$("aboutEdit");ed.classList.toggle("hidden",!state.isAdmin);
-    if(state.isAdmin&&!ed.dataset.filled){ed.dataset.filled="1";$("aboutIntroInput").value=aboutData.intro||"";$("aboutCommitteeInput").value=com.map(c=>c.name+(c.role?", "+c.role:"")).join("\n");}
+    if(state.isAdmin&&!ed.dataset.filled){ed.dataset.filled="1";aboutFillForm();}
   }
-  if($("aboutEdit"))$("aboutEdit").addEventListener("submit",async e=>{
-    e.preventDefault();if(!state.isAdmin||!state.session)return;
-    const committee=$("aboutCommitteeInput").value.split("\n").map(l=>l.trim()).filter(Boolean).slice(0,30).map(l=>{const k=l.indexOf(",");return k<0?{name:l.slice(0,60),role:""}:{name:l.slice(0,k).trim().slice(0,60),role:l.slice(k+1).trim().slice(0,60)};}).filter(c=>c.name);
-    const value={intro:$("aboutIntroInput").value.trim(),committee};
-    const btn=e.target.querySelector("button[type=submit]");btn.disabled=true;
-    const {error}=await client.from("site_content").upsert({key:"about",value,updated_at:new Date().toISOString(),updated_by:state.session.user.id});
-    btn.disabled=false;
-    if(error){status("aboutStatus",error.message,"error");return;}
-    aboutData=value;status("aboutStatus","About page saved.","success");loadAbout();
-  });
+  if($("aboutEdit")){
+    $("abReset").addEventListener("click",()=>{aboutFillForm();status("aboutStatus","Form reset to the saved version.");});
+    $("aboutEdit").addEventListener("submit",async e=>{
+      e.preventDefault();if(!state.isAdmin||!state.session)return;
+      const v=id=>$(id).value.trim();
+      const lines=id=>$(id).value.split("\n").map(l=>l.trim()).filter(Boolean);
+      const committee=lines("aboutCommitteeInput").slice(0,30).map(l=>{const k=l.indexOf(",");return k<0?{name:l.slice(0,60),role:""}:{name:l.slice(0,k).trim().slice(0,60),role:l.slice(k+1).trim().slice(0,60)};}).filter(c=>c.name);
+      const run=lines("abRunIn").slice(0,12).map(l=>{const k=l.indexOf(":");return k<0?{title:l.slice(0,60),desc:""}:{title:l.slice(0,k).trim().slice(0,60),desc:l.slice(k+1).trim().slice(0,200)};}).filter(r=>r.title);
+      const value={title:v("abTitleIn"),subtitle:v("abSubtitleIn"),intro_title:v("abIntroTitleIn"),intro:v("aboutIntroInput"),run_title:v("abRunTitleIn"),run,committee_title:v("abComTitleIn"),committee,contact_title:v("abContactTitleIn"),contact:v("abContactIn")};
+      const btn=e.target.querySelector("button[type=submit]");btn.disabled=true;status("aboutStatus","Saving…");
+      const {error}=await client.from("site_content").upsert({key:"about",value,updated_at:new Date().toISOString(),updated_by:state.session.user.id});
+      btn.disabled=false;
+      if(error){status("aboutStatus",error.message,"error");return;}
+      aboutData=value;status("aboutStatus","About page saved. Everyone sees the new text now.","success");loadAbout();
+      $("aboutTitle").scrollIntoView({behavior:"smooth",block:"start"});
+    });
+  }
   (function(){const y=new Date().getFullYear(),m=new Date().getMonth();const fy=$("ftYear");if(fy)fy.textContent=y;const fs=$("ftSeason");if(fs)fs.textContent="Season "+(m>=6?y+"–"+String(y+1).slice(2):(y-1)+"–"+String(y).slice(2));})();
 
 

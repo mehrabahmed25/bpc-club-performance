@@ -253,23 +253,41 @@
   </section>
 
   <section id="view-about" class="view hidden">
-    <div class="section-head"><p class="eyebrow">THE CLUB</p><h2>About BPC</h2><p>Brahmanbaria Pes Club: who we are and how the club is run.</p></div>
+    <div class="section-head"><p class="eyebrow">THE CLUB</p><h2 id="aboutTitle">About BPC</h2><p id="aboutSubtitle">Brahmanbaria Pes Club: who we are and how the club is run.</p></div>
     <div class="ab-grid">
-      <article class="ab-card ab-intro"><img src="icons/icon-192.png" alt="Brahmanbaria Pes Club crest" class="ab-crest" width="96" height="96"><div><h3>Brahmanbaria Pes Club</h3><div id="aboutIntro" class="ab-text"></div></div></article>
-      <article class="ab-card"><h3>What we run</h3><ul class="ab-list">
-        <li><b>Monthly league</b><span>Friendly matches counted toward a monthly table and award.</span></li>
-        <li><b>Tournaments</b><span>Club cups, the BPC Trio team league and special events.</span></li>
-        <li><b>Bid Cup</b><span>A live player auction run inside the club.</span></li>
-        <li><b>House Cup and team series</b><span>Club-wide competitions between houses and teams.</span></li></ul></article>
-      <article class="ab-card"><h3>Management Committee</h3><div id="aboutCommittee"></div></article>
-      <article class="ab-card"><h3>Contact</h3><p>For questions, results or disputes, message the Management Committee on Facebook.</p><p><a class="ft-fb" href="https://www.facebook.com/bpc.efootball" target="_blank" rel="noopener">BPC on Facebook</a></p><p class="small"><a href="#/rules" data-view="rules">Read the club rules</a></p></article>
+      <article class="ab-card ab-intro"><img src="icons/icon-192.png" alt="Brahmanbaria Pes Club crest" class="ab-crest" width="96" height="96"><div><h3 id="aboutIntroTitle">Brahmanbaria Pes Club</h3><div id="aboutIntro" class="ab-text"></div></div></article>
+      <article class="ab-card"><h3 id="aboutRunTitle">What we run</h3><ul class="ab-list" id="aboutRun"></ul></article>
+      <article class="ab-card"><h3 id="aboutComTitle">Management Committee</h3><div id="aboutCommittee"></div></article>
+      <article class="ab-card"><h3 id="aboutContactTitle">Contact</h3><div id="aboutContact" class="ab-text"></div><p><a class="ft-fb" href="https://www.facebook.com/bpc.efootball" target="_blank" rel="noopener">BPC on Facebook</a></p><p class="small"><a href="#/rules" data-view="rules">Read the club rules</a></p></article>
     </div>
     <form id="aboutEdit" class="panel ab-edit hidden">
       <h3>Edit About page</h3>
-      <label>About the club<textarea id="aboutIntroInput" rows="5" maxlength="1500" placeholder="A short history of the club: when and where it started, and what it stands for."></textarea></label>
-      <label>Management Committee<textarea id="aboutCommitteeInput" rows="5" maxlength="1500" placeholder="One person per line, as Name, Role&#10;e.g. Mehrab Ahmed Apu, President"></textarea></label>
-      <p class="small">Leave a blank line between paragraphs. Committee: one person per line, name and role separated by a comma.</p>
-      <button class="primary" type="submit">Save About page</button><div id="aboutStatus" class="status"></div>
+      <p class="small">Only admins see this form. Every text on the page can be changed here. Leave a box empty to use the default text.</p>
+      <fieldset><legend>Page header</legend>
+        <label>Page title<input id="abTitleIn" maxlength="60" placeholder="About BPC"></label>
+        <label>Subtitle<input id="abSubtitleIn" maxlength="160" placeholder="Brahmanbaria Pes Club: who we are and how the club is run."></label>
+      </fieldset>
+      <fieldset><legend>About the club</legend>
+        <label>Card heading<input id="abIntroTitleIn" maxlength="60" placeholder="Brahmanbaria Pes Club"></label>
+        <label>Text<textarea id="aboutIntroInput" rows="6" maxlength="2500" placeholder="A short history of the club: when and where it started, and what it stands for."></textarea></label>
+        <p class="small">Leave a blank line between paragraphs.</p>
+      </fieldset>
+      <fieldset><legend>What we run</legend>
+        <label>Card heading<input id="abRunTitleIn" maxlength="60" placeholder="What we run"></label>
+        <label>Items<textarea id="abRunIn" rows="6" maxlength="2000" placeholder="One item per line, as Title: description&#10;e.g. Monthly league: Friendly matches counted toward a monthly table and award."></textarea></label>
+        <p class="small">One item per line. Put a colon between the title and its description.</p>
+      </fieldset>
+      <fieldset><legend>Management Committee</legend>
+        <label>Card heading<input id="abComTitleIn" maxlength="60" placeholder="Management Committee"></label>
+        <label>Members<textarea id="aboutCommitteeInput" rows="5" maxlength="1500" placeholder="One person per line, as Name, Role&#10;e.g. Mehrab Ahmed Apu, President"></textarea></label>
+        <p class="small">One person per line, name and role separated by a comma.</p>
+      </fieldset>
+      <fieldset><legend>Contact</legend>
+        <label>Card heading<input id="abContactTitleIn" maxlength="60" placeholder="Contact"></label>
+        <label>Text<textarea id="abContactIn" rows="3" maxlength="800" placeholder="For questions, results or disputes, message the Management Committee on Facebook."></textarea></label>
+      </fieldset>
+      <div class="ab-edit-act"><button class="primary" type="submit">Save About page</button><button class="secondary" type="button" id="abReset">Undo unsaved changes</button></div>
+      <div id="aboutStatus" class="status"></div>
     </form>
   </section>
 
