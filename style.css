@@ -2311,3 +2311,8 @@ body.tx-lock{overflow:hidden}
 .ab-edit legend{font:800 14px var(--display);padding:0 6px;color:var(--ink)}
 .ab-edit input,.ab-edit textarea{width:100%}
 .ab-edit-act{display:flex;flex-wrap:wrap;gap:10px}
+
+.rl-updated{margin:14px 0 0;text-align:right}
+.rl-edit{margin-top:18px}
+.rl-ed-act{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.rl-ed-act button{padding:7px 12px;font-size:13px}

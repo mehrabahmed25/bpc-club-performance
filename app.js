@@ -102,6 +102,7 @@
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
     if(name==="about")loadAbout();
+    if(name==="rules")loadRules();
     if(!(opts&&opts.fromRoute))setRoute(name==="player"&&state.viewPlayerId?"player/"+state.viewPlayerId:name);
     if(name!=="player")document.title=(VIEW_TITLES[name]?VIEW_TITLES[name]+" · ":"")+SITE_TITLE;
     updateTabbar();
@@ -132,6 +133,80 @@
   window.addEventListener("popstate",()=>{routeFromHash();});
   document.addEventListener("click",e=>{const a=e.target.closest('a[href^="#rl-"]');if(!a)return;e.preventDefault();const t=document.getElementById(a.getAttribute("href").slice(1));if(t){t.scrollIntoView({behavior:"smooth",block:"start"});t.setAttribute("tabindex","-1");t.focus({preventScroll:true});}});
   document.addEventListener("click",e=>{const a=e.target.closest('a[data-view][href^="#/"]');if(a)e.preventDefault();},true);
+
+
+  // ---- Rules page (editable by admins) ----
+  let rulesData=null,rulesDraft=null;
+  const RULES_DEF={title:"Rules",subtitle:"How matches count, how the monthly award works, and how BPC competitions are run.",sections:[
+    {title:"Monthly league",body:"- Every approved and counted friendly match earns points: 3 for a win, 1 for a draw, 0 for a loss.\n- At most **80 counted matches** per player each month.\n- At most **5 counted matches** between the same two players each month. This includes matches either of you submitted.\n- Matches over these limits are still approved and kept in your history, but they do not count for the table.\n- The table is ordered by points, then goal difference, then wins, then head-to-head points."},
+    {title:"Monthly award",body:"To be eligible for the monthly award, a player needs, within the same month:\n- at least **40 counted matches**,\n- of which at least **25 against COBEG XI players**,\n- covering at least **5 different COBEG XI players**.\n\nThe award ring on the leaderboard and the tracker on your dashboard show your progress."},
+    {title:"Submitting results",body:"- Enter the final score exactly as played, with the correct opponent and date.\n- A result counts only after an admin approves it. Pending or rejected results do not affect the table.\n- An admin may reject a result that is wrong, duplicated or cannot be confirmed."},
+    {title:"BPC Trio",body:"- **Teams.** Each team has 3 players in a fixed original lineup: 1st, 2nd and 3rd pick. Only the Management Committee can change it.\n- **Fixtures.** Each fixture is three 1v1 games: 1st pick v 1st pick, 2nd v 2nd, 3rd v 3rd. The team that wins more games takes 3 points; a draw is 1 point.\n- **Home and swap.** Every fixture has a home team, and home games are shared out evenly. Only the home captain may switch their 1st and 2nd pick, once per fixture, before the deadline and before boards 1 or 2 are played. The 3rd pick stays, and there is no counter-swap.\n- **Walkover.** If a player cannot play a round, their captain reports it and an admin confirms. That board goes 3–0 to the opponent. If both players are missing, neither team gets the board.\n- **Replacement.** A player who leaves the tournament is replaced by the Management Committee in the same slot, before the round starts. Each team has up to 2 replacements.\n- **Man of the Match.** The winning captain chooses the MOTM from their own players who played, within 24 hours. After that, an admin chooses."},
+    {title:"Other tournaments",body:"Every tournament lists its own format, deadlines and scoring on its Info tab. Where a tournament's own rules differ from this page, the tournament's rules apply.\n\n[See tournaments](#/tournaments)"},
+    {title:"Fair play",body:"- Play your own matches on your own account, and report scores honestly.\n- Treat opponents and admins with respect, in games and in the club group.\n- The Management Committee has the final say on disputes and on anything these rules do not cover."}
+  ]};
+  function rlInline(t){
+    return esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\[([^\]]+)\]\((#\/[a-z0-9/-]+|https:\/\/[^\s)]+)\)/gi,(m,txt,url)=>url.startsWith("#/")?'<a class="secondary rl-btn" href="'+url+'" data-rl-route="'+url.slice(2)+'">'+txt+'</a>':'<a href="'+url+'" target="_blank" rel="noopener">'+txt+'</a>');
+  }
+  function rlBody(src){
+    const out=[];let list=null,para=[];
+    const flushP=()=>{if(para.length){out.push('<p>'+para.map(rlInline).join("<br>")+'</p>');para=[];}};
+    const flushL=()=>{if(list){out.push('<ul>'+list.map(x=>'<li>'+rlInline(x)+'</li>').join("")+'</ul>');list=null;}};
+    String(src||"").split("\n").forEach(raw=>{const l=raw.trim();
+      if(/^[-•*]\s+/.test(l)){flushP();(list||(list=[])).push(l.replace(/^[-•*]\s+/,""));}
+      else if(!l){flushP();flushL();}
+      else{flushL();para.push(l);}});
+    flushP();flushL();return out.join("");
+  }
+  const rlVal=()=>{const d=rulesData||{};return {title:(d.title||"").trim()||RULES_DEF.title,subtitle:(d.subtitle||"").trim()||RULES_DEF.subtitle,sections:Array.isArray(d.sections)&&d.sections.length?d.sections:RULES_DEF.sections};};
+  async function loadRules(){
+    if(client&&!rulesData){const {data}=await client.from("site_content").select("value,updated_at").eq("key","rules").maybeSingle();rulesData=(data&&data.value)||{};rulesData._at=data&&data.updated_at;}
+    const v=rlVal();
+    $("rulesTitle").textContent=v.title;$("rulesSubtitle").textContent=v.subtitle;document.title=v.title+" · "+SITE_TITLE;
+    $("rulesToc").innerHTML='<b>On this page</b>'+v.sections.map((x,k)=>'<a href="#rl-'+k+'">'+esc(x.title)+'</a>').join("");
+    $("rulesBody").innerHTML=v.sections.map((x,k)=>'<section class="rl-sec" id="rl-'+k+'"><span class="rl-no">'+(k+1)+'</span><div><h3>'+esc(x.title)+'</h3>'+rlBody(x.body)+'</div></section>').join("");
+    $("rulesBody").querySelectorAll("[data-rl-route]").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();try{history.pushState(null,"","#/"+a.dataset.rlRoute);}catch(_){}routeFromHash();}));
+    $("rulesUpdated").textContent=rulesData&&rulesData._at?"Last updated "+new Date(rulesData._at).toLocaleDateString(undefined,{day:"numeric",month:"long",year:"numeric"})+".":"";
+    const ed=$("rulesEdit");ed.classList.toggle("hidden",!state.isAdmin);
+    if(state.isAdmin&&!ed.dataset.filled){ed.dataset.filled="1";rulesFill(v);}
+  }
+  function rulesFill(v){
+    $("rlTitleIn").value=(rulesData&&rulesData.title)||"";$("rlSubtitleIn").value=(rulesData&&rulesData.subtitle)||"";
+    rulesDraft=v.sections.map(x=>({title:x.title,body:x.body}));rulesRenderEditor();
+  }
+  function rulesReadEditor(){
+    $("rlSections").querySelectorAll(".rl-ed").forEach((f,k)=>{if(rulesDraft[k]){rulesDraft[k].title=f.querySelector("input").value;rulesDraft[k].body=f.querySelector("textarea").value;}});
+  }
+  function rulesRenderEditor(){
+    const box=$("rlSections"),n=rulesDraft.length;
+    box.innerHTML=rulesDraft.map((x,k)=>'<fieldset class="rl-ed"><legend>Section '+(k+1)+'</legend>'
+      +'<label>Heading<input maxlength="80" value="'+esc(x.title)+'"></label>'
+      +'<label>Text<textarea rows="'+Math.min(14,Math.max(4,String(x.body).split("\n").length+1))+'" maxlength="4000">'+esc(x.body)+'</textarea></label>'
+      +'<div class="rl-ed-act"><button type="button" class="secondary" data-rl-mv="'+k+'" data-d="-1"'+(k===0?' disabled':'')+'>Move up</button><button type="button" class="secondary" data-rl-mv="'+k+'" data-d="1"'+(k===n-1?' disabled':'')+'>Move down</button><button type="button" class="reject-btn" data-rl-del="'+k+'">Remove</button></div></fieldset>').join("");
+    box.querySelectorAll("[data-rl-mv]").forEach(b=>b.addEventListener("click",()=>{rulesReadEditor();const k=+b.dataset.rlMv,t=k+(+b.dataset.d);[rulesDraft[k],rulesDraft[t]]=[rulesDraft[t],rulesDraft[k]];rulesRenderEditor();}));
+    box.querySelectorAll("[data-rl-del]").forEach(b=>b.addEventListener("click",()=>{rulesReadEditor();const k=+b.dataset.rlDel;if(!confirm('Remove the section "'+(rulesDraft[k].title||"untitled")+'"? It disappears when you save.'))return;rulesDraft.splice(k,1);rulesRenderEditor();}));
+  }
+  if($("rulesEdit")){
+    $("rlAdd").addEventListener("click",()=>{rulesReadEditor();rulesDraft.push({title:"",body:""});rulesRenderEditor();const f=[...$("rlSections").querySelectorAll(".rl-ed input")].pop();if(f)f.focus();});
+    $("rlUndo").addEventListener("click",()=>{rulesFill(rlVal());status("rulesStatus","Form reset to the saved rules.");});
+    $("rlDefault").addEventListener("click",()=>{if(!confirm("Replace the form with the original rules? Nothing changes on the page until you save."))return;$("rlTitleIn").value="";$("rlSubtitleIn").value="";rulesDraft=RULES_DEF.sections.map(x=>({...x}));rulesRenderEditor();status("rulesStatus","Original rules loaded into the form. Save to publish them.");});
+    $("rulesEdit").addEventListener("submit",async e=>{
+      e.preventDefault();if(!state.isAdmin||!state.session)return;
+      rulesReadEditor();
+      const sections=rulesDraft.map(x=>({title:String(x.title||"").trim().slice(0,80),body:String(x.body||"").trim().slice(0,4000)})).filter(x=>x.title||x.body);
+      if(sections.some(x=>!x.title)){status("rulesStatus","Every section needs a heading.","error");return;}
+      if(!sections.length){status("rulesStatus","Add at least one section.","error");return;}
+      const value={title:$("rlTitleIn").value.trim(),subtitle:$("rlSubtitleIn").value.trim(),sections};
+      const btn=e.target.querySelector("button[type=submit]");btn.disabled=true;status("rulesStatus","Saving…");
+      const at=new Date().toISOString();
+      const {error}=await client.from("site_content").upsert({key:"rules",value,updated_at:at,updated_by:state.session.user.id});
+      btn.disabled=false;
+      if(error){status("rulesStatus",error.message,"error");return;}
+      rulesData={...value,_at:at};$("rulesEdit").dataset.filled="";
+      status("rulesStatus","Rules saved. Everyone sees the new version now.","success");loadRules();
+      $("rulesTitle").scrollIntoView({behavior:"smooth",block:"start"});
+    });
+  }
 
   // ---- About page (every text editable by admins) ----
   let aboutData=null;

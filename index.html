@@ -219,37 +219,24 @@
   </section>
 
   <section id="view-rules" class="view hidden">
-    <div class="section-head"><p class="eyebrow">CLUB RULES</p><h2>Rules</h2><p>How matches count, how the monthly award works, and how BPC competitions are run.</p></div>
+    <div class="section-head"><p class="eyebrow">CLUB RULES</p><h2 id="rulesTitle">Rules</h2><p id="rulesSubtitle">How matches count, how the monthly award works, and how BPC competitions are run.</p></div>
     <div class="rl-layout">
-      <nav class="rl-toc" aria-label="On this page"><b>On this page</b><a href="#rl-league">Monthly league</a><a href="#rl-award">Monthly award</a><a href="#rl-results">Submitting results</a><a href="#rl-trio">BPC Trio</a><a href="#rl-tourn">Other tournaments</a><a href="#rl-conduct">Fair play</a></nav>
-      <div class="rl-body">
-        <section class="rl-sec" id="rl-league"><span class="rl-no">1</span><div><h3>Monthly league</h3><ul>
-          <li>Every approved and counted friendly match earns points: 3 for a win, 1 for a draw, 0 for a loss.</li>
-          <li>At most <b>80 counted matches</b> per player each month.</li>
-          <li>At most <b>5 counted matches</b> between the same two players each month. This includes matches either of you submitted.</li>
-          <li>Matches over these limits are still approved and kept in your history, but they do not count for the table.</li>
-          <li>The table is ordered by points, then goal difference, then wins, then head-to-head points.</li></ul></div></section>
-        <section class="rl-sec" id="rl-award"><span class="rl-no">2</span><div><h3>Monthly award</h3><p>To be eligible for the monthly award, a player needs, within the same month:</p><ul>
-          <li>at least <b>40 counted matches</b>,</li><li>of which at least <b>25 against COBEG XI players</b>,</li><li>covering at least <b>5 different COBEG XI players</b>.</li></ul>
-          <p class="small">The award ring on the leaderboard and the tracker on your dashboard show your progress.</p></div></section>
-        <section class="rl-sec" id="rl-results"><span class="rl-no">3</span><div><h3>Submitting results</h3><ul>
-          <li>Enter the final score exactly as played, with the correct opponent and date.</li>
-          <li>A result counts only after an admin approves it. Pending or rejected results do not affect the table.</li>
-          <li>An admin may reject a result that is wrong, duplicated or cannot be confirmed.</li></ul></div></section>
-        <section class="rl-sec" id="rl-trio"><span class="rl-no">4</span><div><h3>BPC Trio</h3><ul>
-          <li><b>Teams.</b> Each team has 3 players in a fixed original lineup: 1st, 2nd and 3rd pick. Only the Management Committee can change it.</li>
-          <li><b>Fixtures.</b> Each fixture is three 1v1 games: 1st pick v 1st pick, 2nd v 2nd, 3rd v 3rd. The team that wins more games takes 3 points; a draw is 1 point.</li>
-          <li><b>Home and swap.</b> Every fixture has a home team, and home games are shared out evenly. Only the home captain may switch their 1st and 2nd pick, once per fixture, before the deadline and before boards 1 or 2 are played. The 3rd pick stays, and there is no counter-swap.</li>
-          <li><b>Walkover.</b> If a player cannot play a round, their captain reports it and an admin confirms. That board goes 3–0 to the opponent. If both players are missing, neither team gets the board.</li>
-          <li><b>Replacement.</b> A player who leaves the tournament is replaced by the Management Committee in the same slot, before the round starts. Each team has up to 2 replacements.</li>
-          <li><b>Man of the Match.</b> The winning captain chooses the MOTM from their own players who played, within 24 hours. After that, an admin chooses.</li></ul></div></section>
-        <section class="rl-sec" id="rl-tourn"><span class="rl-no">5</span><div><h3>Other tournaments</h3><p>Every tournament lists its own format, deadlines and scoring on its Info tab. Where a tournament's own rules differ from this page, the tournament's rules apply.</p><p><a class="secondary rl-btn" href="#/tournaments" data-view="tournaments">See tournaments</a></p></div></section>
-        <section class="rl-sec" id="rl-conduct"><span class="rl-no">6</span><div><h3>Fair play</h3><ul>
-          <li>Play your own matches on your own account, and report scores honestly.</li>
-          <li>Treat opponents and admins with respect, in games and in the club group.</li>
-          <li>The Management Committee has the final say on disputes and on anything these rules do not cover.</li></ul></div></section>
-      </div>
+      <nav class="rl-toc" id="rulesToc" aria-label="On this page"></nav>
+      <div class="rl-body" id="rulesBody"></div>
     </div>
+    <p class="small rl-updated" id="rulesUpdated"></p>
+    <form id="rulesEdit" class="panel ab-edit rl-edit hidden">
+      <h3>Edit rules</h3>
+      <p class="small">Only admins see this form. Formatting: start a line with <b>- </b> for a bullet point, wrap words in <b>**double stars**</b> for bold, and leave a blank line between paragraphs. Links: <b>[See tournaments](#/tournaments)</b>.</p>
+      <fieldset><legend>Page header</legend>
+        <label>Page title<input id="rlTitleIn" maxlength="60" placeholder="Rules"></label>
+        <label>Subtitle<input id="rlSubtitleIn" maxlength="200" placeholder="How matches count, how the monthly award works, and how BPC competitions are run."></label>
+      </fieldset>
+      <div id="rlSections"></div>
+      <div class="ab-edit-act"><button type="button" class="secondary" id="rlAdd">Add a section</button></div>
+      <div class="ab-edit-act"><button class="primary" type="submit">Save rules</button><button class="secondary" type="button" id="rlUndo">Undo unsaved changes</button><button class="secondary" type="button" id="rlDefault">Start from the original rules</button></div>
+      <div id="rulesStatus" class="status"></div>
+    </form>
   </section>
 
   <section id="view-about" class="view hidden">
