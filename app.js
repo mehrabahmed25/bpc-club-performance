@@ -86,18 +86,18 @@
     document.querySelectorAll(".navgroup").forEach(g=>{g.classList.remove("open");const b=g.querySelector(".navgroup-btn");b.setAttribute("aria-expanded","false");b.classList.toggle("active",!!g.querySelector(".navlink.active"));});
     $("nav").classList.remove("open");
     if(name!=="home")clipsPause();
-    if(name==="home"){loadHomeClips();loadHomeMatchday();loadPublicPoster();loadHomeBanner();loadHomeTicker();loadHomeSeries();loadHomeAuction();loadHomePodium();loadHomeLegends();loadHomeTeam();loadHomeHouses();loadHomeStories();}
-    else { $("uclPosterSection").classList.add("hidden"); $("homeBannerSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
+    document.body.dataset.view=name;
+    if(name==="home"){loadHomeClips();loadHomeMatchday();loadPublicPoster();loadHomeTicker();loadHomeAuction();loadHomeTeam();loadHomeHouses();loadHomeStories();}
+    else { $("uclPosterSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
     if(name==="player")renderPlayerPage();
     if(name==="stories")loadStories();
-    if(name==="series")loadSeriesPage();
     if(name==="houses")loadHousesPage();
     if(name==="auction")loadAuctionPage();else if(typeof auStop==="function")auStop();
     if(name==="history")loadHistory();
     if(name==="official")loadOfficialPage();
-    if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();loadSeriesStrip();loadAuctionStrip();}
+    if(name==="tournaments"){tnOpen=null;applyTnVisibility();loadTournaments();loadAuctionStrip();}
     if(name==="funds")loadFundsPage();
     if(name==="admin")loadAdmin();
     if(name==="profile")loadProfile();
@@ -215,7 +215,7 @@
     intro_title:"Brahmanbaria Pes Club",
     intro:"Brahmanbaria Pes Club (BPC) is an eFootball club from Brahmanbaria, Bangladesh. Members play friendly matches through the month, compete for the monthly award, and take part in club tournaments, the BPC Trio and the Bid Cup.",
     run_title:"What we run",
-    run:[{title:"Monthly league",desc:"Friendly matches counted toward a monthly table and award."},{title:"Tournaments",desc:"Club cups, the BPC Trio team league and special events."},{title:"Bid Cup",desc:"A live player auction run inside the club."},{title:"House Cup and team series",desc:"Club-wide competitions between houses and teams."}],
+    run:[{title:"Monthly league",desc:"Friendly matches counted toward a monthly table and award."},{title:"Tournaments",desc:"Club cups, the BPC Trio team league and special events."},{title:"Bid Cup",desc:"A live player auction run inside the club."},{title:"House Cup",desc:"A monthly club-wide competition between houses."}],
     committee_title:"Management Committee",
     contact_title:"Contact",contact:"For questions, results or disputes, message the Management Committee on Facebook."
   };
@@ -473,33 +473,6 @@
   $("posterPrev").addEventListener("click",()=>{posterIndex=(posterIndex-1+posterSlides.length)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
   $("posterNext").addEventListener("click",()=>{posterIndex=(posterIndex+1)%posterSlides.length;renderPosterSlide();restartPosterTimer();});
 
-  function bannerDestinationValue(){
-    const choice=$("bannerDestination").value;
-    if(choice==="none")return "";
-    if(choice==="custom"){
-      const raw=$("bannerCustomUrl").value.trim();
-      if(!raw)return null;
-      try{const url=new URL(raw);if(url.protocol!=="https:"&&url.protocol!=="http:")return null;return url.href;}catch{return null;}
-    }
-    return ({home:"home",leaderboard:"leaderboard",history:"history",submit:"submit"})[choice]||"";
-  }
-  function renderHomeBannerLink(url){
-    const img=$("homeBannerImage");
-    $("homeBannerSection").dataset.destination=url||"";
-    img.style.cursor=url?"pointer":"default";
-    img.tabIndex=url?0:-1;
-    img.setAttribute("role",url?"link":"img");
-    img.setAttribute("aria-label",url?"Club banner — open destination":"BPC club performance banner");
-  }
-  function openBannerDestination(){
-    const destination=$("homeBannerSection").dataset.destination;
-    if(!destination)return;
-    if(["home","leaderboard","history","submit"].includes(destination)){showView(destination);return;}
-    try{const url=new URL(destination);if(url.protocol==="https:"||url.protocol==="http:")window.open(url.href,"_blank","noopener,noreferrer");}catch{}
-  }
-  $("bannerDestination").addEventListener("change",()=>{$("bannerCustomUrlLabel").classList.toggle("hidden",$("bannerDestination").value!=="custom");});
-  $("homeBannerImage").addEventListener("click",openBannerDestination);
-  $("homeBannerImage").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openBannerDestination();}});
 
 
   // ================= Highlight clips banner =================
@@ -621,41 +594,6 @@
     finally{btn.disabled=false;}
   });
 
-  async function loadHomeBanner(){
-    if(!client)return;
-    const section=$("homeBannerSection");
-    const {data,error}=await client.from("site_posters").select("id,image_path,link_url").eq("title","BPC Home Banner").eq("is_active",true).lte("published_at",new Date().toISOString()).gt("expires_at",new Date().toISOString()).order("created_at",{ascending:false}).limit(1);
-    if(error||!data||!data.length){section.classList.add("hidden");return;}
-    $("homeBannerImage").src=client.storage.from("bpc-posters").getPublicUrl(data[0].image_path).data.publicUrl;
-    renderHomeBannerLink(data[0].link_url||"");
-    section.classList.remove("hidden");
-  }
-
-  $("bannerForm").addEventListener("submit",async e=>{
-    e.preventDefault();
-    if(!state.isAdmin||!state.session)return;
-    const file=$("bannerFile").files?.[0];
-    if(!file){status("bannerAdminStatus","Choose a banner image first.","error");return;}
-    if(file.size>8*1024*1024){status("bannerAdminStatus","Image must be 8 MB or smaller.","error");return;}
-    if(!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type)){status("bannerAdminStatus","Please choose a JPG, PNG, WEBP, or GIF image.","error");return;}
-    const btn=$("publishBannerBtn");btn.disabled=true;status("bannerAdminStatus","Uploading banner…");
-    const path="banners/"+Date.now()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
-    try{
-      const up=await client.storage.from("bpc-posters").upload(path,file,{contentType:file.type,upsert:false});
-      if(up.error)throw up.error;
-      const {error}=await client.from("site_posters").update({is_active:false}).eq("title","BPC Home Banner").eq("is_active",true);
-      if(error)throw error;
-      const destination=bannerDestinationValue();
-      if(destination===null)throw new Error("Please enter a valid http:// or https:// custom URL.");
-      const {error:insertError}=await client.from("site_posters").insert({title:"BPC Home Banner",image_path:path,link_url:destination||null,is_active:true,created_by:state.session.user.id,expires_at:"9999-12-31T23:59:59.000Z"});
-      if(insertError)throw insertError;
-      $("bannerFile").value="";
-      status("bannerAdminStatus","Home banner uploaded. It will remain until you replace or remove it.","success");
-      await loadHomeBanner();await loadPosterAdmin();
-    }catch(err){status("bannerAdminStatus",err.message||"Could not upload banner.","error");}
-    finally{btn.disabled=false;}
-  });
-
   async function loadPosterAdmin(){
     if(!client||!state.isAdmin)return;
     const box=$("posterAdminList");
@@ -678,7 +616,7 @@
     e.preventDefault();
     if(!state.isAdmin||!state.session)return;
     const file=$("posterFile").files?.[0];
-    const title=$("posterUploadTitle").value.trim()||"UCL Finalists";
+    const title=$("posterUploadTitle").value.trim()||"Club announcement";
     if(!file){status("posterAdminStatus","Choose an image first.","error");return;}
     if(file.size>8*1024*1024){status("posterAdminStatus","Image must be 8 MB or smaller.","error");return;}
     if(!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type)){status("posterAdminStatus","Please choose a JPG, PNG, WEBP, or GIF image.","error");return;}
@@ -2052,13 +1990,6 @@ $("playersBody").innerHTML = shown.map(p =>
         const r=m.a_goals>m.b_goals?"a":m.a_goals<m.b_goals?"b":"d";
         return '<div class="h2h-m r-'+r+'"><span class="d">'+prettyDate(m.match_date)+'</span><span class="n l'+(r==="a"?' win':'')+'">'+esc(A)+'</span><span class="sc">'+m.a_goals+' – '+m.b_goals+'</span><span class="n r'+(r==="b"?' win':'')+'">'+esc(B)+'</span></div>';
       }).join("")+'</div>':'');
-    box.insertAdjacentHTML("beforeend",'<section id="h2hSeries"></section><section id="h2hTrash" class="tt-wrap"></section>');
-    client.rpc("get_series_h2h",{p_a:a,p_b:b}).then(r=>{
-      const el=$("h2hSeries"),sg=r.data||[];if(!el||!sg.length||$("h2hA").value!==a||$("h2hB").value!==b)return;
-      const w=[0,0],d=sg.reduce((n,g)=>{if(g.a_goals>g.b_goals)w[0]++;else if(g.a_goals<g.b_goals)w[1]++;else n++;return n;},0);
-      el.innerHTML='<div class="h2h-series"><h3 class="h2h-hist-title">Team series meetings <small>separate from the figures above</small></h3><p class="h2h-ser-sum"><b>'+esc(A)+' '+w[0]+'</b> · '+d+' draw'+(d===1?'':'s')+' · <b>'+esc(B)+' '+w[1]+'</b> in '+sg.length+' series game'+(sg.length===1?'':'s')+'</p><div class="h2h-hist">'+sg.map(g=>{const rr=g.a_goals>g.b_goals?"a":g.a_goals<g.b_goals?"b":"d";return '<div class="h2h-m r-'+rr+'"><span class="d">'+esc(g.series)+' · R'+g.round+'</span><span class="n l'+(rr==="a"?' win':'')+'">'+esc(A)+'</span><span class="sc">'+g.a_goals+' – '+g.b_goals+'</span><span class="n r'+(rr==="b"?' win':'')+'">'+esc(B)+'</span></div>';}).join("")+'</div></div>';
-    });
-    renderTrash(a,b);
   }
   $("h2hA").addEventListener("change",renderH2h);
   $("h2hB").addEventListener("change",renderH2h);
@@ -2094,40 +2025,6 @@ $("playersBody").innerHTML = shown.map(p =>
     const s=Math.max(1,Math.round((Date.now()-new Date(iso).getTime())/1000));
     if(s<60)return "just now";if(s<3600)return Math.floor(s/60)+"m ago";if(s<86400)return Math.floor(s/3600)+"h ago";
     if(s<604800)return Math.floor(s/86400)+"d ago";return prettyDate(String(iso).slice(0,10));
-  }
-
-  // ================= Trash talk wall (inside Head to Head) =================
-  async function renderTrash(a,b){
-    const box=$("h2hTrash");if(!box)return;
-    const {data,error}=await client.rpc("get_trash_talk",{p_a:a,p_b:b});
-    if(error){box.innerHTML='<p class="tt-sub">Could not load the wall.</p>';return;}
-    const names={};(state.h2hPlayers||[]).forEach(p=>names[p.id]=p.display_name);
-    const canPost=!!state.session&&state.player&&state.player.active;
-    const compose=canPost?'<form class="tt-compose" id="ttForm"><textarea id="ttText" maxlength="200" rows="2" placeholder="Say something to '+esc(names[a]||"them")+' or '+esc(names[b]||"them")+'. Keep it playful."></textarea><div class="tt-bar"><span id="ttCount">0 / 200</span><button class="primary" type="submit" id="ttPost">Post</button></div><div id="ttMsg" class="status"></div></form>'
-      :'<p class="tt-signin">'+(state.session?'Only active registered players can post.':'Sign in to join the banter.')+'</p>';
-    const list=(data||[]).map(t=>{
-      const side=t.author_player_id===a?"l":t.author_player_id===b?"r":"f";
-      return '<div class="tt-msg '+side+'">'+avBig(t.author_name,t.author_player_id,"tt-av")+'<div class="tt-bub"><div class="tt-meta"><b class="link-player" data-player="'+esc(t.author_player_id)+'">'+esc(t.author_name)+'</b>'+(side==="f"?'<em>fan</em>':'')+'<span>'+timeAgo(t.created_at)+'</span>'+(t.can_hide?'<button type="button" class="tt-x" data-tt="'+esc(t.id)+'" title="Remove this post">Remove</button>':'')+'</div><p>'+esc(t.body)+'</p></div></div>';
-    }).join("")||'<p class="tt-empty">Quiet so far. Start the banter.</p>';
-    box.innerHTML='<h3 class="h2h-hist-title">Trash talk</h3><p class="tt-sub">Friendly banter only. Abuse gets removed.</p>'+compose+'<div class="tt-list">'+list+'</div>';
-    const f=$("ttForm");
-    if(f){
-      const ta=$("ttText");
-      ta.addEventListener("input",()=>{$("ttCount").textContent=ta.value.length+" / 200";});
-      f.addEventListener("submit",async e=>{
-        e.preventDefault();const body=ta.value.trim();if(!body)return;
-        $("ttPost").disabled=true;
-        const r=await client.rpc("post_trash_talk",{p_a:a,p_b:b,p_body:body});
-        if(r.error){status("ttMsg",r.error.message,"error");$("ttPost").disabled=false;return;}
-        renderTrash(a,b);
-      });
-    }
-    box.querySelectorAll("[data-tt]").forEach(btn=>btn.addEventListener("click",async()=>{
-      if(!confirm("Remove this post?"))return;
-      const r=await client.rpc("hide_trash_talk",{p_id:btn.dataset.tt});
-      if(r.error){toast(r.error.message);return;}
-      renderTrash(a,b);
-    }));
   }
 
   // ================= Auto-written stories (EN + BN templates) =================
@@ -2496,7 +2393,7 @@ $("playersBody").innerHTML = shown.map(p =>
   });
   async function loadAuctionStrip(){
     const el=$("auctionStrip");if(!el||!client)return;
-    let list=[];try{const r=await client.rpc("get_auction_list");list=r.data||[];}catch(e){}
+    let list=[];try{const r=await client.rpc("get_auction_list");list=(r.data||[]).filter(a=>a.status!=="archived");}catch(e){}
     const adm=state.tnAdmin;
     if(!list.length&&!adm){el.classList.add("hidden");return;}
     el.innerHTML='<div><b>Bid Cup auctions</b><span class="small">'+(list.length?'Managers bid for players with a limited purse.':'No auction yet.')+'</span></div><div class="sr-strip-links">'+list.slice(0,3).map(s=>'<button type="button" class="ghost" data-auction="'+esc(s.id)+'">'+esc(s.name)+'</button>').join("")+'<button type="button" class="primary" data-auction-list="1" data-go="1">'+(adm?'Manage auctions':'All auctions')+'</button></div>';
@@ -2565,267 +2462,7 @@ $("playersBody").innerHTML = shown.map(p =>
     status("ruStatus","Copied. Paste it into the club group.","ok");toast("Roundup copied.");
   });
 
-  // ================= Team series (e.g. Married v Unmarried) =================
-  var seriesList=[],seriesBundle=null,seriesId=null,seriesFrom="home";
   function sideName(s,side){return side==="a"?s.team_a:s.team_b;}
-  function seriesTally(list){const w={a:0,b:0};(list||[]).forEach(r=>{if(r.winner==="a")w.a++;else if(r.winner==="b")w.b++;});return w;}
-  function seriesLeader(s,w){const need=Math.floor(s.rounds/2)+1;return w.a>=need?"a":w.b>=need?"b":null;}
-  // ---- matchday poster (Home banner + series page header) ----
-  var srTimer=null;
-  function srCdText(ms){
-    if(ms<=0)return"Sign-ups closed";
-    const t=Math.floor(ms/1000),d=Math.floor(t/86400),h=Math.floor(t%86400/3600),m=Math.floor(t%3600/60),sec=t%60,p=n=>String(n).padStart(2,"0");
-    return "Closes in "+(d?d+"d ":"")+p(h)+"h "+p(m)+"m "+p(sec)+"s";
-  }
-  function srTick(){
-    const els=document.querySelectorAll(".sr-cd[data-until]");
-    if(!els.length){clearInterval(srTimer);srTimer=null;return;}
-    els.forEach(e=>{e.textContent=srCdText(new Date(e.dataset.until)-Date.now());});
-  }
-  function srStartTimer(){if(!srTimer)srTimer=setInterval(srTick,1000);srTick();}
-  function srStack(list,count,max){
-    const l=(list||[]).slice(0,max||6),more=Math.max(0,count-l.length);
-    return '<span class="srp-stack">'+l.map(p=>avBig(p.name,p.id,"srp-pa")).join("")+(more?'<span class="srp-more">+'+more+'</span>':'')+(!l.length?'<span class="srp-none">Be the first</span>':'')+'</span>';
-  }
-  function srTug(a,b,s){
-    const t=a+b,p=t?Math.min(92,Math.max(8,Math.round(a/t*100))):50;
-    return '<div class="srp-tug" role="img" aria-label="Games won: '+esc(s.team_a)+' '+a+', '+esc(s.team_b)+' '+b+'"><i class="srp-tug-a" style="width:'+p+'%"></i><i class="srp-tug-b" style="width:'+(100-p)+'%"></i><span class="srp-knot" style="left:'+p+'%"></span><small class="l">'+a+' game'+(a===1?'':'s')+'</small><small class="m">Games won</small><small class="r">'+b+' game'+(b===1?'':'s')+'</small></div>';
-  }
-  function srPips(s,rounds,started){
-    const need=Math.floor(s.rounds/2)+1,out=[];
-    for(let r=1;r<=s.rounds;r++){
-      const ro=(rounds||[]).find(x=>x.round===r);
-      const w=ro&&ro.complete?ro.winner:null;
-      const live=!w&&(ro&&ro.total>0&&(started||[]).includes(r)||ro&&ro.approved>0);
-      out.push('<span class="srp-pip '+(w==="a"?"pa":w==="b"?"pb":w==="draw"?"pd":live?"live":"")+'"><b>'+r+'</b><em>'+(w==="a"?esc(s.team_a):w==="b"?esc(s.team_b):w==="draw"?"Drawn":live?"Live":"Round")+'</em></span>');
-    }
-    return '<div class="srp-pips">'+out.join('<i class="srp-link"></i>')+'</div><p class="srp-need">First to '+need+' round'+(need===1?'':'s')+' takes the series</p>';
-  }
-  function srConfetti(){
-    const c=["#f6b73c","#3b73ff","#ffffff","#13a46b"];let h="";
-    for(let i=0;i<34;i++)h+='<i style="left:'+(Math.random()*100).toFixed(1)+'%;background:'+c[i%4]+';animation-delay:'+(Math.random()*.8).toFixed(2)+'s;--dx:'+((Math.random()-.5)*160).toFixed(0)+'px;--r:'+Math.round(Math.random()*720)+'deg"></i>';
-    return '<div class="srp-confetti" aria-hidden="true">'+h+'</div>';
-  }
-  // opts: {s, a:{count,players}, b:{...}, tally:{a,b}, lead, games:{a,b}, rounds, started, big, tag}
-  function srPoster(o){
-    const s=o.s,lead=o.lead,open=s.status==="open"&&s.reg_open&&(!s.reg_deadline||new Date(s.reg_deadline)>new Date());
-    const chip=lead?'<span class="sr-chip done">'+esc(sideName(s,lead))+' win the series</span>':s.status==="finished"?'<span class="sr-chip done">Finished</span>':s.status==="live"?'<span class="sr-chip live"><i class="srp-dot"></i>Live</span>':open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Sign-ups closed</span>';
-    const cd=open&&s.reg_deadline?'<span class="sr-cd" data-until="'+esc(s.reg_deadline)+'">'+srCdText(new Date(s.reg_deadline)-Date.now())+'</span>':'<span class="srp-best">Best of '+s.rounds+' rounds</span>';
-    const team=side=>{
-      const t=o[side],won=lead===side;
-      return '<div class="srp-team s'+side+(won?' won':'')+(lead&&!won?' lost':'')+'">'+(won?'<span class="srp-ribbon">Champions</span>':'')+'<span class="sr-crest">'+esc(initials(sideName(s,side)))+'</span><b>'+esc(sideName(s,side))+'</b><small>'+t.count+' player'+(t.count===1?'':'s')+'</small>'+srStack(t.players,t.count,o.big?8:6)+'</div>';
-    };
-    return '<div class="srp-bg" aria-hidden="true"><i class="srp-half a"></i><i class="srp-half b"></i><i class="srp-slash"></i><span class="srp-ghost a">'+esc(s.team_a)+'</span><span class="srp-ghost b">'+esc(s.team_b)+'</span></div>'+
-      (lead?srConfetti():'')+
-      '<div class="srp-top"><div class="srp-title">'+chip+'<h2>'+esc(s.name)+'</h2></div>'+cd+'</div>'+
-      '<div class="srp-main">'+team("a")+'<div class="srp-vs"><span class="srp-score"><b>'+o.tally.a+'</b><i>–</i><b>'+o.tally.b+'</b></span><small>rounds</small></div>'+team("b")+'</div>'+
-      srTug(o.games.a,o.games.b,s)+(o.big?srPips(s,o.rounds,o.started):'')+(o.tag||'');
-  }
-  async function loadSeriesStrip(){
-    const el=$("seriesStrip");if(!el||!client)return;
-    try{const {data}=await client.rpc("get_series_list");seriesList=data||[];}catch(e){seriesList=[];}
-    const adm=state.tnAdmin;
-    if(!seriesList.length&&!adm){el.classList.add("hidden");return;}
-    el.innerHTML='<div><b>Team series</b><span class="small">'+(seriesList.length?'Team v team contests played as 1v1 games.':'No series yet.')+'</span></div><div class="sr-strip-links">'+seriesList.map(s=>'<button type="button" class="ghost" data-series="'+esc(s.id)+'">'+esc(s.name)+'</button>').join("")+(adm?'<button type="button" class="primary" data-series="new">New series</button>':'')+'</div>';
-    el.classList.remove("hidden");
-  }
-  async function loadHomeSeries(){
-    const box=$("homeSeries");if(!box||!client)return;
-    try{
-      const [r]=await Promise.all([client.rpc("get_series_list"),ensureAvatars()]);
-      seriesList=r.data||[];
-    }catch(e){return;}
-    const list=seriesList.filter(s=>s.status!=="archived").slice(0,2);
-    if(!list.length){box.classList.add("hidden");return;}
-    box.innerHTML=list.map(s=>{
-      const w=s.rounds_won||{a:0,b:0},lead=seriesLeader(s,w),g=s.games||{a:0,b:0};
-      const open=s.status==="open"&&s.reg_open;
-      return '<div class="sr-banner sr-poster" role="button" tabindex="0" data-series="'+esc(s.id)+'">'+srPoster({s,a:{count:s.a_count,players:s.a_players},b:{count:s.b_count,players:s.b_players},tally:w,lead,games:g,tag:'<span class="srp-cta">'+(open?'Pick your side':lead?'See the result':'Open the series')+'<i></i></span>'})+'</div>';
-    }).join("");
-    srStartTimer();
-    box.classList.remove("hidden");
-  }
-  function openSeries(id,from){
-    seriesId=id;
-    const cur=document.querySelector(".view:not(.hidden)");seriesFrom=from||(cur&&cur.id!=="view-series"?cur.id.replace("view-",""):seriesFrom)||"home";
-    showView("series");
-  }
-  async function loadSeriesPage(){
-    const box=$("seriesPage");if(!box||!client)return;
-    box.innerHTML=skel("cards");
-    await ensureAvatars();
-    if(seriesId&&seriesId!=="new"){
-      const {data,error}=await client.rpc("get_series_bundle",{p_id:seriesId});
-      if(error||!data){box.innerHTML='<div class="h2h-empty"><b>Series not found.</b><span>It may have been archived.</span></div>';return;}
-      seriesBundle=data;renderSeriesDetail();
-    }else{
-      const {data}=await client.rpc("get_series_list");seriesList=data||[];renderSeriesIndex();
-    }
-  }
-  function seriesBack(){return '<button type="button" class="ghost sr-back" id="srBack">← '+(seriesFrom==="tournaments"?"Tournaments":"Back")+'</button>';}
-  function renderSeriesIndex(){
-    const box=$("seriesPage"),adm=state.tnAdmin;
-    const cards=seriesList.map(s=>'<button type="button" class="sr-row" data-series="'+esc(s.id)+'"><b>'+esc(s.name)+'</b><span>'+esc(s.team_a)+' '+(s.rounds_won?s.rounds_won.a:0)+' – '+(s.rounds_won?s.rounds_won.b:0)+' '+esc(s.team_b)+'</span><small>'+esc(s.status)+(s.pending?' · '+s.pending+' waiting for approval':'')+'</small></button>').join("");
-    const form=adm?'<form id="srCreate" class="panel sr-create"><h3>New series</h3><div class="sr-grid"><label>Series name<input name="name" required maxlength="100" value="Married v Unmarried"></label><label>Team one<input name="a" required maxlength="40" value="Married"></label><label>Team two<input name="b" required maxlength="40" value="Unmarried"></label><label>Best of rounds<input name="rounds" type="number" min="1" max="9" value="3"></label><label>Sign-up deadline (optional)<input name="deadline" type="datetime-local"></label></div><button class="primary" type="submit">Create and open sign-ups</button><div id="srCreateStatus" class="status"></div></form>':'';
-    box.innerHTML=seriesBack()+'<div class="wk-mast"><div><h2>Team series</h2><p>Two teams, 1v1 games, best of rounds wins.</p></div></div><div class="sr-list">'+(cards||'<div class="h2h-empty"><b>No series yet.</b><span>Series appear here once an admin creates one.</span></div>')+'</div>'+form;
-    $("srBack").onclick=()=>showView(seriesFrom==="series"?"home":seriesFrom);
-    $("srCreate")?.addEventListener("submit",async e=>{
-      e.preventDefault();const f=e.target,d=new FormData(f);
-      const {data,error}=await client.rpc("series_create",{p_name:d.get("name"),p_team_a:d.get("a"),p_team_b:d.get("b"),p_per_side:8,p_rounds:Number(d.get("rounds"))||3,p_deadline:d.get("deadline")?new Date(d.get("deadline")).toISOString():null});
-      if(error){status("srCreateStatus",error.message,"error");return;}
-      toast("Series created. Sign-ups are open.");seriesId=data;loadSeriesPage();
-    });
-  }
-  function seriesPlayer(m,cls){return '<span class="sr-pl link-player" data-player="'+esc(m.player_id)+'">'+avBig(m.name,m.player_id,cls||"sr-av")+'<b>'+esc(m.name)+'</b></span>';}
-  function renderSeriesDetail(){
-    const B=seriesBundle,s=B.series,adm=B.is_admin,me=B.me,box=$("seriesPage");
-    const mem={};B.members.forEach(m=>mem[m.id]=m);
-    const tally=seriesTally(B.rounds),lead=seriesLeader(s,tally);
-    const conf=side=>B.members.filter(m=>m.side===side&&m.status==="confirmed");
-    const pend=B.members.filter(m=>m.status==="pending");
-    const open=s.status==="open"&&s.reg_open&&(!s.reg_deadline||new Date(s.reg_deadline)>new Date());
-    const chip=lead?'<span class="sr-chip done">'+esc(sideName(s,lead))+' win the series</span>':s.status==="finished"?'<span class="sr-chip done">Finished</span>':s.status==="live"?'<span class="sr-chip live">Live</span>':open?'<span class="sr-chip open">Sign-ups open</span>':'<span class="sr-chip">Sign-ups closed</span>';
-    // header
-    const gw={a:0,b:0};B.games.forEach(g=>{if(g.status==="approved"&&g.a_goals!=null){if(g.a_goals>g.b_goals)gw.a++;else if(g.a_goals<g.b_goals)gw.b++;}});
-    const pl=side=>conf(side).slice(0,8).map(m=>({id:m.player_id,name:m.name}));
-    let html=seriesBack()+'<div class="sr-poster sr-hero-big">'+srPoster({s,a:{count:conf("a").length,players:pl("a")},b:{count:conf("b").length,players:pl("b")},tally,lead,games:gw,rounds:B.rounds,started:B.started,big:true})+'</div>';
-    // join panel
-    let join="";
-    if(!state.session)join=open?'<div class="sr-join"><b>Want to play?</b><span class="small">Sign in to pick a side.</span><button type="button" class="primary" data-view="account">Sign in</button></div>':'';
-    else if(me&&me.status==="pending")join='<div class="sr-join"><b>You asked to join '+esc(sideName(s,me.side))+'.</b><span class="small">An admin will confirm your spot.</span><button type="button" class="ghost" id="srLeave">Withdraw</button></div>';
-    else if(me&&me.status==="confirmed")join='<div class="sr-join ok"><b>You are in '+esc(sideName(s,me.side))+'.</b><span class="small">Your games and score box show below once pairings are set.</span>'+(!B.games.some(g=>g.mine)?'<button type="button" class="ghost" id="srLeave">Leave team</button>':'')+'</div>';
-    else if(open)join='<div class="sr-join"><b>Pick your side</b><span class="small">Admin confirms every entry. Any number of players can join each team.</span><div class="sr-pick"><button type="button" class="primary" data-srjoin="a">Join '+esc(s.team_a)+'</button><button type="button" class="primary alt" data-srjoin="b">Join '+esc(s.team_b)+'</button></div></div>';
-    html+=join+'<div id="srStatus" class="status"></div>';
-    // squads
-    const squad=side=>{
-      const list=B.members.filter(m=>m.side===side&&(m.status==="confirmed"||adm||(me&&m.id===me.member_id)));
-      return '<section class="sr-squad s'+side+'"><h3>'+esc(sideName(s,side))+' <small>'+conf(side).length+' players</small></h3>'+(list.length?list.map(m=>'<div class="sr-mem '+(m.status==="pending"?"pending":"")+'">'+seriesPlayer(m)+(m.status==="pending"?'<span class="sr-chip">Waiting</span>':'')+(m.id===(side==="a"?s.captain_a:s.captain_b)?'<span class="sr-chip open">Captain</span>':'')+(adm?'<span class="sr-mact">'+(m.status==="confirmed"?(m.id===(side==="a"?s.captain_a:s.captain_b)?'<button type="button" class="ghost" data-srcap="" data-side="'+side+'">Remove captain</button>':'<button type="button" class="ghost" data-srcap="'+esc(m.id)+'" data-side="'+side+'">Make captain</button>'):'')+(m.status==="pending"?'<button type="button" class="primary" data-srmem="approve" data-id="'+esc(m.id)+'">Approve</button>':'')+'<button type="button" class="ghost" data-srmem="switch" data-id="'+esc(m.id)+'">Move</button><button type="button" class="ghost" data-srmem="remove" data-id="'+esc(m.id)+'">Remove</button></span>':'')+'</div>').join(""):'<p class="small">No players yet.</p>')+'</section>';
-    };
-    html+='<div class="sr-squads">'+squad("a")+squad("b")+'</div>';
-    // rounds
-    for(let r=1;r<=s.rounds;r++){
-      const games=B.games.filter(g=>g.round===r),ro=B.rounds.find(x=>x.round===r);
-      const head=ro?'<span class="sr-rtally">'+ro.a_wins+' – '+ro.b_wins+(ro.complete?(ro.winner==="draw"?' · drawn':' · '+esc(sideName(s,ro.winner))+' take the round'):'')+'</span>':'<span class="sr-rtally">Not scheduled</span>';
-      const started=(B.started||[]).includes(r)||games.some(g=>g.status==="submitted"||g.status==="approved");
-      html+='<section class="sr-round"><div class="sr-r-head"><h3>Round '+r+(started?' <span class="sr-chip live">Started</span>':'')+'</h3>'+head+(adm?(started&&(B.started||[]).includes(r)?'<button type="button" class="ghost" data-srstart="'+r+'" data-v="0">Unlock round</button>':(!started?'<button type="button" class="primary" data-srstart="'+r+'" data-v="1">Start round</button>':'')):'')+'</div>'+squadsBlock(r,B,mem,s,adm)+(games.length?games.map(g=>gameRow(g,mem,s,adm)).join(""):'<p class="small sr-empty">Fixtures appear once both captains submit their squads.</p>')+(adm?pairTools(r,games,B,mem):'')+'</section>';
-    }
-    // admin controls
-    if(adm){
-      html+='<section class="panel sr-admin"><h3>Series controls</h3><div class="sr-ctl">'+
-        '<button type="button" class="ghost" data-srset="reg">'+(s.reg_open?'Close sign-ups':'Open sign-ups')+'</button>'+
-        (s.status==="open"?'<button type="button" class="primary" data-srset="live">Start the series</button>':'')+
-        (s.status==="live"?'<button type="button" class="primary" data-srset="finished">Mark finished</button>':'')+
-        (s.status!=="open"?'<button type="button" class="ghost" data-srset="open">Back to sign-up stage</button>':'')+
-        '<button type="button" class="ghost" data-srset="archived">Archive</button></div>'+
-        '<form id="srDeadline" class="inline-form"><label class="small">Sign-up deadline<input type="datetime-local" name="d"></label><button class="ghost" type="submit">Save</button><button class="ghost" type="button" id="srDeadlineClear">Clear</button></form>'+
-        (pend.length?'<p class="small">'+pend.length+' entr'+(pend.length>1?'ies':'y')+' waiting for approval.</p>':'')+'</section>';
-    }
-    box.innerHTML=html;
-    srStartTimer();
-    wireSeries();
-  }
-  function gameRow(g,mem,s,adm){
-    const a=mem[g.a_member],b=mem[g.b_member];if(!a||!b)return"";
-    const has=g.a_goals!=null&&g.b_goals!=null;
-    const win=g.status==="approved"&&has?(g.a_goals>g.b_goals?"a":g.a_goals<g.b_goals?"b":""):"";
-    const st=g.status==="approved"?'<span class="sr-chip done">Final</span>':g.status==="submitted"?'<span class="sr-chip live">Waiting for approval</span>':'<span class="sr-chip">Waiting for score</span>';
-    const canSend=state.session&&(adm||g.mine)&&(g.status!=="approved"||adm);
-    const form=canSend?'<form class="sr-send" data-game="'+esc(g.id)+'"><input type="number" min="0" max="99" inputmode="numeric" name="a" aria-label="'+esc(a.name)+' goals" value="'+(has?g.a_goals:"")+'" required><span>–</span><input type="number" min="0" max="99" inputmode="numeric" name="b" aria-label="'+esc(b.name)+' goals" value="'+(has?g.b_goals:"")+'" required><button class="primary" type="submit">'+(adm?'Save score':'Send score')+'</button>'+(adm&&g.status==="submitted"?'<button type="button" class="ghost" data-srrev="reject" data-id="'+esc(g.id)+'">Reject</button>':'')+(adm&&g.status==="submitted"?'<button type="button" class="primary" data-srrev="approve" data-id="'+esc(g.id)+'">Approve</button>':'')+'</form>':'';
-    return '<div class="sr-game '+(g.mine?"mine":"")+'"><div class="sr-g-row"><div class="sr-g-p sa '+(win==="a"?"w":"")+'">'+seriesPlayer(a)+'</div><div class="sr-g-mid">'+(has&&(g.status==="approved"||adm||g.mine)?'<strong>'+g.a_goals+' – '+g.b_goals+'</strong>':'<strong class="vs">v</strong>')+st+'</div><div class="sr-g-p r sb '+(win==="b"?"w":"")+'">'+seriesPlayer(b)+'</div></div>'+form+'</div>';
-  }
-  function pairTools(r,games,B,mem){
-    const A=B.members.filter(m=>m.side==="a"&&m.status==="confirmed"),Bs=B.members.filter(m=>m.side==="b"&&m.status==="confirmed");
-    if(!A.length||!Bs.length)return"";
-    const cur={};games.forEach(g=>cur[g.a_member]=g.b_member);
-    return '<details class="sr-pair"><summary>Admin: set pairings by hand for round '+r+'</summary><div class="sr-pair-body"><p class="small">Changing a pairing clears that game\'s score. Unchanged games keep theirs.</p><div class="sr-pair-rows" data-round="'+r+'">'+A.map(a=>'<div class="sr-pair-row"><span>'+esc(a.name)+'</span><select data-a="'+esc(a.id)+'"><option value="">No game</option>'+Bs.map(b=>'<option value="'+esc(b.id)+'"'+(cur[a.id]===b.id?' selected':'')+'>'+esc(b.name)+'</option>').join("")+'</select></div>').join("")+'</div><button type="button" class="primary" data-srsave="'+r+'">Save pairings</button></div></details>';
-  }
-  var srDraft={};
-  function squadIds(B,r,side){const q=B.squads.find(x=>x.round===r&&x.side===side);return q?q.members.slice():[];}
-  function squadsBlock(r,B,mem,s,adm){
-    const me=B.me,cap=side=>adm||(me&&me.captain&&me.side===side&&me.status==="confirmed");
-    const played=(B.started||[]).includes(r)||B.games.some(g=>g.round===r&&(g.status==="submitted"||g.status==="approved"));
-    const col=side=>{
-      const ids=squadIds(B,r,side),name=sideName(s,side);
-      const editable=cap(side)&&(adm||!played);
-      if(editable){
-        const k=r+side;if(!srDraft[k])srDraft[k]=ids.slice();
-        return '<div class="sr-sq s'+side+'" data-round="'+r+'" data-side="'+side+'"><h4>'+esc(name)+' squad</h4><div class="sr-sq-edit"></div></div>';
-      }
-      return '<div class="sr-sq s'+side+'"><h4>'+esc(name)+' squad</h4>'+(ids.length?'<ol>'+ids.map(id=>'<li>'+(mem[id]?seriesPlayer(mem[id],"sr-av sm"):"")+'</li>').join("")+'</ol>':'<p class="small">Not submitted yet.</p>')+'</div>';
-    };
-    const na=squadIds(B,r,"a").length,nb=squadIds(B,r,"b").length;
-    return '<div class="sr-squads-r">'+col("a")+col("b")+'</div>'+((na||nb)?'<p class="small sr-bench">'+(na&&nb?Math.min(na,nb)+' game'+(Math.min(na,nb)===1?'':'s')+' · '+(na!==nb?(na>nb?(na-nb)+' extra on '+esc(s.team_a)+' bench':(nb-na)+' extra on '+esc(s.team_b)+' bench'):'squads are level'):'Waiting for the other captain.')+'</p>':'');
-  }
-  function paintDraft(el,B){
-    const host=el.parentElement,r=Number(host.dataset.round),side=host.dataset.side,k=r+side,draft=srDraft[k]||[];
-    const mem={};B.members.forEach(m=>mem[m.id]=m);
-    const pool=B.members.filter(m=>m.side===side&&m.status==="confirmed"&&!draft.includes(m.id));
-    el.innerHTML=(draft.length?'<ol>'+draft.map((id,i)=>'<li>'+(mem[id]?seriesPlayer(mem[id],"sr-av sm"):"")+'<span class="sr-ord"><button type="button" data-o="up" data-i="'+i+'" aria-label="Move up"'+(i===0?" disabled":"")+'>↑</button><button type="button" data-o="down" data-i="'+i+'" aria-label="Move down"'+(i===draft.length-1?" disabled":"")+'>↓</button><button type="button" data-o="x" data-i="'+i+'" aria-label="Remove">✕</button></span></li>').join("")+'</ol>':'<p class="small">Add players in playing order. Number 1 plays the other team\'s number 1.</p>')+
-      (pool.length?'<div class="sr-add"><select aria-label="Add a player"><option value="">Add a player…</option>'+pool.map(m=>'<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>').join("")+'</select><button type="button" class="ghost" data-o="add">Add</button></div>':'')+
-      '<button type="button" class="primary sr-save-sq">Submit squad</button>';
-    el.onclick=async e=>{
-      const b=e.target.closest("button");if(!b)return;
-      const i=Number(b.dataset.i),d=srDraft[k];
-      if(b.dataset.o==="up"&&i>0){[d[i-1],d[i]]=[d[i],d[i-1]];}
-      else if(b.dataset.o==="down"&&i<d.length-1){[d[i+1],d[i]]=[d[i],d[i+1]];}
-      else if(b.dataset.o==="x"){d.splice(i,1);}
-      else if(b.dataset.o==="add"){const v=el.querySelector(".sr-add select").value;if(v)d.push(v);}
-      else if(b.classList.contains("sr-save-sq")){
-        const {error}=await client.rpc("series_submit_squad",{p_id:B.series.id,p_round:r,p_side:side,p_members:d});
-        if(error){status("srStatus",error.message,"error");toast(error.message);return;}
-        toast("Squad submitted.");srDraft={};await loadSeriesPage();return;
-      }
-      paintDraft(el,B);
-    };
-  }
-  async function seriesCall(fn,args,okMsg){
-    const {error,data}=await client.rpc(fn,args);
-    if(error){status("srStatus",error.message,"error");toast(error.message);return null;}
-    if(okMsg)toast(okMsg);await loadSeriesPage();return data===undefined?true:(data===null?true:data);
-  }
-  function wireSeries(){
-    const B=seriesBundle,s=B.series,box=$("seriesPage");
-    $("srBack").onclick=()=>{if(seriesFrom==="series"||seriesFrom==="home")showView("home");else showView(seriesFrom);};
-    box.querySelectorAll("[data-srjoin]").forEach(b=>b.onclick=()=>seriesCall("series_register",{p_id:s.id,p_side:b.dataset.srjoin},"Sign-up sent. An admin will confirm it."));
-    box.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>showView(b.dataset.view));
-    const lv=$("srLeave");if(lv)lv.onclick=()=>seriesCall("series_leave",{p_id:s.id},"You have left the series.");
-    box.querySelectorAll("[data-srmem]").forEach(b=>b.onclick=()=>seriesCall("series_member_action",{p_member:b.dataset.id,p_action:b.dataset.srmem},b.dataset.srmem==="approve"?"Player confirmed.":b.dataset.srmem==="remove"?"Player removed.":"Player moved."));
-    box.querySelectorAll("form.sr-send").forEach(f=>f.addEventListener("submit",async e=>{
-      e.preventDefault();const d=new FormData(f);
-      const r=await seriesCall("series_submit_score",{p_game:f.dataset.game,p_a:Number(d.get("a")),p_b:Number(d.get("b"))});
-      if(r)toast(r==="approved"?"Score saved.":"Score sent for approval.");
-    }));
-    box.querySelectorAll("[data-srrev]").forEach(b=>b.onclick=()=>seriesCall("series_review_score",{p_game:b.dataset.id,p_approve:b.dataset.srrev==="approve"},b.dataset.srrev==="approve"?"Score approved.":"Score sent back."));
-    box.querySelectorAll("[data-srset]").forEach(b=>b.onclick=()=>{
-      const k=b.dataset.srset;
-      seriesCall("series_set",k==="reg"?{p_id:s.id,p_reg_open:!s.reg_open}:{p_id:s.id,p_status:k},"Saved.").then(r=>{if(r&&k==="archived")showView("home");});
-    });
-    $("srDeadline")?.addEventListener("submit",e=>{e.preventDefault();const v=new FormData(e.target).get("d");if(!v){toast("Pick a date first.");return;}seriesCall("series_set",{p_id:s.id,p_deadline:new Date(v).toISOString()},"Deadline saved.");});
-    $("srDeadlineClear")?.addEventListener("click",()=>seriesCall("series_set",{p_id:s.id,p_clear_deadline:true},"Deadline cleared."));
-    box.querySelectorAll(".sr-sq[data-round] .sr-sq-edit").forEach(el=>paintDraft(el,B));
-    box.querySelectorAll("[data-srstart]").forEach(b=>b.onclick=()=>seriesCall("series_start_round",{p_id:s.id,p_round:Number(b.dataset.srstart),p_started:b.dataset.v==="1"},b.dataset.v==="1"?"Round started. Captains can no longer change its squads.":"Round unlocked."));
-    box.querySelectorAll("[data-srcap]").forEach(b=>b.onclick=()=>seriesCall("series_set_captain",{p_id:s.id,p_side:b.dataset.side,p_member:b.dataset.srcap||null},b.dataset.srcap?"Captain set.":"Captain removed."));
-    box.querySelectorAll("[data-srauto-unused]").forEach(b=>b.onclick=()=>{
-      const rows=box.querySelector('.sr-pair-rows[data-round="'+b.dataset.srauto+'"]');
-      const bs=[...rows.querySelector("select").options].map(o=>o.value).filter(Boolean);
-      [...rows.querySelectorAll("select")].forEach((sel,i)=>{sel.value=bs[i]||"";});
-    });
-    box.querySelectorAll("[data-srsave]").forEach(b=>b.onclick=()=>{
-      const rows=box.querySelector('.sr-pair-rows[data-round="'+b.dataset.srsave+'"]');
-      const pairs=[...rows.querySelectorAll("select")].filter(x=>x.value).map(x=>({a:x.dataset.a,b:x.value}));
-      if(new Set(pairs.map(p=>p.b)).size!==pairs.length){status("srStatus","Each player can only play one game per round.","error");return;}
-      seriesCall("series_pair_round",{p_id:s.id,p_round:Number(b.dataset.srsave),p_pairs:pairs},"Pairings saved.");
-    });
-  }
-  document.addEventListener("click",e=>{
-    const t=e.target.closest("[data-series]");if(!t)return;
-    openSeries(t.dataset.series);
-  });
-  document.addEventListener("keydown",e=>{
-    if(e.key!=="Enter"&&e.key!==" ")return;
-    const t=e.target.closest&&e.target.closest(".sr-banner[data-series]");if(!t||e.target!==t)return;
-    e.preventDefault();openSeries(t.dataset.series);
-  });
   var REACT=[["fire","🔥","Fire"],["clap","👏","Great"],["laugh","😂","Funny"],["wow","😮","Wow"]];
   function reactRow(id){
     const m=(state.reacts||{})[id]||{};
@@ -3053,7 +2690,6 @@ $("playersBody").innerHTML = shown.map(p =>
     if(!client||!id){box.innerHTML="";return;}
     box.innerHTML=skel("profile");
     const lbMonth=monthDate(pfScope.mode==="month"?pfScope.month:monthNow);
-    const serP=client.rpc("get_player_series",{p_player:id}).then(r=>r.data||null,()=>null);
     const [mres,dir,lb]=await Promise.all([client.rpc("get_player_matches",{p_player:id}),client.from("active_player_directory").select("id,display_name").eq("id",id).maybeSingle(),client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
     const me=dir.data;
     const hmap=await houseMap().catch(()=>null);
@@ -3120,13 +2756,7 @@ $("playersBody").innerHTML = shown.map(p =>
       playerCardHtml(me,lbRow,all,hmap,id)+
       '<section class="pf-card pf-wide"><h3>Badges <small>'+earned+' of '+bd.defs.length+' earned</small></h3><div class="pf-badges">'+badges+'</div></section>'+
       '<section class="pf-card pf-wide"><h3>Latest matches</h3><div class="pf-ms">'+recent+'</div></section>'+
-      '<div id="pfSeries"></div>';
-    serP.then(sd=>{
-      const el=$("pfSeries");if(!el||!sd||!sd.summary||!sd.summary.played)return;
-      const m=sd.summary;
-      el.innerHTML='<section class="pf-card pf-wide pf-series"><div class="pf-ser-band"><b>Team series</b><small>kept separate from friendly matches</small></div><div class="pf-tiles pf-tiles-sm">'+[["Games",m.played],["W · D · L",m.w+" · "+m.d+" · "+m.l],["Goals",m.gf+" – "+m.ga]].map(t=>'<div class="pf-tile"><b>'+t[1]+'</b><span>'+t[0]+'</span></div>').join("")+'</div>'+
-        sd.series.map(x=>'<div class="pf-ser"><div class="pf-ser-h"><b>'+esc(x.name)+'</b><span class="pf-ser-team">Played for <em>'+esc(x.team)+'</em></span></div>'+x.games.map(g=>'<div class="pf-m r-'+(g.gf>g.ga?"w":g.gf<g.ga?"l":"d")+'"><span class="d">Round '+g.round+'</span><span class="o'+(g.opp_id?' link-player':'')+'"'+(g.opp_id?' data-player="'+esc(g.opp_id)+'"':'')+'>'+esc(g.opp)+'</span><span class="s">'+g.gf+' – '+g.ga+'</span></div>').join("")+'</div>').join("")+'</section>';
-    });
+      '';
     bindPlayerCard(box);
     box.querySelectorAll("[data-pfs]").forEach(b=>b.addEventListener("click",()=>{pfScope.mode=b.dataset.pfs;renderPlayerPage();}));
     const pm=$("pfMonth");if(pm)pm.addEventListener("change",()=>{pfScope.month=pm.value||monthNow;renderPlayerPage();});
@@ -3142,12 +2772,9 @@ $("playersBody").innerHTML = shown.map(p =>
       renderH2h();
     });
   }
-  setTimeout(loadHomeLegends,0);
   setTimeout(loadHomeStories,0);
-  setTimeout(loadHomeSeries,0);
   setTimeout(loadHomeAuction,0);
   setTimeout(loadHomeTicker,0);
-  setTimeout(loadHomePodium,0);
   setTimeout(loadHomeHouses,0);
   setTimeout(loadHomeTeam,0);
   function legendCard(kind,scope,rows,monthLabel){
@@ -3257,34 +2884,6 @@ $("playersBody").innerHTML = shown.map(p =>
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
   }
-  async function loadHomePodium(){
-    const box=$("homePodium");if(!box||!client)return;
-    try{
-      const [r]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(monthNow)}),ensureAvatars()]);
-      const rows=r.data||[];
-      const top=rows.filter(x=>Number(x.matches_played)>0);
-      if(top.length<3){box.classList.add("hidden");return;}
-      box.innerHTML='<div class="hl-head"><h2>The table right now</h2><span class="hl-links"><button type="button" class="hl-link" data-view="leaderboard">Full leaderboard</button></span></div><div class="lb-podium" id="homePodiumGrid"></div>';
-      renderPodium(rows,$("homePodiumGrid"));
-      box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
-      box.classList.remove("hidden");
-    }catch(e){console.warn(e);}
-  }
-  async function loadHomeLegends(){
-    const box=$("homeLegends");if(!box||!client)return;
-    try{
-      const [r]=await Promise.all([client.rpc("get_top_performers",{p_month:monthDate(monthNow)}),ensureAvatars()]);
-      const rows=r.data||[];
-      const top=(k)=>[...rows].filter(x=>Number(x[k])>0).sort((x,y)=>Number(y[k])-Number(x[k])||Number(x.matches_played)-Number(y.matches_played)||String(x.player_name).localeCompare(y.player_name))[0];
-      const g=top("goals_for"),c=top("clean_sheets");
-      if(!g&&!c){box.classList.add("hidden");return;}
-      const one=(x,k,label,unit)=>x?'<button type="button" class="hl-card" data-player="'+esc(x.player_id)+'">'+avBig(x.player_name,x.player_id,"hl-av")+'<span class="hl-txt"><small>'+label+'</small><b>'+esc(x.player_name)+'</b><em>'+x[k]+' '+unit+'</em></span></button>':'';
-      box.innerHTML='<div class="hl-head"><h2>This month\'s stars</h2><span class="hl-links"><button type="button" class="hl-link" data-view="stories">Stories</button><button type="button" class="hl-link" data-view="h2h">Head to Head &amp; BPC Stars</button></span></div><div class="hl-grid">'+one(g,"goals_for","Top scorer","goals")+one(c,"clean_sheets","Clean sheet king","clean sheets")+'</div>';
-      box.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
-      box.classList.remove("hidden");
-    }catch(e){console.warn(e);}
-  }
-
   // ---- Collectible tiers, Team of the month pitch, match broadcast graphic ----
   function tierOf(rank,elig){
     const r=Number(rank)||0;
@@ -4510,7 +4109,7 @@ $("playersBody").innerHTML = shown.map(p =>
       }
     }
     if(!state.recoveryMode&&!(recoveryHash&&!state.session))routeFromHash();
-    await loadMembers();await loadPublicPoster();await loadHomeBanner();loadHomeClips();
+    await loadMembers();await loadPublicPoster();await loadHomeClips();
   }
   boot();
 })();

@@ -2392,3 +2392,6 @@ body.tx-lock{overflow:hidden}
 
 /* keep absolutely positioned bits (e.g. sr-only labels) inside the scroll box */
 .table-wrap{position:relative}
+
+/* Decorative stadium background + crowd strip on Home only; working pages stay plain */
+body:not([data-view="home"]) .sbg,body:not([data-view="home"]) .sbg-stand{display:none}

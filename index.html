@@ -86,7 +86,6 @@
 <main>
   <section id="view-home" class="view">
     <section id="homeClips" class="clips hidden" aria-roledescription="carousel" aria-label="Highlight clips"></section>
-    <section id="homeBannerSection" class="home-banner-section hidden" aria-label="Club performance banner"><img id="homeBannerImage" class="home-banner-image" alt="BPC club performance banner"></section>
     <div class="home-hero sdm-hero">
       <svg class="sdm-art" viewBox="0 0 1200 340" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
         <defs>
@@ -114,8 +113,8 @@
     </div>
     <section id="homeMatchday" class="md hidden" aria-label="Matchday"></section>
     <div id="homeTicker" class="home-ticker hidden" aria-label="Recent results"></div>
-    <section id="uclPosterSection" class="poster-section hidden" aria-label="UCL finalists poster">
-    <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">UCL Finalists</h2></div><span class="poster-badge">Featured</span></div>
+    <section id="uclPosterSection" class="poster-section hidden" aria-label="Club announcements">
+    <div class="poster-heading"><div><p class="eyebrow">CLUB ANNOUNCEMENT</p><h2 id="posterTitle">Club announcement</h2></div><span class="poster-badge">Featured</span></div>
     <img id="posterImage" class="poster-image" alt="Club announcement">
     <div id="posterControls" class="poster-controls hidden" aria-label="Announcement slideshow controls">
       <button id="posterPrev" class="poster-arrow" type="button" aria-label="Previous announcement">‹</button>
@@ -124,13 +123,10 @@
     </div>
     <p id="posterCaption" class="poster-caption">Featured for a limited time.</p>
   </section>
-    <section id="homeSeries" class="home-series hidden" aria-label="Team series"></section>
     <section id="homeAuction" class="home-series hidden" aria-label="Auction"></section>
     <section id="homeHouses" class="home-houses hidden" aria-label="BPC House Cup"></section>
-    <section id="homePodium" class="home-podium hidden" aria-label="This month's table"></section>
     <section id="homeTeam" class="home-team hidden" aria-label="Team of the month"></section>
     <section id="homeStories" class="home-stories hidden" aria-label="Latest stories"></section>
-    <section id="homeLegends" class="home-legends hidden" aria-label="This month's stars"></section>
   </section>
 
   <section id="view-leaderboard" class="view hidden">
@@ -321,26 +317,6 @@
         <button class="primary" id="saveBrandingBtn" type="submit">Save branding</button>
         <div id="brandingStatus" class="status"></div>
       </form>
-      <div class="section-head compact"><h2>Home page banner</h2><p>Upload a club-performance banner for the Home page. It stays visible until you remove it.</p></div>
-      <form id="bannerForm" class="panel poster-admin-form">
-        <label>Choose banner image<input id="bannerFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required></label>
-        <label>Banner destination
-          <select id="bannerDestination" required>
-            <option value="leaderboard">Leaderboard</option>
-            <option value="home">Home page</option>
-            <option value="history">Match history</option>
-            <option value="submit">Submit result</option>
-            <option value="custom">Custom URL</option>
-            <option value="none">No link</option>
-          </select>
-        </label>
-        <label id="bannerCustomUrlLabel" class="hidden">Custom URL<input id="bannerCustomUrl" type="url" placeholder="https://example.com"></label>
-        <p class="small">Choose where visitors go when they click the homepage banner.</p>
-        <p class="small">Use JPG, PNG, WEBP, or GIF. Maximum file size: 8 MB.</p>
-        <button class="primary" id="publishBannerBtn" type="submit">Upload banner</button>
-        <div id="bannerAdminStatus" class="status"></div>
-      </form>
-      <div id="bannerAdminCurrent" class="poster-admin-list"></div>
       <div class="section-head compact"><h2>Highlight clips</h2><p>Short clips of great passes, goals and saves play in a banner at the top of the Home page, newest first.</p></div>
       <form id="clipForm" class="panel poster-admin-form">
         <label>Clip title<input id="clipTitle" maxlength="80" required placeholder="e.g. Solo run from halfway"></label>
@@ -354,12 +330,12 @@
         <div id="clipAdminStatus" class="status"></div>
       </form>
       <div id="clipAdminList" class="poster-admin-list"></div>
-      <div class="section-head compact"><h2>UCL finalists poster</h2><p>Upload an announcement image to show it at the top of the Leaderboard. It stays visible until you remove it manually.</p></div>
+      <div class="section-head compact"><h2>Announcements</h2><p>Post an announcement image (champions, new tournaments, finals). Active announcements rotate on the Home page until you remove them.</p></div>
       <form id="posterForm" class="panel poster-admin-form">
-        <label>Poster title<input id="posterUploadTitle" maxlength="120" value="UCL Finalists" required></label>
+        <label>Title<input id="posterUploadTitle" maxlength="120" placeholder="e.g. November champion" required></label>
         <label>Choose poster image<input id="posterFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" required></label>
         <p class="small">Use JPG, PNG, WEBP, or GIF. Maximum file size: 8 MB.</p>
-        <button class="primary" id="publishPosterBtn" type="submit">Upload only</button>
+        <button class="primary" id="publishPosterBtn" type="submit">Post announcement</button>
         <div id="posterAdminStatus" class="status"></div>
       </form>
       <div id="posterAdminList" class="poster-admin-list"></div>
@@ -440,12 +416,10 @@
 
 
   <section id="view-houses" class="view hidden"><div id="housesPage"></div></section>
-  <section id="view-series" class="view hidden"><div id="seriesPage"></div></section>
   <section id="view-auction" class="view hidden"><div id="auctionPage"></div></section>
   <section id="view-tournaments" class="view hidden">
     <div class="tn-masthead"><h2>Tournaments</h2><p>Register, follow your fixtures, and send in scores before the deadline. Tournament results are kept separate from friendly-match statistics.</p></div>
     <div id="auctionStrip" class="sr-strip hidden"></div>
-    <div id="seriesStrip" class="sr-strip hidden"></div>
     <div id="tournamentStatus" class="status"></div>
     <div id="tournamentAdminPanel" class="tn-createbar hidden"><div><b>Run a tournament</b><span class="small">Choose a format, decide how players join and how scores work, and open sign-ups in three steps.</span></div><button type="button" class="primary" id="tnCreateBtn">Create tournament</button></div>
     <details id="tnManagersPanel" class="panel tn-mgr-panel hidden">
