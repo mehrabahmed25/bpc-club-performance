@@ -87,7 +87,7 @@
     $("nav").classList.remove("open");
     if(name!=="home")clipsPause();
     document.body.dataset.view=name;
-    if(name==="home"){loadHomeClips();loadHomeMatchday();loadPublicPoster();loadHomeTicker();loadHomeAuction();loadHomeTeam();loadHomeHouses();loadHomeStories();}
+    if(name==="home"){maybeAutoPotm();loadHomeClips();loadHomeMatchday();loadPublicPoster();loadHomeTicker();loadHomeAuction();loadHomeTeam();loadHomeHouses();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -635,6 +635,7 @@
 
   function setAuthUI(){
     setTimeout(()=>{if(typeof loadBell==="function")loadBell();},0);
+    setTimeout(()=>{if(state.player)checkMyBadges();},2500);
     setTimeout(()=>{if(typeof updateTabbar==="function")updateTabbar();const hv=$("view-home");if(hv&&!hv.classList.contains("hidden")&&typeof loadHomeMatchday==="function")loadHomeMatchday();},0);
     if(state.recoveryMode){
       $("accountNav").textContent="Reset password";
@@ -910,6 +911,7 @@ $("matchForm").addEventListener("submit", async e => {
       new Event("change", { bubbles: true })
     );
 
+    celebrateSubmit(pg,og);
     status(
       "matchMessage",
       "Result submitted successfully. It is now pending admin approval. Reference: " + data,
@@ -2726,6 +2728,7 @@ $("playersBody").innerHTML = shown.map(p =>
     const bestM=[...pts].sort((a,b)=>b.p-a.p)[0];
     const chart='<div class="pf-bars" role="img" aria-label="Points per month">'+pts.map(x=>'<div class="pf-bar'+(x.k===(bestM&&bestM.p?bestM.k:"")?' is-best':'')+'" title="'+monthLabel(x.k)+': '+x.p+' pts"><i style="height:'+Math.max(x.p?6:2,Math.round(x.p/maxP*100))+'%"></i><span>'+monthLabel(x.k).slice(0,3)+'</span></div>').join("")+'</div>';
     const bd=pfBadges(all);
+    if(state.player&&id===state.player.id)setTimeout(()=>badgeCelebrate(all),700);
     const badges=bd.defs.map(d=>{const ok=d[3]>=d[4];return '<div class="pf-badge'+(ok?' is-on':'')+'" title="'+esc(d[2])+'"><span class="g">'+d[0]+'</span><b>'+d[1]+'</b><small>'+(ok?"Earned":Math.min(d[3],d[4])+" / "+d[4])+'</small>'+(ok?'':'<span class="pf-bp"><i style="width:'+Math.round(Math.min(d[3],d[4])/d[4]*100)+'%"></i></span>')+'</div>';}).join("");
     const earned=bd.defs.filter(d=>d[3]>=d[4]).length;
     const recent=all.slice(0,8).map(r=>'<div class="pf-m r-'+pfRes(r)+'"><span class="d">'+prettyDate(r.match_date)+'</span><span class="o'+(r.opponent_id?' link-player':'')+'"'+(r.opponent_id?' data-player="'+esc(r.opponent_id)+'"':'')+'>'+esc(r.opponent_name)+'</span><span class="s">'+r.gf+' – '+r.ga+'</span></div>').join("")||'<div class="pf-none">No counted matches yet.</div>';
@@ -2991,6 +2994,160 @@ $("playersBody").innerHTML = shown.map(p =>
     return '<section class="pf-card pf-wide"><h3>Player card <small>frame follows this month\'s table</small></h3><div class="tc-wrap"><div class="tc tier-'+t.k+(t.foil?' foil':'')+'"><span class="tc-top"><b>'+(lbRow?'#'+lbRow.rank:'—')+'</b><em>'+t.n+'</em></span>'+avBig(me.display_name,me.id,"tc-av")+'<h4>'+esc(me.display_name)+'</h4><div class="tc-st"><span><b>'+st.n+'</b>P</span><span><b>'+st.w+'</b>W</span><span><b>'+st.gf+'</b>GF</span><span><b>'+st.pts+'</b>Pts</span></div>'+(t.foil?'<span class="tc-foil">Award eligible</span>':'')+'</div><p class="tc-leg">Gold is the top 3, silver is rank 4 to 10, bronze is 11 and below. A shimmering foil means the player is eligible for this month\'s award. The card changes as the table changes.</p></div></section>';
   }
 
+
+  // ================= Moments: Player of the Month reveal, submit celebration, badge unlocks =================
+  const fxRM=()=>!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function fxOpen(cls,html,opt){
+    opt=opt||{};
+    const el=document.createElement("div");el.className="fx "+cls;el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");
+    if(opt.label)el.setAttribute("aria-label",opt.label);
+    el.innerHTML=html;document.body.appendChild(el);
+    const back=document.activeElement;let timer=null;
+    const key=e=>{if(e.key==="Escape")close();};
+    function close(){
+      if(!el.isConnected||el.classList.contains("out"))return;
+      if(timer)clearTimeout(timer);document.removeEventListener("keydown",key);
+      el.classList.add("out");
+      setTimeout(()=>{el.remove();if(back&&back.focus&&document.contains(back))back.focus();if(opt.onClose)opt.onClose();},fxRM()?0:240);
+    }
+    document.addEventListener("keydown",key);
+    el.addEventListener("click",e=>{if(e.target===el||e.target.closest("[data-fx-close]"))close();});
+    requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add("in")));
+    if(opt.autoMs)timer=setTimeout(close,opt.autoMs);
+    const f=el.querySelector("[data-fx-focus]");if(f)setTimeout(()=>f.focus({preventScroll:true}),60);
+    return {el,close};
+  }
+  function fxConfetti(n,colors){
+    if(fxRM())return "";
+    let h='<div class="fx-conf" aria-hidden="true">';
+    for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,d=120+Math.random()*190;
+      h+='<i style="--x:'+Math.round(Math.cos(a)*d)+'px;--y:'+Math.round(Math.sin(a)*d-60)+'px;--r:'+Math.round(Math.random()*720-360)+'deg;--d:'+Math.round(Math.random()*160)+'ms;background:'+colors[i%colors.length]+'"></i>';}
+    return h+'</div>';
+  }
+
+  // ---- 1. Submit celebration ----
+  function celebrateSubmit(pg,og){
+    const win=pg>og,draw=pg===og,rm=fxRM();
+    const net='<g class="fx-net" stroke="#ffffff" stroke-opacity=".38" stroke-width="1.2">'
+      +Array.from({length:13},(_,i)=>'<line x1="'+(40+i*18.3)+'" y1="34" x2="'+(52+i*16.5)+'" y2="128"/>').join("")
+      +Array.from({length:6},(_,i)=>'<line x1="'+(40+i*2)+'" y1="'+(34+i*18.8)+'" x2="'+(260-i*2)+'" y2="'+(34+i*18.8)+'"/>').join("")+'</g>';
+    const ball='<g class="fx-ball"><circle r="11" fill="#fff"/><g transform="translate(-11 -11) scale(.9167)" color="#0a1530"><svg width="24" height="24" viewBox="0 0 24 24"><use href="#i-ball"/></svg></g>'
+      +(rm?'':'<animateMotion dur="0.9s" begin="0.15s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".25 .6 .3 1" path="M30 168 Q 60 40 168 96"/><animateTransform attributeName="transform" type="rotate" additive="sum" from="0" to="540" dur="0.9s" begin="0.15s" fill="freeze"/>')+'</g>';
+    const goal='<svg class="fx-goal-svg" viewBox="0 0 300 180" aria-hidden="true">'
+      +'<ellipse cx="150" cy="150" rx="150" ry="18" fill="#13a46b" fill-opacity=".25"/>'+net
+      +'<path d="M40 130 V30 H260 V130" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>'
+      +(rm?'<g transform="translate(168 96)">'+ball+'</g>':ball)+'</svg>';
+    const tick='<svg class="fx-tick" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="42" fill="none" stroke="#ffffff22" stroke-width="6"/><circle class="fx-tick-c" cx="48" cy="48" r="42" fill="none" stroke="#f6b73c" stroke-width="6" stroke-linecap="round" pathLength="100"/><path class="fx-tick-p" d="M30 50 L43 62 L67 36" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" pathLength="100"/></svg>';
+    const html='<div class="fx-sub-box'+(win?' win':'')+'">'
+      +(win?goal+fxConfetti(26,["#f6b73c","#ffffff","#13a46b","#7fb2ff"]):tick)
+      +'<h2>'+(win?'GOAL!':'Result sent')+'</h2>'
+      +'<p><b>'+pg+' – '+og+'</b> '+(win?'win':draw?'draw':'result')+' submitted. It counts once an admin approves it.</p>'
+      +'<button type="button" class="fx-btn" data-fx-close data-fx-focus>Done</button></div>';
+    fxOpen("fx-sub",html,{autoMs:win?4200:2600,label:win?"Goal! Result submitted":"Result submitted"});
+  }
+
+  // ---- 2. Player of the Month pack reveal ----
+  const FX_TIER={icon:["#b993ff","#f6b73c"],gold:["#f6b73c","#ffe48f"],silver:["#c9d3e6","#ffffff"],bronze:["#e0a370","#ffd7b3"],rookie:["#7fb2ff","#d6e6ff"]};
+  function prevMonthOf(m){const d=new Date(m+"-01T12:00:00");d.setMonth(d.getMonth()-1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+  const potmCache={};
+  async function potmData(month){
+    if(potmCache[month])return potmCache[month];
+    const [lb,cb]=await Promise.all([client.rpc("get_leaderboard",{p_month:monthDate(month)}),client.rpc("get_cobeg_match_totals",{p_month:monthDate(month)}),ensureAvatars()]);
+    const rows=(lb.data||[]).filter(r=>Number(r.matches_played)>0).sort((a,b)=>Number(a.rank)-Number(b.rank));
+    if(!rows.length)return null;
+    const tot={};(cb.data||[]).forEach(r=>{tot[r.player_id]=Number(r.total_mp_vs_cobeg_xi)||0;});
+    const elig=rows.find(r=>r.award_eligible&&(tot[r.player_id]||0)>=25);
+    const p=elig||rows[0];
+    const m=await client.rpc("get_player_matches",{p_player:p.player_id});
+    const all=(m.data||[]).map(r=>({...r,gf:Number(r.gf),ga:Number(r.ga)}));
+    return potmCache[month]={p,R:pcRating(all),award:!!elig,month};
+  }
+  async function showPotm(month){
+    if(!client)return;
+    let d=null;try{d=await potmData(month);}catch(e){console.warn(e);}
+    if(!d){toast("No Player of the Month for that month yet.");return;}
+    const {p,R}=d,col=FX_TIER[R.tier.k]||FX_TIER.gold,rm=fxRM();
+    const label=new Date(month+"-01T12:00:00").toLocaleDateString(undefined,{month:"long",year:"numeric"});
+    const title=d.award?"Player of the Month":"Top of the table";
+    const crest=($("siteLogo")&&$("siteLogo").src)||"icons/icon-192.png";
+    const front='<div class="fx-face fx-front"><div class="fx-c-top"><div class="fx-ovr"><b data-ovr="'+(R.n?R.ovr:0)+'">'+(rm&&R.n?R.ovr:R.n?0:"–")+'</b><span>OVR</span></div><div class="fx-c-tier"><em>'+esc(R.tier.n)+'</em><small>#'+p.rank+' in the table</small></div></div>'
+      +avBig(p.player_name,p.player_id,"fx-av")+'<h3 class="fx-name">'+esc(p.player_name)+'</h3>'
+      +'<ul class="fx-attrs">'+R.a.map((x,i)=>'<li style="--i:'+i+'"><b>'+(R.n?x[1]:"–")+'</b><span>'+x[0]+'</span></li>').join("")+'</ul>'
+      +'<dl class="fx-month"><div><dt>Points</dt><dd>'+p.points+'</dd></div><div><dt>Record</dt><dd>'+p.wins+'-'+p.draws+'-'+p.losses+'</dd></div><div><dt>Goals</dt><dd>'+p.goals_for+'</dd></div></dl></div>';
+    const backFace='<div class="fx-face fx-back"><img src="'+esc(crest)+'" alt=""><b>'+title+'</b><small>'+esc(label)+'</small></div>';
+    const html='<div class="fx-pk" style="--c1:'+col[0]+';--c2:'+col[1]+'">'
+      +'<div class="fx-rays" aria-hidden="true"></div><div class="fx-flash" aria-hidden="true"></div>'
+      +'<p class="fx-pk-head">'+title+'<span>'+esc(label)+'</span></p>'
+      +'<button type="button" class="fx-card" data-fx-open aria-label="Open the card"><span class="fx-inner">'+backFace+front+'</span></button>'
+      +'<p class="fx-hint">Tap the card to open</p>'
+      +'<div class="fx-acts"><button type="button" class="fx-btn" data-fx-profile>View profile</button><button type="button" class="fx-btn ghost" data-fx-close>Close</button></div>'
+      +'<div class="fx-conf-slot"></div></div>';
+    const fx=fxOpen("fx-potm",html,{label:title+", "+label});
+    const el=fx.el,stage=el.querySelector(".fx-pk"),card=el.querySelector("[data-fx-open]");
+    let opened=false,auto=null;
+    const open=()=>{
+      if(opened)return;opened=true;if(auto)clearTimeout(auto);
+      card.setAttribute("aria-label",p.player_name+", overall "+(R.n?R.ovr:"unrated")+", "+R.tier.n);
+      if(rm){stage.classList.add("s3","done");return;}
+      stage.classList.add("s2");
+      setTimeout(()=>{stage.classList.add("s3");el.querySelector(".fx-conf-slot").innerHTML=fxConfetti(40,[col[0],col[1],"#ffffff","#f6b73c"]);
+        const b=el.querySelector("[data-ovr]"),to=Number(b.dataset.ovr)||0,t0=performance.now();
+        if(to){const step=t=>{const k=Math.min(1,(t-t0)/900);b.textContent=Math.round(to*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
+      },rm?0:900);
+      setTimeout(()=>{stage.classList.add("done");const v=el.querySelector("[data-fx-profile]");if(v)v.focus({preventScroll:true});},1900);
+    };
+    card.addEventListener("click",open);
+    card.focus({preventScroll:true});
+    auto=setTimeout(open,rm?0:2200);
+    el.querySelector("[data-fx-profile]").addEventListener("click",()=>{fx.close();openPlayer(p.player_id);});
+  }
+  function maybeAutoPotm(){
+    if(!client)return;
+    const day=Number(bdToday().slice(8,10)),pm=prevMonthOf(monthNow);
+    if(day>7)return;
+    let seen="";try{seen=localStorage.getItem("bpc_potm_seen")||"";}catch(e){}
+    if(seen===pm)return;
+    setTimeout(async()=>{
+      if($("view-home").classList.contains("hidden")||document.querySelector(".fx"))return;
+      try{const d=await potmData(pm);if(!d)return;}catch(e){return;}
+      if($("view-home").classList.contains("hidden")||document.querySelector(".fx"))return;
+      try{localStorage.setItem("bpc_potm_seen",pm);}catch(e){}
+      showPotm(pm);
+    },1400);
+  }
+  function setupPotmButton(){
+    const b=$("potmReplay");if(!b)return;
+    const pm=prevMonthOf(monthNow);
+    b.querySelector("span").textContent=new Date(pm+"-01T12:00:00").toLocaleDateString(undefined,{month:"long"})+" Player of the Month";
+    b.addEventListener("click",()=>showPotm(pm));
+  }
+  setupPotmButton();
+
+  // ---- 3. Badge unlocks ----
+  let badgeQueue=[],badgeShowing=false,badgeBusy=false;
+  function badgeCelebrate(all){
+    if(!state.player)return;
+    const on=pfBadges(all).defs.filter(d=>d[3]>=d[4]);
+    const key="bpc_badges_"+state.player.id;let prev=null;
+    try{prev=JSON.parse(localStorage.getItem(key)||"null");}catch(e){}
+    try{localStorage.setItem(key,JSON.stringify(on.map(d=>d[1])));}catch(e){}
+    if(!Array.isArray(prev))return; // first visit on this device: remember quietly
+    on.filter(d=>!prev.includes(d[1])).forEach(d=>{if(!badgeQueue.some(q=>q[1]===d[1]))badgeQueue.push(d);});
+    nextBadge();
+  }
+  function nextBadge(){
+    if(badgeShowing||!badgeQueue.length||document.querySelector(".fx"))return;
+    const d=badgeQueue.shift();badgeShowing=true;
+    const left=badgeQueue.length;
+    fxOpen("fx-badge",'<div class="fx-bdg"><div class="fx-medal"><span class="fx-shine" aria-hidden="true"></span>'+d[0]+'</div>'+fxConfetti(18,["#f6b73c","#ffe48f","#ffffff"])
+      +'<small>Badge unlocked</small><h2>'+esc(d[1])+'</h2><p>'+esc(d[2])+'</p><button type="button" class="fx-btn" data-fx-close data-fx-focus>'+(left?'Next badge':'Nice')+'</button></div>',
+      {label:"Badge unlocked: "+d[1],onClose:()=>{badgeShowing=false;setTimeout(nextBadge,250);}});
+  }
+  async function checkMyBadges(){
+    if(!client||!state.player||badgeBusy)return;badgeBusy=true;
+    try{const r=await client.rpc("get_player_matches",{p_player:state.player.id});if(!r.error)badgeCelebrate((r.data||[]).map(x=>({...x,gf:Number(x.gf),ga:Number(x.ga)})));}
+    catch(e){console.warn(e);}finally{badgeBusy=false;}
+  }
 
   // ---- BPC Houses ----
   let hsCache=null;
