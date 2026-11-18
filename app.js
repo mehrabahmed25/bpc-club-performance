@@ -3001,7 +3001,7 @@ $("playersBody").innerHTML = shown.map(p =>
   let themeCfg=null;
   try{themeCfg=JSON.parse(localStorage.getItem("bpc_theme")||"null");}catch(e){}
   function themePreview(){try{return localStorage.getItem("bpc_theme_preview")||"";}catch(e){return "";}}
-  function themeLive(){const t=themeCfg,n=Date.now();return !!(t&&t.name&&n>=Date.parse(t.start)&&n<Date.parse(t.end));}
+  function themeLive(){const t=themeCfg,n=Date.now();return !!(t&&t.name&&n>=Date.parse(t.start)&&(!t.end||n<Date.parse(t.end)));}
   function themeOn(){return themePreview()==="neon"||(themeLive()&&themeCfg.name==="neon");}
   function themeLeft(ms){const m=Math.max(0,Math.round(ms/60000)),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60;return d?d+"d "+hh+"h":hh?hh+"h "+mm+"m":mm+"m";}
   function applyTheme(){
@@ -3013,7 +3013,7 @@ $("playersBody").innerHTML = shown.map(p =>
       if(!on){st.classList.add("hidden");}
       else{
         const live=themeLive();
-        st.innerHTML='<b>BPC Neon Nights</b><span>'+(live?'Theme ends in '+themeLeft(Date.parse(themeCfg.end)-Date.now()):'Preview on this device only')+'</span>';
+        st.innerHTML='<b>BPC Neon Nights</b><span>'+(!live?'Preview on this device only':themeCfg.end?'Theme ends in '+themeLeft(Date.parse(themeCfg.end)-Date.now()):'Live now')+'</span>';
         st.classList.remove("hidden");
       }
     }
@@ -3033,10 +3033,10 @@ $("playersBody").innerHTML = shown.map(p =>
   function dtLocal(iso){if(!iso)return "";const d=new Date(iso);const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
   function themeAdminRender(){
     const f=$("themeForm");if(!f)return;
-    if(themeCfg){$("themeName").value=themeCfg.name;$("themeStart").value=dtLocal(themeCfg.start);$("themeEnd").value=dtLocal(themeCfg.end);}
+    if(themeCfg){$("themeName").value=themeCfg.name;$("themeStart").value=dtLocal(themeCfg.start);$("themeEnd").value=themeCfg.end?dtLocal(themeCfg.end):"";}
     const fmt=iso=>new Date(iso).toLocaleString(undefined,{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
     const n=Date.now();
-    $("themeNow").textContent=!themeCfg?"No theme scheduled. The site uses its normal design.":themeLive()?THEME_LABEL[themeCfg.name]+" is on now. It ends "+fmt(themeCfg.end)+".":n<Date.parse(themeCfg.start)?THEME_LABEL[themeCfg.name]+" starts "+fmt(themeCfg.start)+" and ends "+fmt(themeCfg.end)+".":"The last theme ended "+fmt(themeCfg.end)+". The site uses its normal design.";
+    $("themeNow").textContent=!themeCfg?"No theme scheduled. The site uses its normal design.":themeLive()?THEME_LABEL[themeCfg.name]+" is on now. "+(themeCfg.end?"It ends "+fmt(themeCfg.end)+".":"It stays on until you press End now."):n<Date.parse(themeCfg.start)?THEME_LABEL[themeCfg.name]+" starts "+fmt(themeCfg.start)+(themeCfg.end?" and ends "+fmt(themeCfg.end)+".":" and stays on until you press End now."):"The last theme ended "+fmt(themeCfg.end)+". The site uses its normal design.";
     $("themePreview").textContent=themePreview()?"Stop preview":"Preview on this device";
   }
   async function saveTheme(value,msg){
@@ -3050,8 +3050,10 @@ $("playersBody").innerHTML = shown.map(p =>
     $("themeForm").addEventListener("submit",async e=>{
       e.preventDefault();
       const s0=new Date($("themeStart").value),e0=new Date($("themeEnd").value);
-      if(isNaN(s0)||isNaN(e0)||e0<=s0){status("themeStatus","The end must be after the start.","error");return;}
-      await saveTheme({name:$("themeName").value,start:s0.toISOString(),end:e0.toISOString()},"Saved. Everyone sees the theme between these dates.");
+      const noEnd=!$("themeEnd").value;
+      if(isNaN(s0)){status("themeStatus","Choose a start date.","error");return;}
+      if(!noEnd&&(isNaN(e0)||e0<=s0)){status("themeStatus","The end must be after the start.","error");return;}
+      await saveTheme({name:$("themeName").value,start:s0.toISOString(),end:noEnd?null:e0.toISOString()},noEnd?"Saved. The theme stays on until you press End now.":"Saved. Everyone sees the theme between these dates.");
     });
     $("themeEndNow").addEventListener("click",async()=>{
       if(!themeCfg){status("themeStatus","No theme is scheduled.","error");return;}

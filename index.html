@@ -24,7 +24,7 @@
 <meta name="twitter:description" content="eFootball leagues, monthly awards, tournaments and the BPC Trio.">
 <meta name="twitter:image" content="https://mehrabahmed25.github.io/bpc-club-performance/icons/og-image.png">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SportsOrganization","name":"Brahmanbaria Pes Club","alternateName":"BPC","sport":"eFootball","url":"https://mehrabahmed25.github.io/bpc-club-performance/","logo":"https://mehrabahmed25.github.io/bpc-club-performance/icons/icon-512.png","sameAs":["https://www.facebook.com/bpc.efootball"],"location":{"@type":"Place","name":"Brahmanbaria, Bangladesh"}}</script>
-<script>try{(function(){var t=JSON.parse(localStorage.getItem("bpc_theme")||"null"),n=Date.now(),pv=localStorage.getItem("bpc_theme_preview");if(pv==="neon"||(t&&t.name==="neon"&&n>=Date.parse(t.start)&&n<Date.parse(t.end)))document.documentElement.classList.add("theme-neon");})();}catch(e){}</script>
+<script>try{(function(){var t=JSON.parse(localStorage.getItem("bpc_theme")||"null"),n=Date.now(),pv=localStorage.getItem("bpc_theme_preview");if(pv==="neon"||(t&&t.name==="neon"&&n>=Date.parse(t.start)&&(!t.end||n<Date.parse(t.end))))document.documentElement.classList.add("theme-neon");})();}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap">
 <link rel="stylesheet" href="style.css">
@@ -330,7 +330,7 @@
       <div class="section-head compact" id="adm-theme"><h2>Site theme</h2><p>Dress the whole site in a temporary theme. It switches on and off by itself on the dates you set, then the normal design returns.</p></div>
       <form id="themeForm" class="panel nn-admin">
         <label>Theme<select id="themeName"><option value="neon">Neon Nights (80s sunset, GTA style)</option></select></label>
-        <div class="nn-admin-row"><label>Starts<input id="themeStart" type="datetime-local" required></label><label>Ends<input id="themeEnd" type="datetime-local" required></label></div>
+        <div class="nn-admin-row"><label>Starts<input id="themeStart" type="datetime-local" required></label><label>Ends<input id="themeEnd" type="datetime-local"><small class="nn-hint">Leave empty to keep it on until you press End now.</small></label></div>
         <p id="themeNow" class="small"></p>
         <div class="nn-admin-acts"><button class="primary" type="submit">Save dates</button><button class="secondary" type="button" id="themeEndNow">End now</button><button class="secondary" type="button" id="themePreview">Preview on this device</button></div>
         <div id="themeStatus" class="status"></div>

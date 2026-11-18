@@ -2617,3 +2617,4 @@ html.theme-neon .bell-it{width:calc(100% - 20px)}
 html.theme-neon .primary{color:#fff}
 html.theme-neon .potm-btn{background:linear-gradient(100deg,#3a1460,#c2256d);border-color:#ff3d8b88}
 html.theme-neon .potm-btn .ic,html.theme-neon .potm-btn em{color:var(--nn-gold)}
+.nn-hint{display:block;margin-top:6px;font-weight:500;color:var(--muted);font-size:12px}
