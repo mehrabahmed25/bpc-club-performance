@@ -1206,6 +1206,7 @@ async function loadHistory(){
     $("adminContent").classList.toggle("hidden",!state.isAdmin);
     if(!state.isAdmin)return;
     loadAdminInbox();buildAdminJump();
+    loadTheme().then(themeAdminRender);
     loadArticleAdmin();
     loadHousesAdmin();
     await loadPosterAdmin();
@@ -2995,6 +2996,74 @@ $("playersBody").innerHTML = shown.map(p =>
   }
 
 
+  // ================= Temporary site theme (Neon Nights) =================
+  const THEME_LABEL={neon:"Neon Nights"};
+  let themeCfg=null;
+  try{themeCfg=JSON.parse(localStorage.getItem("bpc_theme")||"null");}catch(e){}
+  function themePreview(){try{return localStorage.getItem("bpc_theme_preview")||"";}catch(e){return "";}}
+  function themeLive(){const t=themeCfg,n=Date.now();return !!(t&&t.name&&n>=Date.parse(t.start)&&n<Date.parse(t.end));}
+  function themeOn(){return themePreview()==="neon"||(themeLive()&&themeCfg.name==="neon");}
+  function themeLeft(ms){const m=Math.max(0,Math.round(ms/60000)),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60;return d?d+"d "+hh+"h":hh?hh+"h "+mm+"m":mm+"m";}
+  function applyTheme(){
+    const on=themeOn();
+    document.documentElement.classList.toggle("theme-neon",on);
+    if(on&&!document.getElementById("nnFont")){const l=document.createElement("link");l.id="nnFont";l.rel="stylesheet";l.href="https://fonts.googleapis.com/css2?family=Kanit:ital,wght@1,700;1,800&family=Mr+Dafoe&display=swap";document.head.appendChild(l);}
+    const st=$("nnStrip");
+    if(st){
+      if(!on){st.classList.add("hidden");}
+      else{
+        const live=themeLive();
+        st.innerHTML='<b>BPC Neon Nights</b><span>'+(live?'Theme ends in '+themeLeft(Date.parse(themeCfg.end)-Date.now()):'Preview on this device only')+'</span>';
+        st.classList.remove("hidden");
+      }
+    }
+  }
+  async function loadTheme(){
+    if(!client)return;
+    try{
+      const {data}=await client.from("site_content").select("value").eq("key","theme").maybeSingle();
+      themeCfg=(data&&data.value&&data.value.name)?data.value:null;
+      try{if(themeCfg)localStorage.setItem("bpc_theme",JSON.stringify(themeCfg));else localStorage.removeItem("bpc_theme");}catch(e){}
+    }catch(e){console.warn(e);}
+    applyTheme();
+  }
+  applyTheme();loadTheme();
+  setInterval(applyTheme,60000);
+  // admin
+  function dtLocal(iso){if(!iso)return "";const d=new Date(iso);const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
+  function themeAdminRender(){
+    const f=$("themeForm");if(!f)return;
+    if(themeCfg){$("themeName").value=themeCfg.name;$("themeStart").value=dtLocal(themeCfg.start);$("themeEnd").value=dtLocal(themeCfg.end);}
+    const fmt=iso=>new Date(iso).toLocaleString(undefined,{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+    const n=Date.now();
+    $("themeNow").textContent=!themeCfg?"No theme scheduled. The site uses its normal design.":themeLive()?THEME_LABEL[themeCfg.name]+" is on now. It ends "+fmt(themeCfg.end)+".":n<Date.parse(themeCfg.start)?THEME_LABEL[themeCfg.name]+" starts "+fmt(themeCfg.start)+" and ends "+fmt(themeCfg.end)+".":"The last theme ended "+fmt(themeCfg.end)+". The site uses its normal design.";
+    $("themePreview").textContent=themePreview()?"Stop preview":"Preview on this device";
+  }
+  async function saveTheme(value,msg){
+    const {error}=await client.from("site_content").upsert({key:"theme",value,updated_at:new Date().toISOString(),updated_by:state.session.user.id});
+    if(error){status("themeStatus",error.message,"error");return;}
+    themeCfg=value&&value.name?value:null;
+    try{if(themeCfg)localStorage.setItem("bpc_theme",JSON.stringify(themeCfg));else localStorage.removeItem("bpc_theme");}catch(e){}
+    applyTheme();themeAdminRender();status("themeStatus",msg,"success");
+  }
+  if($("themeForm")){
+    $("themeForm").addEventListener("submit",async e=>{
+      e.preventDefault();
+      const s0=new Date($("themeStart").value),e0=new Date($("themeEnd").value);
+      if(isNaN(s0)||isNaN(e0)||e0<=s0){status("themeStatus","The end must be after the start.","error");return;}
+      await saveTheme({name:$("themeName").value,start:s0.toISOString(),end:e0.toISOString()},"Saved. Everyone sees the theme between these dates.");
+    });
+    $("themeEndNow").addEventListener("click",async()=>{
+      if(!themeCfg){status("themeStatus","No theme is scheduled.","error");return;}
+      await saveTheme({},"Theme ended. The normal design is back for everyone.");
+    });
+    $("themePreview").addEventListener("click",()=>{
+      try{if(themePreview())localStorage.removeItem("bpc_theme_preview");else localStorage.setItem("bpc_theme_preview",$("themeName").value);}catch(e){}
+      applyTheme();themeAdminRender();
+      status("themeStatus",themePreview()?"Preview on: only this device shows the theme.":"Preview off.","success");
+    });
+  }
+
   // ================= Moments: Player of the Month reveal, submit celebration, badge unlocks =================
   const fxRM=()=>!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
   function fxOpen(cls,html,opt){
@@ -3039,11 +3108,11 @@ $("playersBody").innerHTML = shown.map(p =>
       +(rm?'<g transform="translate(168 96)">'+ball+'</g>':ball)+'</svg>';
     const tick='<svg class="fx-tick" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="42" fill="none" stroke="#ffffff22" stroke-width="6"/><circle class="fx-tick-c" cx="48" cy="48" r="42" fill="none" stroke="#f6b73c" stroke-width="6" stroke-linecap="round" pathLength="100"/><path class="fx-tick-p" d="M30 50 L43 62 L67 36" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" pathLength="100"/></svg>';
     const html='<div class="fx-sub-box'+(win?' win':'')+'">'
-      +(win?goal+fxConfetti(26,["#f6b73c","#ffffff","#13a46b","#7fb2ff"]):tick)
-      +'<h2>'+(win?'GOAL!':'Result sent')+'</h2>'
+      +(win?goal+fxConfetti(26,["#f6b73c","#ffffff","#13a46b","#7fb2ff"]):themeOn()&&pg<og?'':tick)
+      +(themeOn()?'<h2 class="nn-mission'+(pg<og?' wasted':'')+'">'+(win?'MISSION PASSED':draw?'SURVIVED':'WASTED')+'</h2>'+(win?'<em class="nn-respect">Respect +</em>':''):'<h2>'+(win?'GOAL!':'Result sent')+'</h2>')
       +'<p><b>'+pg+' – '+og+'</b> '+(win?'win':draw?'draw':'result')+' submitted. It counts once an admin approves it.</p>'
       +'<button type="button" class="fx-btn" data-fx-close data-fx-focus>Done</button></div>';
-    fxOpen("fx-sub",html,{autoMs:win?4200:2600,label:win?"Goal! Result submitted":"Result submitted"});
+    fxOpen("fx-sub"+(themeOn()&&pg<og?" nn-wasted":""),html,{autoMs:win?4200:2600,label:win?"Goal! Result submitted":"Result submitted"});
   }
 
   // ---- 2. Player of the Month pack reveal ----
