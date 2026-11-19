@@ -24,7 +24,7 @@
 <meta name="twitter:description" content="eFootball leagues, monthly awards, tournaments and the BPC Trio.">
 <meta name="twitter:image" content="https://mehrabahmed25.github.io/bpc-club-performance/icons/og-image.png">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SportsOrganization","name":"Brahmanbaria Pes Club","alternateName":"BPC","sport":"eFootball","url":"https://mehrabahmed25.github.io/bpc-club-performance/","logo":"https://mehrabahmed25.github.io/bpc-club-performance/icons/icon-512.png","sameAs":["https://www.facebook.com/bpc.efootball"],"location":{"@type":"Place","name":"Brahmanbaria, Bangladesh"}}</script>
-<script>try{(function(){var t=JSON.parse(localStorage.getItem("bpc_theme")||"null"),n=Date.now(),pv=localStorage.getItem("bpc_theme_preview");if(pv==="neon"||(t&&t.name==="neon"&&n>=Date.parse(t.start)&&(!t.end||n<Date.parse(t.end))))document.documentElement.classList.add("theme-neon");})();}catch(e){}</script>
+<script>try{(function(){var t=JSON.parse(localStorage.getItem("bpc_theme")||"null"),n=Date.now(),pv=localStorage.getItem("bpc_theme_preview"),k=pv||(t&&t.name&&n>=Date.parse(t.start)&&(!t.end||n<Date.parse(t.end))?t.name:"");if(k){document.documentElement.classList.add("th-on","theme-"+k);}})();}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap">
 <link rel="stylesheet" href="style.css">
@@ -45,6 +45,7 @@
 <symbol id="i-hundred" viewBox="0 0 24 24"><path d="M4 8l2-1.5V17"/><rect x="9" y="6.5" width="5" height="10.5" rx="2.5"/><rect x="16" y="6.5" width="5" height="10.5" rx="2.5"/></symbol>
 <symbol id="i-whistle" viewBox="0 0 24 24"><circle cx="9" cy="14" r="5"/><path d="M13 11h8v4h-4M9 9V5M6.5 9.5L5 7M11.5 9.5L13 7"/></symbol>
 </defs></svg>
+<div id="thBg" class="th-bg" aria-hidden="true"></div>
 <div class="nn-bg" aria-hidden="true"><svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" focusable="false">
 <defs><linearGradient id="nnSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0b2e"/><stop offset=".45" stop-color="#5b1a6e"/><stop offset=".72" stop-color="#e2416f"/><stop offset=".86" stop-color="#ff9a4a"/></linearGradient>
 <linearGradient id="nnSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset=".6" stop-color="#ff7a59"/><stop offset="1" stop-color="#ff3d8b"/></linearGradient>
@@ -329,10 +330,15 @@
       </div>
       <div class="section-head compact" id="adm-theme"><h2>Site theme</h2><p>Dress the whole site in a temporary theme. It switches on and off by itself on the dates you set, then the normal design returns.</p></div>
       <form id="themeForm" class="panel nn-admin">
-        <label>Theme<select id="themeName"><option value="neon">Neon Nights (80s sunset, GTA style)</option></select></label>
+        <fieldset class="th-pick"><legend>Theme</legend><div id="themePick" class="th-cards"></div></fieldset>
         <div class="nn-admin-row"><label>Starts<input id="themeStart" type="datetime-local" required></label><label>Ends<input id="themeEnd" type="datetime-local"><small class="nn-hint">Leave empty to keep it on until you press End now.</small></label></div>
+        <label>Banner text<input id="themeText" maxlength="60" placeholder="Optional, e.g. Eid Mubarak"><small class="nn-hint">Replaces the title in the Home strip.</small></label>
+        <div id="themeFinal" class="th-final hidden">
+          <div class="nn-admin-row"><label>Finalist one<input id="themeTeamA" maxlength="40" placeholder="e.g. Titans"></label><label>Finalist two<input id="themeTeamB" maxlength="40" placeholder="e.g. Royals"></label></div>
+          <div class="nn-admin-row"><label>Final kicks off<input id="themeFinalAt" type="datetime-local"></label><label>Champion<input id="themeChampion" maxlength="40" placeholder="Fill in after the final"><small class="nn-hint">Saving a champion shows the champion screen to everyone once.</small></label></div>
+        </div>
         <p id="themeNow" class="small"></p>
-        <div class="nn-admin-acts"><button class="primary" type="submit">Save dates</button><button class="secondary" type="button" id="themeEndNow">End now</button><button class="secondary" type="button" id="themePreview">Preview on this device</button></div>
+        <div class="nn-admin-acts"><button class="primary" type="submit">Save</button><button class="secondary" type="button" id="themeEndNow">End now</button><button class="secondary" type="button" id="themePreview">Preview on this device</button></div>
         <div id="themeStatus" class="status"></div>
       </form>
       <div class="section-head compact"><h2>Website branding</h2><p>Upload your official BPC logo and set the name shown in the website header.</p></div>

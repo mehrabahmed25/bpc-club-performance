@@ -2996,27 +2996,108 @@ $("playersBody").innerHTML = shown.map(p =>
   }
 
 
-  // ================= Temporary site theme (Neon Nights) =================
-  const THEME_LABEL={neon:"Neon Nights"};
+  // ================= Temporary site themes =================
+  const BD_OFF=6*3600e3;
+  const bdNow=()=>new Date(Date.now()+BD_OFF); // read with getUTC* = Dhaka wall clock
+  // Sunrise/sunset style prayer times for Dhaka (approximate, Fajr 18 deg).
+  function dhakaTimes(){
+    const lat=23.8103*Math.PI/180,lng=90.4125,d=bdNow(),y=d.getUTCFullYear(),start=Date.UTC(y,0,0),doy=Math.floor((Date.UTC(y,d.getUTCMonth(),d.getUTCDate())-start)/864e5);
+    const g=2*Math.PI/365*(doy-1),eq=229.18*(0.000075+0.001868*Math.cos(g)-0.032077*Math.sin(g)-0.014615*Math.cos(2*g)-0.040849*Math.sin(2*g));
+    const dec=0.006918-0.399912*Math.cos(g)+0.070257*Math.sin(g)-0.006758*Math.cos(2*g)+0.000907*Math.sin(2*g)-0.002697*Math.cos(3*g)+0.00148*Math.sin(3*g);
+    const noon=720-4*lng-eq+360; // minutes, local UTC+6
+    const ha=z=>Math.acos((Math.cos(z*Math.PI/180)-Math.sin(lat)*Math.sin(dec))/(Math.cos(lat)*Math.cos(dec)))*180/Math.PI*4;
+    const fmt=m=>{m=Math.round(m);let H=Math.floor(m/60),M=m%60;const ap=H>=12?"PM":"AM";H=H%12||12;return H+":"+String(M).padStart(2,"0")+" "+ap;};
+    return {sehri:fmt(noon-ha(108)),iftar:fmt(noon+ha(90.833)+1)};
+  }
+  function themeLeft(ms){const m=Math.max(0,Math.round(ms/60000)),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60;return d?d+"d "+hh+"h":hh?hh+"h "+mm+"m":mm+"m";}
+  const THEMES={
+    neon:{label:"Neon Nights",desc:"80s sunset, GTA style",font:"Kanit:ital,wght@1,700;1,800&family=Mr+Dafoe",
+      sub:{win:["MISSION PASSED","Respect +"],draw:["SURVIVED"],loss:["WASTED"]},
+      strip:c=>({t:"BPC Neon Nights",s:c.end?"Theme ends in "+themeLeft(Date.parse(c.end)-Date.now()):"Live now"})},
+    victory:{label:"Victory Day",desc:"Green and red, 16 December",font:"Hind+Siliguri:wght@600;700",
+      strip:()=>{const d=bdNow(),y=d.getUTCFullYear(),m=d.getUTCMonth(),day=d.getUTCDate();
+        if(m===11&&day===16)return {t:"বিজয় দিবস",s:"Joy Bangla! Happy Victory Day from BPC"};
+        const tgt=Date.UTC(y,11,16)-BD_OFF;
+        return Date.now()<tgt?{t:"বিজয় দিবস",s:"Victory Day in "+themeLeft(tgt-Date.now())}:{t:"বিজয় দিবস",s:"Victory Day · Joy Bangla"};},
+      bg:()=>'<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="tvSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00221b"/><stop offset=".6" stop-color="#004d3a"/><stop offset="1" stop-color="#006a4e"/></linearGradient><radialGradient id="tvSun"><stop offset="0" stop-color="#ff4b5c"/><stop offset=".7" stop-color="#f42a41"/><stop offset="1" stop-color="#c8102e"/></radialGradient><radialGradient id="tvGlow"><stop offset="0" stop-color="#f42a41" stop-opacity=".45"/><stop offset="1" stop-color="#f42a41" stop-opacity="0"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#tvSky)"/><circle cx="720" cy="560" r="420" fill="url(#tvGlow)"/><g class="tv-rays" stroke="#ff6b78" stroke-opacity=".18" stroke-width="18">'+Array.from({length:12},(_,i)=>{const a=i*Math.PI/6;return '<line x1="'+(720+Math.cos(a)*250)+'" y1="'+(560+Math.sin(a)*250)+'" x2="'+(720+Math.cos(a)*520)+'" y2="'+(560+Math.sin(a)*520)+'"/>';}).join("")+'</g><circle class="tv-sun" cx="720" cy="560" r="200" fill="url(#tvSun)"/><path d="M0 800 C 200 760 400 790 600 770 C 820 748 1000 790 1200 772 C 1380 756 1500 776 1600 770 V1000 H0Z" fill="#004d3a"/><path d="M0 860 C 260 830 520 870 800 846 C 1080 822 1340 862 1600 840 V1000 H0Z" fill="#00382b"/><g stroke="#2a8a5f" stroke-width="3" stroke-linecap="round" opacity=".7">'+Array.from({length:40},(_,i)=>{const x=20+i*40,hgt=18+(i*37%22);return '<line class="tv-rice" style="--i:'+(i%7)+'" x1="'+x+'" y1="900" x2="'+(x+6)+'" y2="'+(900-hgt)+'"/>';}).join("")+'</g></svg>'},
+    ramadan:{label:"Ramadan & Eid",desc:"Lanterns, crescent, Sehri/Iftar times",font:"El+Messiri:wght@600;700",
+      strip:()=>{const t=dhakaTimes();return {t:"Ramadan Kareem",s:"Dhaka today: Sehri ends "+t.sehri+" · Iftar "+t.iftar+" (approx.)"};},
+      bg:()=>{let st="";for(let i=0;i<40;i++)st+='<circle class="tr-star" style="--i:'+(i%9)+'" cx="'+((i*389)%1600)+'" cy="'+((i*211)%520)+'" r="'+(1+(i%3)*.6)+'"/>';
+        const lan=(x,len,k)=>'<g class="tr-lan" style="--k:'+k+'" transform="translate('+x+' 0)"><line x1="0" y1="0" x2="0" y2="'+len+'" stroke="#e9c46a" stroke-opacity=".6" stroke-width="2"/><g transform="translate(0 '+len+')"><path d="M-12 0 H12 L18 14 L14 46 H-14 L-18 14 Z" fill="#e9c46a"/><path d="M-9 16 H9 L11 42 H-11 Z" fill="#fff3c4" class="tr-light"/><path d="M-6 46 H6 L0 58Z" fill="#e9c46a"/></g></g>';
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="trSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#031820"/><stop offset=".7" stop-color="#0b3a46"/><stop offset="1" stop-color="#0e4f5c"/></linearGradient><mask id="trMoon"><circle cx="1240" cy="200" r="90" fill="#fff"/><circle cx="1280" cy="175" r="80" fill="#000"/></mask></defs><rect width="1600" height="1000" fill="url(#trSky)"/><g fill="#fff">'+st+'</g><circle cx="1240" cy="200" r="90" fill="#f6e3a1" mask="url(#trMoon)"/><circle cx="1240" cy="200" r="130" fill="#f6e3a1" opacity=".06"/>'
+          +lan(160,180,0)+lan(300,110,1)+lan(440,230,2)+lan(1440,150,3)
+          +'<g fill="#021015"><rect x="0" y="830" width="1600" height="170"/><path d="M520 830 V700 a80 80 0 0 1 160 0 V830Z"/><path d="M600 610 l0 -40" stroke="#021015" stroke-width="5"/><rect x="470" y="600" width="24" height="230"/><path d="M470 600 l12 -50 l12 50Z"/><rect x="706" y="600" width="24" height="230"/><path d="M706 600 l12 -50 l12 50Z"/><path d="M820 830 V760 a50 50 0 0 1 100 0 V830Z"/><path d="M300 830 V780 a40 40 0 0 1 80 0 V830Z"/><path d="M1000 830 V740 a70 70 0 0 1 140 0 V830Z"/><rect x="1160" y="640" width="20" height="190"/><path d="M1160 640 l10 -42 l10 42Z"/></g></svg>';}},
+    boishakh:{label:"Pohela Boishakh",desc:"Red and white, alpona",font:"Hind+Siliguri:wght@600;700",light:true,
+      strip:()=>({t:"শুভ নববর্ষ",s:"Shubho Noboborsho from BPC"}),
+      bg:()=>{const ring=(cx,cy,r,n,cls)=>{let p='<g class="'+cls+'" transform="translate('+cx+' '+cy+')" fill="none" stroke="#c8102e" stroke-width="3">';p+='<circle r="'+(r*.28)+'"/><circle r="'+(r*.12)+'" fill="#c8102e"/>';
+          for(let i=0;i<n;i++){const a=i*360/n;p+='<path transform="rotate('+a+')" d="M0 '+(-r*.32)+' C '+(r*.16)+' '+(-r*.55)+' '+(r*.1)+' '+(-r*.8)+' 0 '+(-r*.95)+' C '+(-r*.1)+' '+(-r*.8)+' '+(-r*.16)+' '+(-r*.55)+' 0 '+(-r*.32)+'Z"/><circle transform="rotate('+(a+180/n)+')" cy="'+(-r*.7)+'" r="'+(r*.04)+'" fill="#c8102e"/>';}
+          return p+'<circle r="'+r+'" stroke-dasharray="2 10" stroke-linecap="round"/></g>';};
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice"><rect width="1600" height="1000" fill="#fffaf3"/>'+ring(0,0,360,16,"tb-r1")+ring(1600,1000,420,20,"tb-r2")+ring(1500,80,170,12,"tb-r3")+ring(110,930,150,10,"tb-r3")+'</svg>';}},
+    winter:{label:"Winter Cup & New Year",desc:"Snow, frosted glass, fireworks on 1 January",font:"Baloo+2:wght@700;800",
+      strip:()=>{const d=bdNow();return d.getUTCMonth()===0&&d.getUTCDate()===1?{t:"Happy New Year from BPC",s:"A fresh season starts now"}:{t:"Winter Cup",s:"Stay warm, keep scoring"};},
+      bg:()=>{let fl="";for(let i=0;i<46;i++)fl+='<i style="left:'+((i*37)%100)+'%;--s:'+(4+(i%4)*2)+'px;--d:'+(9+(i*7)%10)+'s;--w:'+(-(i*1.3)%12)+'s;--x:'+((i%5)*12-24)+'px"></i>';
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="twSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06162e"/><stop offset=".7" stop-color="#14396b"/><stop offset="1" stop-color="#2a5d9a"/></linearGradient></defs><rect width="1600" height="1000" fill="url(#twSky)"/><path d="M0 760 C 240 690 480 720 760 740 C 1040 760 1300 690 1600 720 V1000 H0Z" fill="#dfeefa"/><path d="M0 850 C 300 800 620 860 900 830 C 1200 800 1420 850 1600 830 V1000 H0Z" fill="#f4f9fe"/><g fill="#0d2a4f">'+[120,220,1320,1430,1510].map((x,k)=>{const s=k%2?1:1.35;return '<path transform="translate('+x+' '+(760-20*k%40)+') scale('+s+')" d="M0 -150 L44 -60 H24 L60 10 H34 L70 80 H-70 L-34 10 H-60 L-24 -60 H-44Z M-8 80 H8 V110 H-8Z"/>';}).join("")+'</g></svg><div class="tw-snow">'+fl+'</div>';}},
+    final:{label:"Final Night",desc:"Black and silver, countdown, champion screen",font:"Oswald:wght@500;700",
+      sub:{win:["VICTORY"]},
+      strip:c=>{if(c.champion)return {t:"Champions",s:esc(c.champion),big:true};
+        const vs=c.team_a&&c.team_b?esc(c.team_a)+' <i>vs</i> '+esc(c.team_b):"The Final";
+        const at=c.final_at?Date.parse(c.final_at):0;
+        return {t:"Final Night",s:vs+(at?(Date.now()<at?' · kicks off in '+themeLeft(at-Date.now()):' · Live now'):''),html:true};},
+      bg:()=>{let st="";for(let i=0;i<26;i++){const x=(i*271)%1600,y=(i*157)%600,r=6+(i%3)*4;st+='<path class="tf-st" style="--i:'+(i%6)+'" transform="translate('+x+' '+y+')" d="M0 '+(-r)+' L'+(r*.25)+' '+(-r*.25)+' L'+r+' 0 L'+(r*.25)+' '+(r*.25)+' L0 '+r+' L'+(-r*.25)+' '+(r*.25)+' L'+(-r)+' 0 L'+(-r*.25)+' '+(-r*.25)+'Z"/>';}
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="tfSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030305"/><stop offset="1" stop-color="#14161c"/></linearGradient><linearGradient id="tfBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><linearGradient id="tfCup" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7d8594"/><stop offset=".45" stop-color="#f4f6fa"/><stop offset="1" stop-color="#8a92a1"/></linearGradient></defs><rect width="1600" height="1000" fill="url(#tfSky)"/><g fill="#cfd5df" opacity=".5">'+st+'</g><polygon class="tf-beam tf-b1" points="300,0 360,0 900,1000 500,1000" fill="url(#tfBeam)"/><polygon class="tf-beam tf-b2" points="1240,0 1300,0 1100,1000 700,1000" fill="url(#tfBeam)"/><ellipse cx="800" cy="930" rx="420" ry="40" fill="#ffffff10"/><g transform="translate(800 640)" fill="url(#tfCup)" class="tf-cup"><path d="M-110 -170 H110 C 110 -60 60 0 0 10 C -60 0 -110 -60 -110 -170Z"/><path d="M-110 -150 C -190 -150 -190 -50 -90 -40" fill="none" stroke="url(#tfCup)" stroke-width="16"/><path d="M110 -150 C 190 -150 190 -50 90 -40" fill="none" stroke="url(#tfCup)" stroke-width="16"/><rect x="-18" y="8" width="36" height="110"/><path d="M-90 118 H90 L110 200 H-110Z"/></g></svg>';}},
+    retro:{label:"Retro PES",desc:"Early-2000s game menus, pixels, scanlines",font:"Press+Start+2P",
+      sub:{win:["MATCH SAVED"],draw:["MATCH SAVED"],loss:["MATCH SAVED"]},
+      strip:()=>({t:"PRESS START",s:"BPC Retro Mode · Player 1 ready"}),
+      bg:()=>'<div class="tp-grid"></div><div class="tp-pitch"></div>'}
+  };
   let themeCfg=null;
   try{themeCfg=JSON.parse(localStorage.getItem("bpc_theme")||"null");}catch(e){}
-  function themePreview(){try{return localStorage.getItem("bpc_theme_preview")||"";}catch(e){return "";}}
-  function themeLive(){const t=themeCfg,n=Date.now();return !!(t&&t.name&&n>=Date.parse(t.start)&&(!t.end||n<Date.parse(t.end)));}
-  function themeOn(){return themePreview()==="neon"||(themeLive()&&themeCfg.name==="neon");}
-  function themeLeft(ms){const m=Math.max(0,Math.round(ms/60000)),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60;return d?d+"d "+hh+"h":hh?hh+"h "+mm+"m":mm+"m";}
+  function themePreview(){try{const v=localStorage.getItem("bpc_theme_preview")||"";return THEMES[v]?v:"";}catch(e){return "";}}
+  function themeLive(){const t=themeCfg,n=Date.now();return !!(t&&t.name&&THEMES[t.name]&&n>=Date.parse(t.start)&&(!t.end||n<Date.parse(t.end)));}
+  function curTheme(){return themePreview()||(themeLive()?themeCfg.name:"");}
+  function themeOn(){return curTheme()==="neon";}
+  let themeBgFor="";
   function applyTheme(){
-    const on=themeOn();
-    document.documentElement.classList.toggle("theme-neon",on);
-    if(on&&!document.getElementById("nnFont")){const l=document.createElement("link");l.id="nnFont";l.rel="stylesheet";l.href="https://fonts.googleapis.com/css2?family=Kanit:ital,wght@1,700;1,800&family=Mr+Dafoe&display=swap";document.head.appendChild(l);}
-    const st=$("nnStrip");
-    if(st){
-      if(!on){st.classList.add("hidden");}
-      else{
-        const live=themeLive();
-        st.innerHTML='<b>BPC Neon Nights</b><span>'+(!live?'Preview on this device only':themeCfg.end?'Theme ends in '+themeLeft(Date.parse(themeCfg.end)-Date.now()):'Live now')+'</span>';
-        st.classList.remove("hidden");
-      }
-    }
+    const k=curTheme(),root=document.documentElement;
+    [...root.classList].filter(c=>c.indexOf("theme-")===0).forEach(c=>{if(c!=="theme-"+k)root.classList.remove(c);});
+    root.classList.toggle("th-on",!!k);if(k)root.classList.add("theme-"+k);
+    const T=THEMES[k];
+    if(T&&T.font&&!document.getElementById("thFont-"+k)){const l=document.createElement("link");l.id="thFont-"+k;l.rel="stylesheet";l.href="https://fonts.googleapis.com/css2?family="+T.font+"&display=swap";document.head.appendChild(l);}
+    const bg=$("thBg");if(bg&&themeBgFor!==k){bg.innerHTML=T&&T.bg?T.bg():"";themeBgFor=k;}
+    const st=$("nnStrip");if(!st)return;
+    if(!T){st.classList.add("hidden");return;}
+    const c=(themeLive()&&themeCfg.name===k)?themeCfg:{name:k},x=T.strip(c);
+    const title=c.text?esc(c.text):x.html||x.big?x.t:esc(x.t);
+    st.className="nn-strip th-strip"+(x.big?" big":"");
+    st.innerHTML='<b>'+(k==="neon"&&!c.text?"BPC Neon Nights":title)+'</b><span>'+(themeLive()&&themeCfg.name===k?(x.html||x.big?x.s:esc(x.s)):'Preview on this device only')+'</span>';
+    if(k==="winter")maybeFireworks();
+    if(k==="final"&&c.champion)maybeChampion(c.champion);
+  }
+  function maybeFireworks(){
+    const d=bdNow();if(!(d.getUTCMonth()===0&&d.getUTCDate()===1)&&!(d.getUTCMonth()===11&&d.getUTCDate()===31&&d.getUTCHours()===23&&d.getUTCMinutes()>=55))return;
+    if(maybeFireworks.done||fxRMq())return;maybeFireworks.done=true;
+    const cv=document.createElement("canvas");cv.className="tw-fw";cv.setAttribute("aria-hidden","true");document.body.appendChild(cv);
+    const ctx=cv.getContext("2d"),dpr=Math.min(2,window.devicePixelRatio||1);let W,H,parts=[],t0=performance.now();
+    const size=()=>{W=cv.width=innerWidth*dpr;H=cv.height=innerHeight*dpr;};size();
+    const cols=["#9fe7ff","#ffffff","#ffd166","#ff7ab3","#7fb2ff"];
+    function burst(){const x=W*(.15+Math.random()*.7),y=H*(.12+Math.random()*.35),c=cols[Math.floor(Math.random()*cols.length)];for(let i=0;i<70;i++){const a=Math.random()*Math.PI*2,v=(1.5+Math.random()*3.5)*dpr;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:1,c});}}
+    let last=0;
+    (function frame(t){ctx.globalCompositeOperation="destination-out";ctx.fillStyle="rgba(0,0,0,.18)";ctx.fillRect(0,0,W,H);ctx.globalCompositeOperation="lighter";
+      if(t-t0<11000&&t-last>520){burst();last=t;}
+      parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.04*dpr;p.vx*=.985;p.l-=.012;ctx.globalAlpha=Math.max(0,p.l);ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,2.4*dpr,2.4*dpr);});
+      parts=parts.filter(p=>p.l>0);ctx.globalAlpha=1;
+      if(t-t0<13500)requestAnimationFrame(frame);else cv.remove();})(t0);
+  }
+  function fxRMq(){return !!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);}
+  function maybeChampion(name){
+    let seen="";try{seen=localStorage.getItem("bpc_champ_seen")||"";}catch(e){}
+    if(seen===name)return;
+    setTimeout(()=>{
+      if(document.querySelector(".fx")||$("view-home").classList.contains("hidden"))return;
+      try{localStorage.setItem("bpc_champ_seen",name);}catch(e){}
+      fxOpen("fx-champ",'<div class="fx-ch"><svg class="fx-ch-cup" viewBox="-200 -200 400 420" aria-hidden="true"><defs><linearGradient id="chCup" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a92a1"/><stop offset=".45" stop-color="#ffffff"/><stop offset="1" stop-color="#8a92a1"/></linearGradient></defs><g fill="url(#chCup)"><path d="M-110 -170 H110 C 110 -60 60 0 0 10 C -60 0 -110 -60 -110 -170Z"/><path d="M-110 -150 C -190 -150 -190 -50 -90 -40" fill="none" stroke="url(#chCup)" stroke-width="16"/><path d="M110 -150 C 190 -150 190 -50 90 -40" fill="none" stroke="url(#chCup)" stroke-width="16"/><rect x="-18" y="8" width="36" height="110"/><path d="M-90 118 H90 L110 200 H-110Z"/></g></svg>'
+        +fxConfetti(50,["#ffffff","#cfd5df","#ffd166","#9aa3b2"])+'<small>Champions</small><h2>'+esc(name)+'</h2><p>Final Night winners. Congratulations from BPC.</p><button type="button" class="fx-btn" data-fx-close data-fx-focus>Celebrate</button></div>',{label:"Champions: "+name});
+    },1600);
   }
   async function loadTheme(){
     if(!client)return;
@@ -3027,16 +3108,26 @@ $("playersBody").innerHTML = shown.map(p =>
     }catch(e){console.warn(e);}
     applyTheme();
   }
-  applyTheme();loadTheme();
+  setTimeout(()=>{applyTheme();loadTheme();},0);
   setInterval(applyTheme,60000);
-  // admin
+  // ---- admin ----
   function dtLocal(iso){if(!iso)return "";const d=new Date(iso);const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
+  let themeSel="neon";
+  function themePickRender(){
+    const box=$("themePick");if(!box)return;
+    box.innerHTML=Object.keys(THEMES).map(k=>'<label class="th-card th-sw-'+k+(k===themeSel?' on':'')+'"><input type="radio" name="themePickR" value="'+k+'"'+(k===themeSel?' checked':'')+'><span class="th-sw" aria-hidden="true"></span><b>'+THEMES[k].label+'</b><small>'+THEMES[k].desc+'</small></label>').join("");
+    box.querySelectorAll("input").forEach(r=>r.addEventListener("change",()=>{themeSel=r.value;themePickRender();$("themeFinal").classList.toggle("hidden",themeSel!=="final");}));
+    $("themeFinal").classList.toggle("hidden",themeSel!=="final");
+  }
   function themeAdminRender(){
     const f=$("themeForm");if(!f)return;
-    if(themeCfg){$("themeName").value=themeCfg.name;$("themeStart").value=dtLocal(themeCfg.start);$("themeEnd").value=themeCfg.end?dtLocal(themeCfg.end):"";}
+    const c=themeCfg;
+    if(c){themeSel=c.name;$("themeStart").value=dtLocal(c.start);$("themeEnd").value=c.end?dtLocal(c.end):"";$("themeText").value=c.text||"";
+      $("themeTeamA").value=c.team_a||"";$("themeTeamB").value=c.team_b||"";$("themeFinalAt").value=c.final_at?dtLocal(c.final_at):"";$("themeChampion").value=c.champion||"";}
+    themePickRender();
     const fmt=iso=>new Date(iso).toLocaleString(undefined,{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
-    const n=Date.now();
-    $("themeNow").textContent=!themeCfg?"No theme scheduled. The site uses its normal design.":themeLive()?THEME_LABEL[themeCfg.name]+" is on now. "+(themeCfg.end?"It ends "+fmt(themeCfg.end)+".":"It stays on until you press End now."):n<Date.parse(themeCfg.start)?THEME_LABEL[themeCfg.name]+" starts "+fmt(themeCfg.start)+(themeCfg.end?" and ends "+fmt(themeCfg.end)+".":" and stays on until you press End now."):"The last theme ended "+fmt(themeCfg.end)+". The site uses its normal design.";
+    const L=c&&THEMES[c.name]?THEMES[c.name].label:"";
+    $("themeNow").textContent=!c?"No theme scheduled. The site uses its normal design.":themeLive()?L+" is on now. "+(c.end?"It ends "+fmt(c.end)+".":"It stays on until you press End now."):Date.now()<Date.parse(c.start)?L+" starts "+fmt(c.start)+(c.end?" and ends "+fmt(c.end)+".":" and stays on until you press End now."):"The last theme ended "+fmt(c.end)+". The site uses its normal design.";
     $("themePreview").textContent=themePreview()?"Stop preview":"Preview on this device";
   }
   async function saveTheme(value,msg){
@@ -3047,22 +3138,26 @@ $("playersBody").innerHTML = shown.map(p =>
     applyTheme();themeAdminRender();status("themeStatus",msg,"success");
   }
   if($("themeForm")){
+    themePickRender();
     $("themeForm").addEventListener("submit",async e=>{
       e.preventDefault();
-      const s0=new Date($("themeStart").value),e0=new Date($("themeEnd").value);
-      const noEnd=!$("themeEnd").value;
+      const s0=new Date($("themeStart").value),e0=new Date($("themeEnd").value),noEnd=!$("themeEnd").value;
       if(isNaN(s0)){status("themeStatus","Choose a start date.","error");return;}
       if(!noEnd&&(isNaN(e0)||e0<=s0)){status("themeStatus","The end must be after the start.","error");return;}
-      await saveTheme({name:$("themeName").value,start:s0.toISOString(),end:noEnd?null:e0.toISOString()},noEnd?"Saved. The theme stays on until you press End now.":"Saved. Everyone sees the theme between these dates.");
+      const v={name:themeSel,start:s0.toISOString(),end:noEnd?null:e0.toISOString()};
+      const tx=$("themeText").value.trim();if(tx)v.text=tx;
+      if(themeSel==="final"){const a=$("themeTeamA").value.trim(),b=$("themeTeamB").value.trim(),fa=$("themeFinalAt").value,ch=$("themeChampion").value.trim();
+        if(a)v.team_a=a;if(b)v.team_b=b;if(fa&&!isNaN(new Date(fa)))v.final_at=new Date(fa).toISOString();if(ch)v.champion=ch;}
+      await saveTheme(v,THEMES[themeSel].label+(noEnd?" saved. It stays on until you press End now.":" saved. Everyone sees it between these dates."));
     });
     $("themeEndNow").addEventListener("click",async()=>{
       if(!themeCfg){status("themeStatus","No theme is scheduled.","error");return;}
       await saveTheme({},"Theme ended. The normal design is back for everyone.");
     });
     $("themePreview").addEventListener("click",()=>{
-      try{if(themePreview())localStorage.removeItem("bpc_theme_preview");else localStorage.setItem("bpc_theme_preview",$("themeName").value);}catch(e){}
+      try{if(themePreview())localStorage.removeItem("bpc_theme_preview");else localStorage.setItem("bpc_theme_preview",themeSel);}catch(e){}
       applyTheme();themeAdminRender();
-      status("themeStatus",themePreview()?"Preview on: only this device shows the theme.":"Preview off.","success");
+      status("themeStatus",themePreview()?"Previewing "+THEMES[themePreview()].label+" on this device only.":"Preview off.","success");
     });
   }
 
@@ -3099,6 +3194,7 @@ $("playersBody").innerHTML = shown.map(p =>
   // ---- 1. Submit celebration ----
   function celebrateSubmit(pg,og){
     const win=pg>og,draw=pg===og,rm=fxRM();
+    const thK=curTheme(),thS=thK&&THEMES[thK].sub,thSub=thS?(win?thS.win:draw?thS.draw:thS.loss)||null:null;
     const net='<g class="fx-net" stroke="#ffffff" stroke-opacity=".38" stroke-width="1.2">'
       +Array.from({length:13},(_,i)=>'<line x1="'+(40+i*18.3)+'" y1="34" x2="'+(52+i*16.5)+'" y2="128"/>').join("")
       +Array.from({length:6},(_,i)=>'<line x1="'+(40+i*2)+'" y1="'+(34+i*18.8)+'" x2="'+(260-i*2)+'" y2="'+(34+i*18.8)+'"/>').join("")+'</g>';
@@ -3110,11 +3206,11 @@ $("playersBody").innerHTML = shown.map(p =>
       +(rm?'<g transform="translate(168 96)">'+ball+'</g>':ball)+'</svg>';
     const tick='<svg class="fx-tick" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="42" fill="none" stroke="#ffffff22" stroke-width="6"/><circle class="fx-tick-c" cx="48" cy="48" r="42" fill="none" stroke="#f6b73c" stroke-width="6" stroke-linecap="round" pathLength="100"/><path class="fx-tick-p" d="M30 50 L43 62 L67 36" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" pathLength="100"/></svg>';
     const html='<div class="fx-sub-box'+(win?' win':'')+'">'
-      +(win?goal+fxConfetti(26,["#f6b73c","#ffffff","#13a46b","#7fb2ff"]):themeOn()&&pg<og?'':tick)
-      +(themeOn()?'<h2 class="nn-mission'+(pg<og?' wasted':'')+'">'+(win?'MISSION PASSED':draw?'SURVIVED':'WASTED')+'</h2>'+(win?'<em class="nn-respect">Respect +</em>':''):'<h2>'+(win?'GOAL!':'Result sent')+'</h2>')
+      +(win?goal+fxConfetti(26,["#f6b73c","#ffffff","#13a46b","#7fb2ff"]):thSub&&thSub[0]==="WASTED"?'':tick)
+      +(thSub?'<h2 class="nn-mission th-mission'+(thSub[0]==="WASTED"?' wasted':'')+'">'+thSub[0]+'</h2>'+(thSub[1]?'<em class="nn-respect">'+thSub[1]+'</em>':''):'<h2>'+(win?'GOAL!':'Result sent')+'</h2>')
       +'<p><b>'+pg+' – '+og+'</b> '+(win?'win':draw?'draw':'result')+' submitted. It counts once an admin approves it.</p>'
       +'<button type="button" class="fx-btn" data-fx-close data-fx-focus>Done</button></div>';
-    fxOpen("fx-sub"+(themeOn()&&pg<og?" nn-wasted":""),html,{autoMs:win?4200:2600,label:win?"Goal! Result submitted":"Result submitted"});
+    fxOpen("fx-sub"+(thSub&&thSub[0]==="WASTED"?" nn-wasted":""),html,{autoMs:win?4200:2600,label:win?"Goal! Result submitted":"Result submitted"});
   }
 
   // ---- 2. Player of the Month pack reveal ----
