@@ -754,6 +754,7 @@ async function loadMembers() {
   }
 
   state.members = membersResult.data || [];
+  if(typeof applyTheme==="function")setTimeout(applyTheme,0);
 
   if (playersResult.error) {
     console.error("Could not load registered players:", playersResult.error);
@@ -1206,7 +1207,7 @@ async function loadHistory(){
     $("adminContent").classList.toggle("hidden",!state.isAdmin);
     if(!state.isAdmin)return;
     loadAdminInbox();buildAdminJump();
-    loadTheme().then(themeAdminRender);
+    Promise.all([loadTheme(),loadThemeHidden()]).then(themeAdminRender);
     loadArticleAdmin();
     loadHousesAdmin();
     await loadPosterAdmin();
@@ -1225,6 +1226,7 @@ async function loadHistory(){
     document.querySelectorAll("[data-reject]").forEach(b=>b.onclick=()=>reviewMatch(b.dataset.reject,false));
     const members=await client.from("cobeg_members").select("id,name,active").order("name");
     state.members=members.data||[];
+    setTimeout(applyTheme,0);
     $("memberList").innerHTML=state.members.map(m=>'<span class="member-chip">'+esc(m.name)+(m.active?'':' (inactive)')+'</span>').join("");
     
 
@@ -3048,8 +3050,47 @@ $("playersBody").innerHTML = shown.map(p =>
     retro:{label:"Retro PES",desc:"Early-2000s game menus, pixels, scanlines",font:"Press+Start+2P",
       sub:{win:["MATCH SAVED"],draw:["MATCH SAVED"],loss:["MATCH SAVED"]},
       strip:()=>({t:"PRESS START",s:"BPC Retro Mode · Player 1 ready"}),
-      bg:()=>'<div class="tp-grid"></div><div class="tp-pitch"></div>'}
+      bg:()=>'<div class="tp-grid"></div><div class="tp-pitch"></div>'},
+    cyber:{label:"Cyberpunk",desc:"Neon rain city, glitch, street cred",font:"Rajdhani:wght@600;700",dark:true,
+      sub:{win:["SYSTEM BREACHED","+CRED"],draw:["SIGNAL STABLE"],loss:["CONNECTION LOST"]},
+      strip:()=>({t:"BPC//NET",s:"Uplink stable"+(memberCount()?" · "+memberCount()+" runners online":"")}),
+      bg:()=>{let b="",w="";const xs=[0,90,150,260,330,450,540,640,760,850,960,1060,1180,1260,1380,1470,1540];
+        xs.forEach((x,i)=>{const hgt=260+((i*97)%380),wd=70+((i*31)%50);b+='<rect x="'+x+'" y="'+(1000-hgt)+'" width="'+wd+'" height="'+hgt+'"/>';
+          for(let r=0;r<6;r++){const y=1000-hgt+30+r*38;if(y>960)break;w+='<rect class="tc-w" style="--i:'+((i+r)%7)+'" x="'+(x+10+(r*17)%(wd-24))+'" y="'+y+'" width="12" height="5" fill="'+((i+r)%3?'#ff2bd6':'#2de2e6')+'"/>';}});
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="tcSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05000f"/><stop offset=".7" stop-color="#1a0033"/><stop offset="1" stop-color="#3b0059"/></linearGradient></defs><rect width="1600" height="1000" fill="url(#tcSky)"/><g fill="#0a0018">'+b+'</g><g>'+w+'</g><g class="tc-holo"><rect x="1000" y="380" width="260" height="120" fill="#2de2e6" fill-opacity=".12" stroke="#2de2e6" stroke-width="3"/><text x="1130" y="452" text-anchor="middle" font-size="46" font-weight="700" fill="#2de2e6" font-family="Rajdhani,sans-serif">BPC//NET</text></g><g class="tc-holo tc-h2"><rect x="260" y="300" width="200" height="90" fill="#ff2bd6" fill-opacity=".12" stroke="#ff2bd6" stroke-width="3"/><text x="360" y="358" text-anchor="middle" font-size="34" font-weight="700" fill="#ff2bd6" font-family="Rajdhani,sans-serif">PLAY 24/7</text></g></svg><div class="tc-rain"></div>';}},
+    royale:{label:"Battle Royale",desc:"Island map, closing storm circle",font:"Bebas+Neue",dark:true,
+      sub:{win:["#1 CHAMPION"],draw:["TOP 2"],loss:["ELIMINATED","Placed #2"]},
+      strip:()=>({t:"Players remaining"+(memberCount()?": "+memberCount():""),s:"The circle is closing"}),
+      bg:()=>'<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice"><defs><mask id="trzHole"><rect width="1600" height="1000" fill="#fff"/><circle class="trz-c" cx="820" cy="520" r="300" fill="#000"/></mask><pattern id="trzG" width="80" height="80" patternUnits="userSpaceOnUse"><path d="M80 0H0V80" fill="none" stroke="#ffffff22" stroke-width="2"/></pattern></defs><rect width="1600" height="1000" fill="#0e5a8a"/><path d="M380 300 C 520 140 900 120 1120 220 C 1330 320 1360 560 1220 760 C 1080 940 700 960 520 830 C 330 700 250 450 380 300Z" fill="#3f8f4a"/><path d="M500 360 C 600 260 820 250 960 330 C 1100 410 1120 560 1020 680 C 900 800 680 800 580 700 C 470 590 430 450 500 360Z" fill="#5aa65a"/><g fill="#2f6f39"><circle cx="640" cy="420" r="26"/><circle cx="700" cy="460" r="20"/><circle cx="960" cy="600" r="30"/><circle cx="880" cy="380" r="18"/><circle cx="560" cy="640" r="24"/></g><g fill="#c9a36b"><rect x="760" y="500" width="40" height="30"/><rect x="820" y="520" width="30" height="40"/><rect x="900" y="470" width="36" height="26"/></g><rect width="1600" height="1000" fill="url(#trzG)"/><rect width="1600" height="1000" fill="#7a2bd9" fill-opacity=".45" mask="url(#trzHole)"/><circle class="trz-c" cx="820" cy="520" r="300" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="18 12"/><g transform="translate(820 520)"><path d="M0 -26 L10 0 L0 -6 L-10 0Z" fill="#ffde00"/></g></svg>'},
+    fantasy:{label:"Dark Fantasy RPG",desc:"Stone, embers, castle, knight ranks",font:"Cinzel:wght@600;700",dark:true,
+      sub:{win:["ENEMY FELLED"],draw:["STALEMATE"],loss:["YOU FELL"]},
+      strip:()=>({t:"The Realm of BPC",s:"Rise, champion. Glory awaits."}),
+      bg:()=>{let em="";for(let i=0;i<34;i++)em+='<i style="left:'+((i*29)%100)+'%;--d:'+(6+(i*7)%8)+'s;--w:'+(-(i*.9)%8)+'s;--x:'+((i%5)*14-28)+'px"></i>';
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="tfaSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d0b10"/><stop offset=".6" stop-color="#2a1f2b"/><stop offset="1" stop-color="#5a3420"/></linearGradient><radialGradient id="tfaMoon"><stop offset="0" stop-color="#f3e6c4" stop-opacity=".9"/><stop offset="1" stop-color="#f3e6c4" stop-opacity="0"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#tfaSky)"/><circle cx="1180" cy="230" r="160" fill="url(#tfaMoon)"/><circle cx="1180" cy="230" r="60" fill="#efe1bd"/><path d="M0 720 L220 520 L380 640 L560 430 L760 650 L900 560 L1100 700 L1300 520 L1600 740 V1000 H0Z" fill="#1a141c"/><g fill="#0b080d"><rect x="640" y="560" width="320" height="240"/><rect x="600" y="470" width="60" height="330"/><rect x="940" y="470" width="60" height="330"/><rect x="760" y="420" width="80" height="140"/><path d="M590 470 L630 400 L670 470Z M930 470 L970 400 L1010 470Z M750 420 L800 330 L850 420Z"/><g fill="#ff9a3d" class="tfa-win"><rect x="620" y="540" width="14" height="22"/><rect x="960" y="540" width="14" height="22"/><rect x="792" y="470" width="16" height="26"/></g></g><path d="M0 860 C 300 820 600 880 900 850 C 1200 820 1400 860 1600 840 V1000 H0Z" fill="#0b080d"/><rect class="tfa-mist" y="760" width="1600" height="240" fill="#bba4c2" fill-opacity=".08"/></svg><div class="tfa-emb">'+em+'</div>';}},
+    fighting:{label:"Fighting Game",desc:"VS splash, lightning, K.O. screens",font:"Bangers",dark:true,
+      sub:{pre:"ROUND 1 · FIGHT!",win:["K.O.!","YOU WIN"],draw:["DOUBLE K.O."],loss:["K.O.","YOU LOSE"]},
+      strip:()=>({t:"ROUND 1 · FIGHT!",s:"Choose your opponent"}),
+      bg:()=>'<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice"><rect width="1600" height="1000" fill="#10061c"/><polygon points="0,0 900,0 700,1000 0,1000" fill="#b3122e"/><polygon points="900,0 1600,0 1600,1000 700,1000" fill="#1c3fb8"/><g fill="#000" fill-opacity=".18">'+Array.from({length:14},(_,i)=>'<polygon points="'+(i*130-200)+',0 '+(i*130-140)+',0 '+(i*130-400)+',1000 '+(i*130-460)+',1000"/>').join("")+'</g><polyline class="tfg-bolt" points="820,0 760,300 840,320 740,640 820,660 720,1000" fill="none" stroke="#fff6a8" stroke-width="10" stroke-linejoin="round"/><text x="800" y="580" text-anchor="middle" font-family="Bangers,Impact,sans-serif" font-size="320" fill="#ffde00" fill-opacity=".14" transform="rotate(-8 800 500)">VS</text></svg>'},
+    racing:{label:"Street Racing",desc:"Night highway, speed lines, race grid",font:"Russo+One",dark:true,
+      sub:{win:["FIRST PLACE","+REP"],draw:["PHOTO FINISH"],loss:["SECOND PLACE"]},
+      strip:()=>({t:"BPC Night Race",s:"Start your engines"}),
+      bg:()=>'<div class="trc-sky"></div><div class="trc-road"><i></i></div><div class="trc-lines"></div>'},
+    space:{label:"Space Sci-fi",desc:"Starfield, planet, HUD panels",font:"Orbitron:wght@600;800",dark:true,
+      sub:{win:["MISSION COMPLETE"],draw:["MISSION COMPLETE"],loss:["MISSION FAILED"]},
+      strip:c=>{const dd=c.start?Math.max(1,Math.ceil((Date.now()-Date.parse(c.start))/864e5)):1;return {t:"Mission log · Day "+dd,s:"All systems nominal"};},
+      bg:()=>{let st="";for(let i=0;i<90;i++)st+='<circle class="tsp-s" style="--i:'+(i%8)+'" cx="'+((i*523)%1600)+'" cy="'+((i*337)%1000)+'" r="'+(.6+(i%4)*.5)+'"/>';
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="tspP" cx="35%" cy="35%"><stop offset="0" stop-color="#7fd4ff"/><stop offset=".6" stop-color="#2a5bd7"/><stop offset="1" stop-color="#0b1a4a"/></radialGradient><radialGradient id="tspN" cx="70%" cy="30%" r="60%"><stop offset="0" stop-color="#5b2bd9" stop-opacity=".35"/><stop offset="1" stop-color="#5b2bd9" stop-opacity="0"/></radialGradient></defs><rect width="1600" height="1000" fill="#02030a"/><rect width="1600" height="1000" fill="url(#tspN)"/><g fill="#fff">'+st+'</g><g class="tsp-planet"><circle cx="1220" cy="700" r="230" fill="url(#tspP)"/><ellipse class="tsp-ring" cx="1220" cy="700" rx="380" ry="70" fill="none" stroke="#9fd8ff" stroke-opacity=".5" stroke-width="10" transform="rotate(-14 1220 700)"/></g><g stroke="#2de2e6" stroke-opacity=".18" fill="none"><circle cx="420" cy="380" r="180"/><circle cx="420" cy="380" r="120"/><line x1="220" y1="380" x2="620" y2="380"/><line x1="420" y1="180" x2="420" y2="580"/><line class="tsp-scan" x1="420" y1="380" x2="600" y2="380" stroke-opacity=".6" stroke-width="3"/></g></svg>';}},
+    block:{label:"Block Builder",desc:"Blocky hills, pixel clouds, day/night",font:"Silkscreen:wght@400;700",
+      sub:{win:["ACHIEVEMENT GET!","Won a match"]},
+      strip:()=>({t:"BPC Craft",s:"Build. Play. Win."}),
+      bg:()=>{let blocks="";const hs=[5,6,6,7,8,8,7,6,5,5,6,7,7,6,5,4,4,5,6,6];hs.forEach((n,i)=>{for(let r=0;r<n;r++){const y=1000-(r+1)*80;blocks+='<rect x="'+(i*80)+'" y="'+y+'" width="80" height="80" fill="'+(r===n-1?'#5bb33c':r>n-3?'#8b5a2b':'#7a7a7a')+'"/>';if(r===n-1)blocks+='<rect x="'+(i*80)+'" y="'+(y+60)+'" width="80" height="20" fill="#8b5a2b"/>';}});
+        return '<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" shape-rendering="crispEdges"><rect class="tbk-sky" width="1600" height="1000" fill="#7ec0ff"/><rect class="tbk-sun" x="1200" y="120" width="90" height="90" fill="#ffe14d"/><g class="tbk-cl" fill="#fff"><rect x="100" y="140" width="200" height="40"/><rect x="140" y="110" width="100" height="40"/><rect x="700" y="200" width="240" height="40"/><rect x="760" y="170" width="120" height="40"/></g><g stroke="#00000022" stroke-width="2">'+blocks+'</g></svg>';}},
+    zombie:{label:"Zombie Survival",desc:"Foggy ruined city, for Halloween",font:"Special+Elite&family=Creepster",dark:true,
+      sub:{win:["YOU SURVIVED"],draw:["STILL STANDING"],loss:["INFECTED"]},
+      strip:()=>({t:"Survivors"+(memberCount()?": "+memberCount():""),s:"Stay together. Stay alive."}),
+      bg:()=>'<svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice"><defs><linearGradient id="tzSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0f0c"/><stop offset=".7" stop-color="#1d2a22"/><stop offset="1" stop-color="#34463a"/></linearGradient><radialGradient id="tzLamp"><stop offset="0" stop-color="#e8f5a8" stop-opacity=".55"/><stop offset="1" stop-color="#e8f5a8" stop-opacity="0"/></radialGradient></defs><rect width="1600" height="1000" fill="url(#tzSky)"/><circle cx="1300" cy="180" r="70" fill="#c9d6a3" fill-opacity=".5"/><g fill="#0a0d0b"><path d="M60 1000 V560 h140 v-40 l30 -20 v60 h60 V1000Z"/><path d="M340 1000 V620 h70 l20 -40 l40 70 h60 V1000Z"/><rect x="560" y="500" width="150" height="500"/><path d="M760 1000 V600 l60 -30 l90 50 V1000Z"/><rect x="1000" y="540" width="120" height="460"/><path d="M1160 1000 V640 h80 l30 -60 l30 40 h90 V1000Z"/><rect x="1430" y="590" width="140" height="410"/></g><g class="tz-lamp"><circle cx="900" cy="700" r="160" fill="url(#tzLamp)"/><rect x="896" y="690" width="8" height="310" fill="#050605"/><rect x="884" y="680" width="34" height="14" fill="#e8f5a8"/></g><rect class="tz-fog tz-f1" x="-400" y="720" width="2400" height="300" fill="#c9d6c4" fill-opacity=".10"/><rect class="tz-fog tz-f2" x="-400" y="820" width="2400" height="200" fill="#c9d6c4" fill-opacity=".12"/></svg>'}
   };
+  function memberCount(){return (state.members||[]).length||"";}
   let themeCfg=null;
   try{themeCfg=JSON.parse(localStorage.getItem("bpc_theme")||"null");}catch(e){}
   function themePreview(){try{const v=localStorage.getItem("bpc_theme_preview")||"";return THEMES[v]?v:"";}catch(e){return "";}}
@@ -3068,6 +3109,7 @@ $("playersBody").innerHTML = shown.map(p =>
     if(!T){st.classList.add("hidden");return;}
     const c=(themeLive()&&themeCfg.name===k)?themeCfg:{name:k},x=T.strip(c);
     const title=c.text?esc(c.text):x.html||x.big?x.t:esc(x.t);
+    if(c.count_at&&k!=="final"){const at=Date.parse(c.count_at);x.s=(x.html||x.big?x.s:esc(x.s))+' · '+esc(c.count_label||"Starts")+(Date.now()<at?' in '+themeLeft(at-Date.now()):' now');x.html=true;}
     st.className="nn-strip th-strip"+(x.big?" big":"");
     st.innerHTML='<b>'+(k==="neon"&&!c.text?"BPC Neon Nights":title)+'</b><span>'+(themeLive()&&themeCfg.name===k?(x.html||x.big?x.s:esc(x.s)):'Preview on this device only')+'</span>';
     if(k==="winter")maybeFireworks();
@@ -3113,17 +3155,38 @@ $("playersBody").innerHTML = shown.map(p =>
   // ---- admin ----
   function dtLocal(iso){if(!iso)return "";const d=new Date(iso);const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
   let themeSel="neon";
+  let themeHidden=[],themeShowRemoved=false;
+  async function loadThemeHidden(){
+    try{const {data}=await client.from("site_content").select("value").eq("key","theme_hidden").maybeSingle();themeHidden=(data&&data.value&&Array.isArray(data.value.list))?data.value.list:[];}catch(e){}
+  }
+  async function saveThemeHidden(list,msg){
+    const {error}=await client.from("site_content").upsert({key:"theme_hidden",value:{list},updated_at:new Date().toISOString(),updated_by:state.session.user.id});
+    if(error){status("themeStatus",error.message,"error");return;}
+    themeHidden=list;if(themeHidden.includes(themeSel))themeSel=Object.keys(THEMES).find(k=>!themeHidden.includes(k))||"neon";
+    themePickRender();status("themeStatus",msg,"success");
+  }
   function themePickRender(){
     const box=$("themePick");if(!box)return;
-    box.innerHTML=Object.keys(THEMES).map(k=>'<label class="th-card th-sw-'+k+(k===themeSel?' on':'')+'"><input type="radio" name="themePickR" value="'+k+'"'+(k===themeSel?' checked':'')+'><span class="th-sw" aria-hidden="true"></span><b>'+THEMES[k].label+'</b><small>'+THEMES[k].desc+'</small></label>').join("");
-    box.querySelectorAll("input").forEach(r=>r.addEventListener("change",()=>{themeSel=r.value;themePickRender();$("themeFinal").classList.toggle("hidden",themeSel!=="final");}));
+    const live=themeLive()?themeCfg.name:"";
+    const keys=Object.keys(THEMES).filter(k=>!themeHidden.includes(k));
+    box.innerHTML=keys.map(k=>'<div class="th-card th-sw-'+k+(k===themeSel?' on':'')+'"><label><input type="radio" name="themePickR" value="'+k+'"'+(k===themeSel?' checked':'')+'><span class="th-sw" aria-hidden="true"></span><b>'+THEMES[k].label+(k===live?' <em class="th-live">On now</em>':'')+'</b><small>'+THEMES[k].desc+'</small></label>'+(k===live?'':'<button type="button" class="th-del" data-del="'+k+'" aria-label="Remove '+THEMES[k].label+'">Remove</button>')+'</div>').join("")
+      +(themeHidden.length?'<div class="th-removed"><button type="button" class="text-button" id="themeRemovedToggle">'+(themeShowRemoved?'Hide removed themes':'Removed themes ('+themeHidden.length+')')+'</button>'+(themeShowRemoved?'<ul>'+themeHidden.filter(k=>THEMES[k]).map(k=>'<li>'+THEMES[k].label+' <button type="button" class="secondary" data-restore="'+k+'">Restore</button></li>').join("")+'</ul>':'')+'</div>':'');
+    box.querySelectorAll("input").forEach(r=>r.addEventListener("change",()=>{themeSel=r.value;themePickRender();}));
+    box.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
+      const k=b.dataset.del;
+      if(!confirm("Remove the "+THEMES[k].label+" theme from this list? You can restore it later from Removed themes."))return;
+      saveThemeHidden(themeHidden.concat(k),THEMES[k].label+" removed.");
+    }));
+    box.querySelectorAll("[data-restore]").forEach(b=>b.addEventListener("click",()=>saveThemeHidden(themeHidden.filter(x=>x!==b.dataset.restore),THEMES[b.dataset.restore].label+" restored.")));
+    const tg=$("themeRemovedToggle");if(tg)tg.addEventListener("click",()=>{themeShowRemoved=!themeShowRemoved;themePickRender();});
     $("themeFinal").classList.toggle("hidden",themeSel!=="final");
+    $("themeCount").classList.toggle("hidden",themeSel==="final");
   }
   function themeAdminRender(){
     const f=$("themeForm");if(!f)return;
     const c=themeCfg;
     if(c){themeSel=c.name;$("themeStart").value=dtLocal(c.start);$("themeEnd").value=c.end?dtLocal(c.end):"";$("themeText").value=c.text||"";
-      $("themeTeamA").value=c.team_a||"";$("themeTeamB").value=c.team_b||"";$("themeFinalAt").value=c.final_at?dtLocal(c.final_at):"";$("themeChampion").value=c.champion||"";}
+      $("themeTeamA").value=c.team_a||"";$("themeTeamB").value=c.team_b||"";$("themeFinalAt").value=c.final_at?dtLocal(c.final_at):"";$("themeChampion").value=c.champion||"";$("themeCountAt").value=c.count_at?dtLocal(c.count_at):"";$("themeCountLabel").value=c.count_label||"";}
     themePickRender();
     const fmt=iso=>new Date(iso).toLocaleString(undefined,{day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
     const L=c&&THEMES[c.name]?THEMES[c.name].label:"";
@@ -3146,6 +3209,7 @@ $("playersBody").innerHTML = shown.map(p =>
       if(!noEnd&&(isNaN(e0)||e0<=s0)){status("themeStatus","The end must be after the start.","error");return;}
       const v={name:themeSel,start:s0.toISOString(),end:noEnd?null:e0.toISOString()};
       const tx=$("themeText").value.trim();if(tx)v.text=tx;
+      if(themeSel!=="final"){const ca=$("themeCountAt").value,cl=$("themeCountLabel").value.trim();if(ca&&!isNaN(new Date(ca))){v.count_at=new Date(ca).toISOString();if(cl)v.count_label=cl;}}
       if(themeSel==="final"){const a=$("themeTeamA").value.trim(),b=$("themeTeamB").value.trim(),fa=$("themeFinalAt").value,ch=$("themeChampion").value.trim();
         if(a)v.team_a=a;if(b)v.team_b=b;if(fa&&!isNaN(new Date(fa)))v.final_at=new Date(fa).toISOString();if(ch)v.champion=ch;}
       await saveTheme(v,THEMES[themeSel].label+(noEnd?" saved. It stays on until you press End now.":" saved. Everyone sees it between these dates."));
@@ -3194,7 +3258,7 @@ $("playersBody").innerHTML = shown.map(p =>
   // ---- 1. Submit celebration ----
   function celebrateSubmit(pg,og){
     const win=pg>og,draw=pg===og,rm=fxRM();
-    const thK=curTheme(),thS=thK&&THEMES[thK].sub,thSub=thS?(win?thS.win:draw?thS.draw:thS.loss)||null:null;
+    const thK=curTheme(),thS=thK&&THEMES[thK].sub,thSub=thS?(win?thS.win:draw?thS.draw:thS.loss)||null:null,thDark=!!(thSub&&!win&&!draw&&(thK==="neon"||THEMES[thK].dark));
     const net='<g class="fx-net" stroke="#ffffff" stroke-opacity=".38" stroke-width="1.2">'
       +Array.from({length:13},(_,i)=>'<line x1="'+(40+i*18.3)+'" y1="34" x2="'+(52+i*16.5)+'" y2="128"/>').join("")
       +Array.from({length:6},(_,i)=>'<line x1="'+(40+i*2)+'" y1="'+(34+i*18.8)+'" x2="'+(260-i*2)+'" y2="'+(34+i*18.8)+'"/>').join("")+'</g>';
@@ -3206,11 +3270,12 @@ $("playersBody").innerHTML = shown.map(p =>
       +(rm?'<g transform="translate(168 96)">'+ball+'</g>':ball)+'</svg>';
     const tick='<svg class="fx-tick" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="42" fill="none" stroke="#ffffff22" stroke-width="6"/><circle class="fx-tick-c" cx="48" cy="48" r="42" fill="none" stroke="#f6b73c" stroke-width="6" stroke-linecap="round" pathLength="100"/><path class="fx-tick-p" d="M30 50 L43 62 L67 36" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" pathLength="100"/></svg>';
     const html='<div class="fx-sub-box'+(win?' win':'')+'">'
-      +(win?goal+fxConfetti(26,["#f6b73c","#ffffff","#13a46b","#7fb2ff"]):thSub&&thSub[0]==="WASTED"?'':tick)
-      +(thSub?'<h2 class="nn-mission th-mission'+(thSub[0]==="WASTED"?' wasted':'')+'">'+thSub[0]+'</h2>'+(thSub[1]?'<em class="nn-respect">'+thSub[1]+'</em>':''):'<h2>'+(win?'GOAL!':'Result sent')+'</h2>')
+      +(win?goal+fxConfetti(26,["#f6b73c","#ffffff","#13a46b","#7fb2ff"]):thDark?'':tick)
+      +(thS&&thS.pre&&!fxRM()?'<div class="th-pre" aria-hidden="true">'+thS.pre+'</div>':'')
+      +(thSub?'<h2 class="nn-mission th-mission'+(thDark?' wasted':'')+'">'+thSub[0]+'</h2>'+(thSub[1]?'<em class="nn-respect">'+thSub[1]+'</em>':''):'<h2>'+(win?'GOAL!':'Result sent')+'</h2>')
       +'<p><b>'+pg+' – '+og+'</b> '+(win?'win':draw?'draw':'result')+' submitted. It counts once an admin approves it.</p>'
       +'<button type="button" class="fx-btn" data-fx-close data-fx-focus>Done</button></div>';
-    fxOpen("fx-sub"+(thSub&&thSub[0]==="WASTED"?" nn-wasted":""),html,{autoMs:win?4200:2600,label:win?"Goal! Result submitted":"Result submitted"});
+    fxOpen("fx-sub"+(thDark?" nn-wasted":"")+(thK?" fxt-"+thK:""),html,{autoMs:win?4200:2600,label:win?"Goal! Result submitted":"Result submitted"});
   }
 
   // ---- 2. Player of the Month pack reveal ----
