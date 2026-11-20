@@ -3243,3 +3243,115 @@ html.theme-zombie .panel,html.theme-zombie .tn-card{border-color:#cfd5c6}
 html.theme-fighting .fxt-fighting .th-mission{animation:fx-pop .45s cubic-bezier(.2,1.4,.4,1) 1s both}
 html.theme-fighting .fxt-fighting .nn-respect{animation:fx-pop .4s ease-out 1.25s both}
 html.theme-fighting .fxt-fighting .fx-goal-svg,html.theme-fighting .fxt-fighting .fx-tick{animation:fx-up .3s ease-out .9s both}
+
+/* ===== Live Dhaka sky on the Home stadium (normal design only; themes keep their own) ===== */
+.sdm-orb .orb-glow{fill:url(#skySunG);opacity:.9}
+.sdm-orb .orb-core{fill:#fff4c2}
+.sdm-orb.moon .orb-glow{fill:url(#skyMoonG);opacity:.35}
+.sdm-orb.moon .orb-core{fill:#e9eefc}
+html.th-on .sdm-orb{display:none}
+html:not(.th-on) .home-hero.sdm-hero{transition:background .8s}
+html:not(.th-on) .home-hero.sdm-hero.sky-dawn{background:linear-gradient(180deg,#24336e 0%,#8a5a8e 38%,#e8897a 70%,#ffc994 100%)}
+html:not(.th-on) .home-hero.sdm-hero.sky-day{background:linear-gradient(180deg,#1f6fcf 0%,#4f9ce6 45%,#9fd0f4 100%)}
+html:not(.th-on) .home-hero.sdm-hero.sky-golden{background:linear-gradient(180deg,#2a3a7a 0%,#a8587a 40%,#f0835a 72%,#ffc061 100%)}
+html:not(.th-on) .home-hero.sdm-hero.sky-dusk{background:linear-gradient(180deg,#0d1640 0%,#33296a 45%,#8a4a78 80%,#c86a6a 100%)}
+html:not(.th-on) .home-hero.sdm-hero.sky-day:after{background:linear-gradient(90deg,#0b2a5ad9 0%,#0b2a5a73 40%,transparent 72%)}
+html:not(.th-on) .home-hero.sdm-hero.sky-dawn:after,html:not(.th-on) .home-hero.sdm-hero.sky-golden:after{background:linear-gradient(90deg,#1a1a4ad9 0%,#1a1a4a73 40%,transparent 72%)}
+.sdm-stars{transition:opacity 1s}
+html:not(.th-on) .sky-day .sdm-stars{opacity:0}
+html:not(.th-on) .sky-dawn .sdm-stars,html:not(.th-on) .sky-golden .sdm-stars{opacity:.12}
+html:not(.th-on) .sky-dusk .sdm-stars{opacity:.35}
+/* floodlights: off in daylight, warming up at sunset, full at night */
+html:not(.th-on) .sky-day .sdm-beams{animation:none;opacity:0}
+html:not(.th-on) .sky-day .sdm-lamps{animation:none;fill:#c9d2e3;opacity:.75}
+html:not(.th-on) .sky-dawn .sdm-beams{animation:none;opacity:.25}
+html:not(.th-on) .sky-golden .sdm-beams{animation:none;opacity:.55}
+html:not(.th-on) .sky-day #stStand stop:first-child{stop-color:#3b5fae}html:not(.th-on) .sky-day #stStand stop:last-child{stop-color:#1c356f}
+html:not(.th-on) .sky-day #stGrass stop:first-child{stop-color:#169a5e}html:not(.th-on) .sky-day #stGrass stop:last-child{stop-color:#3fd18d}
+
+/* ===== Parallax depth on Home ===== */
+:root{--sy:0}
+.home-hero .sdm-stars{translate:0 calc(var(--sy) * .2px)}
+.home-hero .sdm-orb{translate:0 calc(var(--sy) * .28px)}
+.home-hero .sdm-beams,.home-hero .sdm-lamps{translate:0 calc(var(--sy) * .1px)}
+.home-hero .home-hero-copy{translate:0 calc(var(--sy) * -.05px)}
+.sbg .sbg-num{translate:0 calc(var(--sy) * -.16px)}
+.sbg>g{translate:0 calc(var(--sy) * -.06px)}
+.sbg>text:not(.sbg-num){translate:0 calc(var(--sy) * -.1px)}
+.nn-bg .nn-sun{translate:0 calc(var(--sy) * .14px)}
+.nn-bg .nn-city,.nn-bg .nn-win{translate:0 calc(var(--sy) * -.03px)}
+.nn-bg .nn-palms{translate:0 calc(var(--sy) * -.12px)}
+.th-bg>svg{translate:0 calc(var(--sy) * -.05px)}
+.th-bg>svg,.nn-bg svg{height:110%!important}
+
+/* ===== 3D foil cards ===== */
+.pc.holo{touch-action:pan-y}
+.pc.holo .pc-flipper{transition:transform .18s ease-out}
+.pc.holo .pc-front:before,.fx-card.holo .fx-front:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:4;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%),#ffffffa0,transparent 42%),
+    linear-gradient(125deg,transparent 15%,#ff7ab3 30%,#ffe48f 40%,#7fe3ff 52%,#b993ff 64%,#ff7ab3 76%,transparent 90%);
+  background-size:100% 100%,260% 260%;background-position:center,var(--mx,50%) var(--my,50%);
+  mix-blend-mode:color-dodge;opacity:calc(.12 + var(--hl,0) * .5);transition:opacity .25s}
+.pc.holo:not(.tier-icon) .pc-front:before{mix-blend-mode:overlay;opacity:calc(.18 + var(--hl,0) * .6)}
+.fx-card.holo{perspective:1100px}
+.fx-pk.done .fx-card.holo .fx-inner{transform:rotateY(calc(180deg + var(--ry,0deg))) rotateX(var(--rx,0deg));transition:transform .18s ease-out}
+.fx-card.holo{touch-action:pan-y}
+@media(hover:none){.pc.holo .pc-front:before{animation:holo-idle 6s ease-in-out infinite}}
+@keyframes holo-idle{0%,100%{background-position:center,20% 30%}50%{background-position:center,80% 70%}}
+@media(prefers-reduced-motion:reduce){.pc.holo .pc-front:before{animation:none}}
+
+/* ===== Attribute hexagon ===== */
+.pf-hex{--hc:#5d6b84}
+.pf-hex.tier-gold{--hc:#d29a12}.pf-hex.tier-silver{--hc:#6f7d99}.pf-hex.tier-bronze{--hc:#b8743c}.pf-hex.tier-icon{--hc:#2f56c9}.pf-hex.tier-rookie{--hc:#3c7be0}
+.hx-wrap{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:22px;align-items:center}
+.hx{width:100%;height:auto;overflow:visible}
+.hx-grid polygon{fill:none;stroke:#c9d3e6;stroke-width:1.2}.hx-grid polygon:first-child{fill:#f4f7fc;stroke:#aab6cc}
+.hx-grid line{stroke:#d7deeb;stroke-width:1}
+.hx-shape{fill:var(--hc);fill-opacity:.28;stroke:var(--hc);stroke-width:3;stroke-linejoin:round;transform-origin:150px 150px;transform:scale(0);transition:transform .9s cubic-bezier(.2,.9,.3,1.15)}
+.pf-hex.in .hx-shape{transform:scale(1)}
+.hx-dot{fill:#fff;stroke:var(--hc);stroke-width:3;opacity:0;transition:opacity .3s;transition-delay:calc(.6s + var(--i) * 70ms)}
+.pf-hex.in .hx-dot{opacity:1}
+.hx-k{font:800 13px var(--display);fill:#5b6782}
+.hx-v{font:800 16px var(--display);fill:var(--ink)}
+.hx-l{opacity:0;transition:opacity .3s;transition-delay:calc(.2s + var(--i) * 60ms)}.pf-hex.in .hx-l{opacity:1}
+.hx-list{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.hx-list li{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;font-size:14px}
+.hx-list b{font:800 16px var(--display)}
+.hx-list i{grid-column:1/-1;height:6px;border-radius:6px;background:#e8edf5;overflow:hidden;position:relative}
+.hx-list i:after{content:"";position:absolute;inset:0;width:calc(var(--v) * 1%);background:var(--hc);border-radius:6px;transform:scaleX(0);transform-origin:left;transition:transform .8s cubic-bezier(.2,.8,.2,1) .4s}
+.pf-hex.in .hx-list i:after{transform:scaleX(1)}
+@media(max-width:680px){.hx-wrap{grid-template-columns:1fr}.hx{max-width:320px;margin:0 auto}}
+@media(prefers-reduced-motion:reduce){.hx-shape,.hx-dot,.hx-l,.hx-list i:after{transition:none}.hx-shape{transform:none}.hx-dot,.hx-l{opacity:1}.hx-list i:after{transform:none}}
+
+/* ===== Page transitions ===== */
+.topbar{view-transition-name:topbar}
+.tabbar{view-transition-name:tabbar}
+::view-transition-group(topbar),::view-transition-group(tabbar){animation:none}
+::view-transition-old(root){animation:vt-out .2s ease-in both}
+::view-transition-new(root){animation:vt-in .34s cubic-bezier(.2,.8,.2,1) both}
+@keyframes vt-out{to{opacity:0;transform:translateY(-6px)}}
+@keyframes vt-in{from{opacity:0;transform:translateY(14px)}}
+::view-transition-group(pv-photo){animation-duration:.5s;animation-timing-function:cubic-bezier(.2,.8,.2,1);z-index:50}
+::view-transition-old(pv-photo),::view-transition-new(pv-photo){border-radius:50%;overflow:hidden}
+
+/* ===== TV results ticker ===== */
+.home-ticker{border-radius:12px;background:linear-gradient(90deg,#050b1c,#0b1838 50%,#050b1c);border:1px solid #ffffff12;box-shadow:0 12px 28px #0a183a33}
+.tk-tag{display:flex;align-items:center;gap:8px;padding:0 24px 0 14px;clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,0 100%);font-size:13px}
+.tk-tag small{font:700 11px Inter,system-ui,sans-serif;opacity:.7;text-transform:none;letter-spacing:0}
+.tk-live{width:8px;height:8px;border-radius:50%;background:#e0283c;box-shadow:0 0 0 0 #e0283c88;animation:tk-pulse 1.6s ease-out infinite}
+@keyframes tk-pulse{70%{box-shadow:0 0 0 8px #e0283c00}100%{box-shadow:0 0 0 0 #e0283c00}}
+.tk-move{animation-duration:var(--dur,50s)!important;gap:22px;align-items:center}
+.tk-ft{font:800 10px var(--display);font-style:normal;letter-spacing:.06em;padding:2px 6px;border-radius:5px;border:1px solid #ffffff33;color:#aebbd6}
+.tk-ft.fact{border-color:var(--flood);color:var(--flood)}
+.tk-i.new .tk-ft{background:#e0283c;border-color:#e0283c;color:#fff;animation:tk-new 1s ease-in-out 4}
+@keyframes tk-new{50%{opacity:.4}}
+.tk-fact{color:#c5d1e9}.tk-fact b.w{color:var(--flood)}
+.tk-sep{width:2px;height:16px;background:#ffffff22;transform:skewX(-18deg);flex:0 0 auto}
+@media(prefers-reduced-motion:reduce){.tk-live,.tk-i.new .tk-ft{animation:none}}
+/* holo: a narrow rainbow band that follows the tilt */
+.pc.holo .pc-front:before,.fx-card.holo .fx-front:before{
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%),#ffffff59,transparent 36%),
+    linear-gradient(115deg,transparent 30%,#ff5fa240 38%,#ffd85c48 44%,#4fe0ff48 50%,#a77bff40 56%,transparent 64%);
+  background-size:100% 100%,200% 200%;background-position:center,var(--mx,50%) var(--my,50%);mix-blend-mode:normal;opacity:calc(.55 + var(--hl,0) * .45)}
+.pc.holo:not(.tier-icon) .pc-front:before{mix-blend-mode:normal;opacity:calc(.55 + var(--hl,0) * .45)}
+.pf-hex.tier-silver{--hc:#4f6ea8}

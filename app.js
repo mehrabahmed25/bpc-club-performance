@@ -76,7 +76,27 @@
   function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
   function monthDate(v){return v ? v+"-01" : bdToday();}
   function prettyDate(v){if(!v)return "—";const d=new Date(v+"T12:00:00");return d.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"});}
+  // Smooth page transitions (View Transitions API), with a shared photo from list to profile
+  let vtPhoto=null,vtTarget=null;
   function showView(name,opts){
+    const cur=document.querySelector(".view:not(.hidden)");
+    const rm=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if(!document.startViewTransition||rm||document.hidden||(cur&&cur.id==="view-"+name)){vtPhoto=null;return showViewInner(name,opts);}
+    if(vtTarget===name)return;vtTarget=name;
+    const src=vtPhoto;vtPhoto=null;
+    if(src&&name==="player")src.style.viewTransitionName="pv-photo";
+    const t=document.startViewTransition(async()=>{
+      if(src)src.style.viewTransitionName="";
+      showViewInner(name,opts);
+      if(src&&name==="player"){
+        const dst=await new Promise(res=>{const t0=performance.now();(function look(){const el=document.querySelector("#view-player .pf-av");if(el)return res(el);if(performance.now()-t0>650)return res(null);requestAnimationFrame(look);})();});
+        if(dst)dst.style.viewTransitionName="pv-photo";
+      }
+    });
+    t.updateCallbackDone.catch(()=>{}).finally(()=>{vtTarget=null;});t.ready.catch(()=>{});
+    t.finished.finally(()=>{const d=document.querySelector("#view-player .pf-av");if(d)d.style.viewTransitionName="";}).catch(()=>{});
+  }
+  function showViewInner(name,opts){
     if(name==="account"&&state.session&&!state.recoveryMode)name="profile";
     if(name==="funds"&&!state.canAccessFunds){toast("BPC Funds is restricted to authorized accounts.");name="home";}
     if(name==="player"){const cur=document.querySelector(".view:not(.hidden)");if(cur&&cur.id!=="view-player")state.pfFrom=cur.id.replace("view-","");}
@@ -87,7 +107,7 @@
     $("nav").classList.remove("open");
     if(name!=="home")clipsPause();
     document.body.dataset.view=name;
-    if(name==="home"){maybeAutoPotm();loadHomeClips();loadHomeMatchday();loadPublicPoster();loadHomeTicker();loadHomeAuction();loadHomeTeam();loadHomeHouses();loadHomeStories();}
+    if(name==="home"){applySky();setTimeout(parallax,0);maybeAutoPotm();loadHomeClips();loadHomeMatchday();loadPublicPoster();loadHomeTicker();loadHomeAuction();loadHomeTeam();loadHomeHouses();loadHomeStories();}
     else { $("uclPosterSection").classList.add("hidden"); if(posterTimer){clearInterval(posterTimer);posterTimer=null;} }
     if(name==="leaderboard")loadLeaderboard();
     if(name==="h2h")loadH2hPage();
@@ -2592,7 +2612,7 @@ $("playersBody").innerHTML = shown.map(p =>
   function openPlayer(id){if(!id)return;state.viewPlayerId=id;pfScope={mode:"all",month:monthNow};showView("player");}
   document.addEventListener("click",e=>{
     const t=e.target.closest("[data-player]");
-    if(t&&t.dataset.player){e.preventDefault();openPlayer(t.dataset.player);}
+    if(t&&t.dataset.player){e.preventDefault();vtPhoto=t.querySelector("[data-av],.avatar,.av,.tm2-av,.tm2-mini,.pod-av,.lb-av")||null;openPlayer(t.dataset.player);}
   });
   $("pfBack").addEventListener("click",()=>showView(state.pfFrom||"leaderboard"));
   $("dbPublicProfile").addEventListener("click",()=>{if(state.player)openPlayer(state.player.id);});
@@ -2878,15 +2898,33 @@ $("playersBody").innerHTML = shown.map(p =>
     };
   }
   setTimeout(loadHomeMatchday,0);
+  let tkTimer=null,tkSeen=null;
   async function loadHomeTicker(){
     const box=$("homeTicker");if(!box||!client)return;
+    if(!tkTimer)tkTimer=setInterval(()=>{if(document.body.dataset.view==="home"&&!document.hidden)loadHomeTicker();},120e3);
     try{
       const {data}=await client.rpc("get_week_matches",{p_start:ymd(addDays(new Date(bdToday()+"T12:00:00"),-14)),p_end:bdToday()});
-      const rows=(data||[]).filter(m=>m.a_name&&m.b_name).slice(0,14);
-      if(!rows.length){box.classList.add("hidden");return;}
-      const item=m=>{const aw=m.a_goals>m.b_goals,bw=m.b_goals>m.a_goals;return '<span class="tk-i"><b class="'+(aw?'w':'')+'">'+esc(m.a_name)+'</b><em>'+m.a_goals+' – '+m.b_goals+'</em><b class="'+(bw?'w':'')+'">'+esc(m.b_name)+'</b></span>';};
-      const html=rows.map(item).join("");
-      box.innerHTML='<span class="tk-tag">Results</span><div class="tk-track"><div class="tk-move">'+html+html+'</div></div>';
+      const all=(data||[]).filter(m=>m.a_name&&m.b_name).sort((x,y)=>String(y.match_date).localeCompare(String(x.match_date)));
+      if(!all.length){box.classList.add("hidden");return;}
+      const rows=all.slice(0,14),first=n=>String(n).trim().split(/\s+/)[0];
+      // facts: current win streaks, biggest win, most goals
+      const res={},goals={};
+      all.slice().reverse().forEach(m=>{
+        [[m.a_id,m.a_name,m.a_goals,m.b_goals],[m.b_id,m.b_name,m.b_goals,m.a_goals]].forEach(([id,nm,f,a])=>{
+          if(!id)return;const r=res[id]||(res[id]={nm,streak:0});r.streak=f>a?r.streak+1:0;goals[id]=(goals[id]||{nm,g:0});goals[id].g+=Number(f)||0;});
+      });
+      const facts=[];
+      Object.values(res).filter(r=>r.streak>=3).sort((a,b)=>b.streak-a.streak).slice(0,3).forEach(r=>facts.push('<b class="w">'+esc(first(r.nm))+'</b> wins '+r.streak+' in a row'));
+      const big=all.slice().sort((x,y)=>Math.abs(y.a_goals-y.b_goals)-Math.abs(x.a_goals-x.b_goals))[0];
+      if(big&&Math.abs(big.a_goals-big.b_goals)>=4){const aw=big.a_goals>big.b_goals;facts.push('Biggest win: <b class="w">'+esc(first(aw?big.a_name:big.b_name))+'</b> '+Math.max(big.a_goals,big.b_goals)+'–'+Math.min(big.a_goals,big.b_goals)+' vs '+esc(first(aw?big.b_name:big.a_name)));}
+      const tg=Object.values(goals).sort((a,b)=>b.g-a.g)[0];if(tg&&tg.g>=10)facts.push('Top scorer, last 2 weeks: <b class="w">'+esc(first(tg.nm))+'</b> '+tg.g+' goals');
+      const fresh=tkSeen?new Set(rows.map(m=>m.match_id).filter(id=>!tkSeen.has(id))):new Set();
+      tkSeen=new Set(rows.map(m=>m.match_id));
+      const item=m=>{const aw=m.a_goals>m.b_goals,bw=m.b_goals>m.a_goals;return '<span class="tk-i'+(fresh.has(m.match_id)?' new':'')+'"><i class="tk-ft">'+(fresh.has(m.match_id)?'NEW':'FT')+'</i><b class="'+(aw?'w':'')+'">'+esc(m.a_name)+'</b><em>'+m.a_goals+' – '+m.b_goals+'</em><b class="'+(bw?'w':'')+'">'+esc(m.b_name)+'</b></span>';};
+      const mix=[];rows.forEach((m,k)=>{mix.push(item(m));if(k%3===2&&facts.length)mix.push('<span class="tk-i tk-fact"><i class="tk-ft fact">STAT</i>'+facts[(k/3|0)%facts.length]+'</span>');});
+      const html=mix.join('<span class="tk-sep" aria-hidden="true"></span>');
+      const clock=new Date().toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit",timeZone:"Asia/Dhaka"});
+      box.innerHTML='<span class="tk-tag"><i class="tk-live" aria-hidden="true"></i>Latest<small>'+clock+'</small></span><div class="tk-track"><div class="tk-move" style="--dur:'+Math.max(40,mix.length*6)+'s">'+html+'<span class="tk-sep" aria-hidden="true"></span>'+html+'</div></div>';
       box.classList.remove("hidden");
     }catch(e){console.warn(e);}
   }
@@ -2980,16 +3018,17 @@ $("playersBody").innerHTML = shown.map(p =>
     return '<section class="pf-card pf-wide"><h3>Player card <small>rated from counted matches</small></h3><div class="pc-wrap"><div class="pc tier-'+R.tier.k+(foil?' foil':'')+'" data-pc><div class="pc-flipper" aria-live="polite">'+front+back+'</div>'
       +'<button type="button" class="pc-flip" data-pc-flip aria-pressed="false">Flip card</button></div>'
       +'<div class="pc-how"><h4>How the card is rated</h4><ul><li><b>ATT</b> goals scored per match</li><li><b>DEF</b> goals conceded per match, fewer is better</li><li><b>WIN</b> win rate</li><li><b>FRM</b> points from the last 10 matches</li><li><b>EXP</b> matches played</li><li><b>CLT</b> results in one-goal matches</li></ul>'
-      +'<p>Bronze below 55, silver from 55, gold from 68, icon from 80. Rookies get a tier after 5 matches. Ratings move as matches are played.</p></div></div></section>';
+      +'<p>Bronze below 55, silver from 55, gold from 68, icon from 80. Rookies get a tier after 5 matches. Ratings move as matches are played.</p></div></div></section>'+hexHtml(R,me.display_name);
   }
   function bindPlayerCard(root){
+    bindHex(root);root.querySelectorAll("[data-pc]").forEach(tiltify);
+    bindPlayerCardFlip(root);
+  }
+  function bindPlayerCardFlip(root){
     root.querySelectorAll("[data-pc]").forEach(c=>{
       const btn=c.querySelector("[data-pc-flip]");
       btn.addEventListener("click",()=>{const on=c.classList.toggle("flipped");btn.setAttribute("aria-pressed",on?"true":"false");btn.textContent=on?"Flip back":"Flip card";});
-      if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion:reduce)").matches)return;
-      const fl=c.querySelector(".pc-flipper");
-      c.addEventListener("pointermove",e=>{if(e.pointerType==="touch")return;const r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;c.style.setProperty("--rx",(-y*8).toFixed(2)+"deg");c.style.setProperty("--ry",(x*10).toFixed(2)+"deg");c.style.setProperty("--mx",((x+.5)*100).toFixed(0)+"%");});
-      c.addEventListener("pointerleave",()=>{c.style.setProperty("--rx","0deg");c.style.setProperty("--ry","0deg");});
+
     });
   }
   function tierCardHtml(me,lbRow,st){
@@ -3225,6 +3264,101 @@ $("playersBody").innerHTML = shown.map(p =>
     });
   }
 
+  // ================= Live Dhaka sky on the Home stadium =================
+  function dhakaSun(){
+    const lat=23.8103*Math.PI/180,lng=90.4125,d=new Date(Date.now()+6*3600e3),y=d.getUTCFullYear(),doy=Math.floor((Date.UTC(y,d.getUTCMonth(),d.getUTCDate())-Date.UTC(y,0,0))/864e5);
+    const g=2*Math.PI/365*(doy-1),eq=229.18*(0.000075+0.001868*Math.cos(g)-0.032077*Math.sin(g)-0.014615*Math.cos(2*g)-0.040849*Math.sin(2*g));
+    const dec=0.006918-0.399912*Math.cos(g)+0.070257*Math.sin(g)-0.006758*Math.cos(2*g)+0.000907*Math.sin(2*g)-0.002697*Math.cos(3*g)+0.00148*Math.sin(3*g);
+    const noon=720-4*lng-eq+360,ha=Math.acos((Math.cos(90.833*Math.PI/180)-Math.sin(lat)*Math.sin(dec))/(Math.cos(lat)*Math.cos(dec)))*180/Math.PI*4;
+    return {rise:noon-ha,set:noon+ha,now:d.getUTCHours()*60+d.getUTCMinutes()+d.getUTCSeconds()/60};
+  }
+  function skyPhase(){
+    const {rise,set,now}=dhakaSun();
+    const p=now<rise-50||now>set+60?"night":now<rise+40?"dawn":now<set-70?"day":now<set-8?"golden":"dusk";
+    return {p,rise,set,now};
+  }
+  function applySky(){
+    const hero=document.querySelector(".home-hero.sdm-hero");if(!hero)return;
+    const q=window.__SKY||skyPhase(),art=hero.querySelector(".sdm-art");
+    ["night","dawn","day","golden","dusk"].forEach(k=>hero.classList.toggle("sky-"+k,q.p===k));
+    hero.dataset.sky=q.p;
+    if(!art)return;
+    let orb=art.querySelector(".sdm-orb");
+    const stars=art.querySelector('g[opacity=".55"]');if(stars)stars.classList.add("sdm-stars");
+    if(!orb){art.insertAdjacentHTML("afterbegin",'<defs><radialGradient id="skySunG"><stop offset="0" stop-color="#fff7d6"/><stop offset=".45" stop-color="#ffd36b"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient><radialGradient id="skyMoonG"><stop offset="0" stop-color="#f4f7ff"/><stop offset=".55" stop-color="#dfe6f7"/><stop offset="1" stop-color="#dfe6f7" stop-opacity="0"/></radialGradient></defs><g class="sdm-orb"><circle class="orb-glow" r="70"/><circle class="orb-core" r="24"/></g>');orb=art.querySelector(".sdm-orb");}
+    // sun travels rise->set, moon set->rise; arc across the sky
+    const night=q.now<q.rise||q.now>q.set;
+    let t;if(!night)t=(q.now-q.rise)/(q.set-q.rise);else{const len=1440-(q.set-q.rise);t=((q.now-q.set+1440)%1440)/len;}
+    const x=1150-t*1100,y=150-Math.sin(Math.PI*t)*130;
+    orb.setAttribute("transform","translate("+x.toFixed(1)+" "+y.toFixed(1)+")");
+    orb.classList.toggle("moon",night);
+  }
+  setInterval(applySky,5*60e3);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)applySky();});
+
+  // ================= Parallax depth on Home =================
+  let pxRaf=0;
+  function parallax(){
+    pxRaf=0;
+    const on=document.body.dataset.view==="home"&&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+    document.documentElement.style.setProperty("--sy",on?Math.min(1600,window.scrollY).toFixed(0):"0");
+  }
+  window.addEventListener("scroll",()=>{if(!pxRaf)pxRaf=requestAnimationFrame(parallax);},{passive:true});
+
+  // ================= 3D foil tilt (mouse, touch drag and phone motion) =================
+  const tiltCards=new Set();let tiltMotion=false;
+  function tiltSet(el,x,y){ // x,y in -0.5..0.5
+    el.style.setProperty("--rx",(-y*14).toFixed(2)+"deg");el.style.setProperty("--ry",(x*18).toFixed(2)+"deg");
+    el.style.setProperty("--mx",(50+x*90).toFixed(1)+"%");el.style.setProperty("--my",(50+y*90).toFixed(1)+"%");
+    el.style.setProperty("--hl",Math.min(1,Math.hypot(x,y)*2.2).toFixed(2));
+  }
+  function tiltify(el){
+    if(!el||el.dataset.tilt)return;el.dataset.tilt="1";el.classList.add("holo");
+    if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+    tiltCards.add(el);
+    el.addEventListener("pointermove",e=>{if(e.pointerType==="touch"&&tiltMotion)return;const r=el.getBoundingClientRect();tiltSet(el,(e.clientX-r.left)/r.width-.5,(e.clientY-r.top)/r.height-.5);});
+    el.addEventListener("pointerleave",()=>tiltSet(el,0,0));
+    el.addEventListener("pointerup",e=>{if(e.pointerType==="touch")setTimeout(()=>{if(!tiltMotion)tiltSet(el,0,0);},600);});
+    startTiltMotion(false);
+  }
+  function onOrient(e){
+    if(e.beta==null)return;tiltMotion=true;
+    const x=Math.max(-.5,Math.min(.5,(e.gamma||0)/40)),y=Math.max(-.5,Math.min(.5,((e.beta||0)-45)/40));
+    tiltCards.forEach(el=>{if(!el.isConnected){tiltCards.delete(el);return;}tiltSet(el,x,y);});
+  }
+  function startTiltMotion(fromTap){
+    if(startTiltMotion.on||!("DeviceOrientationEvent" in window))return;
+    const D=window.DeviceOrientationEvent;
+    if(typeof D.requestPermission==="function"){ // iPhone: needs a tap
+      if(!fromTap)return;
+      D.requestPermission().then(r=>{if(r==="granted"){startTiltMotion.on=true;window.addEventListener("deviceorientation",onOrient);}}).catch(()=>{});
+      return;
+    }
+    startTiltMotion.on=true;window.addEventListener("deviceorientation",onOrient);
+  }
+  document.addEventListener("click",e=>{if(e.target.closest(".holo"))startTiltMotion(true);});
+
+  // ================= Stat hexagon (FIFA style radar) =================
+  function hexHtml(R,name){
+    const cx=150,cy=150,rad=104,ang=i=>(-90+i*60)*Math.PI/180,pt=(i,f)=>[cx+Math.cos(ang(i))*rad*f,cy+Math.sin(ang(i))*rad*f];
+    const ring=f=>R.a.map((_,i)=>pt(i,f).map(v=>v.toFixed(1)).join(",")).join(" ");
+    const vals=R.a.map(x=>R.n?Math.max(.08,(x[1]-20)/79):0);
+    const poly=vals.map((f,i)=>pt(i,f).map(v=>v.toFixed(1)).join(",")).join(" ");
+    const NAMES={ATT:"Attack",DEF:"Defence",WIN:"Win rate",FRM:"Form",EXP:"Experience",CLT:"Clutch"};
+    const labels=R.a.map((x,i)=>{const p=pt(i,1.24);return '<g class="hx-l" style="--i:'+i+'"><text x="'+p[0].toFixed(1)+'" y="'+(p[1]-4).toFixed(1)+'" text-anchor="middle" class="hx-k">'+x[0]+'</text><text x="'+p[0].toFixed(1)+'" y="'+(p[1]+13).toFixed(1)+'" text-anchor="middle" class="hx-v">'+(R.n?x[1]:"–")+'</text></g>';}).join("");
+    return '<section class="pf-card pf-hex tier-'+R.tier.k+'"><h3>Attribute hexagon <small>'+(R.n?'overall '+R.ovr:'rated after 5 matches')+'</small></h3>'
+      +'<div class="hx-wrap"><svg class="hx" viewBox="-20 -10 340 330" role="img" aria-label="'+esc(name)+' attributes: '+R.a.map(x=>NAMES[x[0]]+' '+(R.n?x[1]:'unrated')).join(", ")+'">'
+      +'<g class="hx-grid">'+[1,.75,.5,.25].map(f=>'<polygon points="'+ring(f)+'"/>').join("")+R.a.map((_,i)=>{const p=pt(i,1);return '<line x1="'+cx+'" y1="'+cy+'" x2="'+p[0].toFixed(1)+'" y2="'+p[1].toFixed(1)+'"/>';}).join("")+'</g>'
+      +'<polygon class="hx-shape" points="'+poly+'"/>'+vals.map((f,i)=>{const p=pt(i,f);return '<circle class="hx-dot" style="--i:'+i+'" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="4.5"/>';}).join("")
+      +labels+'</svg>'
+      +'<ul class="hx-list">'+R.a.map(x=>'<li><span>'+NAMES[x[0]]+'</span><b>'+(R.n?x[1]:"–")+'</b><i style="--v:'+(R.n?x[1]:0)+'"></i></li>').join("")+'</ul></div></section>';
+  }
+  function bindHex(root){
+    const h=root.querySelector(".pf-hex");if(!h)return;
+    if(!("IntersectionObserver" in window)){h.classList.add("in");return;}
+    const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){h.classList.add("in");io.disconnect();}},{threshold:.3});io.observe(h);
+  }
+
   // ================= Moments: Player of the Month reveal, submit celebration, badge unlocks =================
   const fxRM=()=>!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
   function fxOpen(cls,html,opt){
@@ -3320,13 +3454,13 @@ $("playersBody").innerHTML = shown.map(p =>
     const open=()=>{
       if(opened)return;opened=true;if(auto)clearTimeout(auto);
       card.setAttribute("aria-label",p.player_name+", overall "+(R.n?R.ovr:"unrated")+", "+R.tier.n);
-      if(rm){stage.classList.add("s3","done");return;}
+      if(rm){stage.classList.add("s3","done");tiltify(card);return;}
       stage.classList.add("s2");
       setTimeout(()=>{stage.classList.add("s3");el.querySelector(".fx-conf-slot").innerHTML=fxConfetti(40,[col[0],col[1],"#ffffff","#f6b73c"]);
         const b=el.querySelector("[data-ovr]"),to=Number(b.dataset.ovr)||0,t0=performance.now();
         if(to){const step=t=>{const k=Math.min(1,(t-t0)/900);b.textContent=Math.round(to*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
       },rm?0:900);
-      setTimeout(()=>{stage.classList.add("done");const v=el.querySelector("[data-fx-profile]");if(v)v.focus({preventScroll:true});},1900);
+      setTimeout(()=>{stage.classList.add("done");tiltify(card);const v=el.querySelector("[data-fx-profile]");if(v)v.focus({preventScroll:true});},1900);
     };
     card.addEventListener("click",open);
     card.focus({preventScroll:true});
