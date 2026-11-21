@@ -3790,13 +3790,15 @@ $("playersBody").innerHTML = shown.map(p =>
     const none=f.boards.length?'':'<div class="tn-empty">Boards appear once both teams have a full squad.</div>';
     let cards='';
     if(f.final){
-      const ws=f.winner_side,wname=ws==="a"?o.a:o.b;
-      const elig=f.boards.filter(b=>b.status==="approved"&&!b.wo_side).map(b=>({id:b[ws].id,name:b[ws].name,line:'Board '+b.board_no+': '+(ws==="a"?b.score_a+'–'+b.score_b:b.score_b+'–'+b.score_a)+' v '+(ws==="a"?b.b.name:b.a.name)}));
+      const ws=f.winner_side,dr=!ws,wname=ws==="a"?o.a:ws==="b"?o.b:"";
+      const line=(b,sd)=>'Board '+b.board_no+': '+(sd==="a"?b.score_a+'–'+b.score_b:b.score_b+'–'+b.score_a)+' v '+(sd==="a"?b.b.name:b.a.name);
+      const elig=[];f.boards.filter(b=>b.status==="approved"&&!b.wo_side).forEach(b=>{(dr?["a","b"]:[ws]).forEach(sd=>{if(b[sd]&&b[sd].id)elig.push({id:b[sd].id,name:b[sd].name,line:(dr?(sd==="a"?o.a:o.b)+' · ':'')+line(b,sd)});});});
+      const moTeam=f.motm?(f.motm.side==="a"?o.a:f.motm.side==="b"?o.b:wname):wname;
       const until=f.motm_deadline?when(f.motm_deadline):'';
       let mo;
-      if(f.motm)mo='<div class="tx-motm-set"><span class="tx-motm-star" aria-hidden="true">&#9733;</span><div><small>Man of the Match</small><b>'+esc(f.motm.name)+'</b><small>'+esc(wname)+(f.motm.by_admin?' · chosen by an admin':' · chosen by the captain')+'</small></div></div>';
-      else if(!elig.length)mo='<p class="small">No MOTM for this fixture: no '+esc(wname)+' player played a board.</p>';
-      else mo='<p class="small">'+(f.can_pick_motm&&!f.admin?'You won. Choose your Man of the Match from your players before '+esc(until)+'. The choice is final.':f.can_pick_motm?'Admins can choose or change the MOTM at any time.':'Waiting for the '+esc(wname)+' captain to choose the MOTM'+(until?' (until '+esc(until)+', then an admin chooses)':'')+'.')+'</p>';
+      if(f.motm)mo='<div class="tx-motm-set"><span class="tx-motm-star" aria-hidden="true">&#9733;</span><div><small>Man of the Match</small><b>'+esc(f.motm.name)+'</b><small>'+esc(moTeam)+(f.motm.by_admin?' · chosen by an admin':' · chosen by the captain')+'</small></div></div>';
+      else if(!elig.length)mo='<p class="small">No MOTM for this fixture: no '+(dr?'':esc(wname)+' ')+'player played a board.</p>';
+      else mo='<p class="small">'+(f.can_pick_motm&&!f.admin?(dr?'It finished level. Either captain can choose the Man of the Match from both teams before '+esc(until)+'. The first choice is final.':'You won. Choose your Man of the Match from your players before '+esc(until)+'. The choice is final.'):f.can_pick_motm?'Admins can choose or change the MOTM at any time.':(dr?'It finished level. Waiting for either captain to choose the MOTM':'Waiting for the '+esc(wname)+' captain to choose the MOTM')+(until?' (until '+esc(until)+', then an admin chooses)':'')+'.')+'</p>';
       if(f.can_pick_motm&&elig.length)mo+='<div class="tx-motm-pick" data-motm-form="'+esc(m.id)+'">'+elig.map((x,i)=>'<label class="tx-motm-opt"><input type="radio" name="motm-'+esc(m.id)+'" value="'+esc(x.id)+'"'+(f.motm&&f.motm.member_id===x.id?' checked':'')+'><span><b>'+esc(x.name)+'</b><small>'+esc(x.line)+'</small></span></label>').join("")+'<button type="button" class="primary" data-motm-go="'+esc(m.id)+'">'+(f.motm?'Change MOTM':'Confirm MOTM')+'</button></div>';
       cards='<section class="tx-cards"><h4>Match cards</h4>'+mo+'<div class="tn-actions"><button type="button" class="secondary" data-card-result="'+esc(m.id)+'">Result card</button>'+(f.motm?'<button type="button" class="secondary" data-card-motm="'+esc(m.id)+'">MOTM card</button>':'')+'</div></section>';
     }
@@ -3833,11 +3835,11 @@ $("playersBody").innerHTML = shown.map(p =>
     const tx=[230,850];
     [[D.a,true,D.aw],[D.b,false,D.bw]].forEach(([nm,home,won],i)=>{
       cardMono(c,tx[i],300,108,nm);
-      c.fillStyle=won?"#fff":"#c3cde4";cardFit(c,nm,380,46,"800",disp);c.textAlign="center";c.fillText(nm,tx[i],470);
+      c.fillStyle=(won||(!D.aw&&!D.bw))?"#fff":"#c3cde4";cardFit(c,nm,380,46,"800",disp);c.textAlign="center";c.fillText(nm,tx[i],470);
       if(home){c.fillStyle="#f6b73c";rrect(c,tx[i]-56,492,112,40,20);c.fill();c.fillStyle="#1a1200";c.font="800 22px "+disp;c.textBaseline="middle";c.fillText("HOME",tx[i],513);c.textBaseline="alphabetic";}
     });
     c.fillStyle="#fff";c.font="800 170px "+disp;c.textAlign="center";c.fillText(D.ga+"–"+D.gb,W/2,360);
-    c.fillStyle="#9fb0d4";c.font="600 26px "+body;c.fillText("games",W/2,402);
+    c.fillStyle="#9fb0d4";c.font="600 26px "+body;c.fillText(!D.aw&&!D.bw?"games  ·  draw":"games",W/2,402);
     // boards
     const top=600,rowH=150;
     c.fillStyle="rgba(255,255,255,.06)";rrect(c,60,top-30,W-120,rowH*D.boards.length+60,34);c.fill();
@@ -3917,7 +3919,7 @@ $("playersBody").innerHTML = shown.map(p =>
         await presentCard(drawTrioResult(D),"bpc-trio-r"+m.round_number+"-"+slug(a)+"-v-"+slug(b)+".png","Result card: "+a+" v "+b);
       }else{
         if(!f.motm)return;
-        const ws=f.winner_side,bd=f.boards.find(x=>x[ws].id===f.motm.member_id);
+        const ws=f.motm.side||f.winner_side,bd=f.boards.find(x=>x[ws]&&x[ws].id===f.motm.member_id);
         const opp=bd?(ws==="a"?bd.b.name:bd.a.name):"",my=bd?(ws==="a"?bd.score_a:bd.score_b):"",th=bd?(ws==="a"?bd.score_b:bd.score_a):"";
         const D={title:ctx.t.name,round:m.round_number,name:f.motm.name,team:ws==="a"?a:b,board:bd?bd.board_no:"",line:bd?my+"–"+th+" v "+opp:"",fixture:a+" "+m.score_a+"–"+m.score_b+" "+b,when:whenTxt};
         await ensureAvatars();
