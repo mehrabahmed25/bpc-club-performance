@@ -1282,6 +1282,7 @@ $("playersBody").innerHTML = shown.map(p =>
     '<td>' + prettyDate(p.created_at?.slice(0, 10)) + '</td>' +
     '<td class="player-actions">' +
       '<button type="button" class="recovery-btn" data-recover="' + esc(p.id) + '">Recover Account</button> ' +
+      (p.removed_at ? '' : '<button type="button" class="recovery-btn" data-rename="' + esc(p.id) + '">Rename</button> ') +
       (p.removed_at
         ? '<button type="button" class="recovery-btn" data-restore="' + esc(p.id) + '">Restore</button>'
         : (p.user_id === state.session?.user?.id ? '' : '<button type="button" class="recovery-btn danger-btn" data-remove="' + esc(p.id) + '">Remove</button>')) +
@@ -1290,6 +1291,9 @@ $("playersBody").innerHTML = shown.map(p =>
 ).join("") || '<tr><td colspan="4" class="small">No players yet.</td></tr>';
     $("playersBody").querySelectorAll("[data-recover]").forEach(button=>{
       button.onclick=()=>recoverPlayerAccount(button.dataset.recover,button);
+    });
+    $("playersBody").querySelectorAll("[data-rename]").forEach(button=>{
+      button.onclick=()=>startRename(button.dataset.rename,button);
     });
     $("playersBody").querySelectorAll("[data-remove]").forEach(button=>{
       button.onclick=()=>setPlayerRemoved(button.dataset.remove,true,button);
@@ -1300,6 +1304,34 @@ $("playersBody").innerHTML = shown.map(p =>
   }
 
   var showRemovedPlayers=false;
+  function startRename(playerId,button){
+    if(!state.isAdmin||!state.session)return;
+    const tr=button.closest("tr"),cell=tr&&tr.querySelector("td");if(!cell||cell.querySelector(".rn-form"))return;
+    const old=cell.textContent.trim();
+    cell.innerHTML='<form class="rn-form"><label class="sr-only" for="rn-'+esc(playerId)+'">New name for '+esc(old)+'</label><input id="rn-'+esc(playerId)+'" maxlength="40" value="'+esc(old)+'" autocomplete="off"><div class="rn-acts"><button type="submit" class="primary">Save</button><button type="button" class="secondary" data-rn-cancel>Cancel</button></div><small class="rn-msg" role="status"></small></form>';
+    const f=cell.querySelector("form"),inp=f.querySelector("input"),msg=f.querySelector(".rn-msg");
+    inp.focus();inp.select();
+    const restore=()=>{cell.textContent=old;};
+    f.querySelector("[data-rn-cancel]").onclick=restore;
+    inp.addEventListener("keydown",e=>{if(e.key==="Escape")restore();});
+    f.addEventListener("submit",async e=>{
+      e.preventDefault();
+      const nn=inp.value.trim();if(!nn||nn===old){restore();return;}
+      const btns=f.querySelectorAll("button");btns.forEach(b=>b.disabled=true);msg.textContent="Checking…";
+      const dry=await client.rpc("admin_rename_member",{p_player_id:playerId,p_new_name:nn,p_apply:false});
+      if(dry.error){msg.textContent=dry.error.message;msg.classList.add("bad");btns.forEach(b=>b.disabled=false);return;}
+      const d=dry.data,n=Number(d.matches)||0;
+      if(!confirm("Rename “"+d.old+"” to “"+d.new+"”?\n\n"+(n?n+" past match"+(n===1?"":"es")+" where they were the opponent will move to the new name, so their history stays linked.":"No past matches need updating.")+"\n\nTheir profile, the leaderboard and every list will show the new name.")){btns.forEach(b=>b.disabled=false);msg.textContent="";return;}
+      msg.textContent="Renaming…";
+      const r=await client.rpc("admin_rename_member",{p_player_id:playerId,p_new_name:nn,p_apply:true});
+      if(r.error){msg.textContent=r.error.message;msg.classList.add("bad");btns.forEach(b=>b.disabled=false);return;}
+      toast("Renamed to "+r.data.new+".");
+      status("adminStatus","“"+r.data.old+"” is now “"+r.data.new+"”"+(n?". "+n+" past match"+(n===1?"":"es")+" updated.":"."),"success");
+      if(state.player&&state.player.id===playerId)state.player.display_name=r.data.new;
+      try{if(typeof loadMembers==="function")await loadMembers();}catch(err){}
+      loadAdmin();
+    });
+  }
   async function setPlayerRemoved(playerId,remove,button){
     if(!state.isAdmin||!state.session)return;
     const name=button.closest("tr")?.querySelector("td")?.textContent?.trim()||"this player";

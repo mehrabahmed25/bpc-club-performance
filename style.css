@@ -3355,3 +3355,9 @@ html:not(.th-on) .sky-day #stGrass stop:first-child{stop-color:#169a5e}html:not(
   background-size:100% 100%,200% 200%;background-position:center,var(--mx,50%) var(--my,50%);mix-blend-mode:normal;opacity:calc(.55 + var(--hl,0) * .45)}
 .pc.holo:not(.tier-icon) .pc-front:before{mix-blend-mode:normal;opacity:calc(.55 + var(--hl,0) * .45)}
 .pf-hex.tier-silver{--hc:#4f6ea8}
+
+/* admin rename */
+.rn-form{display:grid;gap:6px;min-width:220px}
+.rn-form input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font:inherit}
+.rn-acts{display:flex;gap:6px}.rn-acts button{padding:6px 12px;font-size:13px}
+.rn-msg{font-size:12px;color:var(--muted)}.rn-msg.bad{color:#b42332}
